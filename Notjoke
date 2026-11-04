@@ -1,28 +1,50 @@
 --[[
-    🔮 PHANTOM OS v4 — AI Anti-Bully Moderation Suite (Mobile Optimized)
-    Tabs: Live Mod | Strikes | Appeals | AI Chat
-    Free AI auto-fallback: OpenRouter (key) -> Pollinations (no key)
-    AI Chat commands: /help /add /white /stats /reset
+    🔮 PHANTOM OS v5 — AI Anti-Bully / Anti-Spam Moderation Suite (Mobile)
+    Tabs: Live Mod | Strikes | Reports | AI Chat
+    AI providers (auto rotation + fallback):
+      Groq (free key) > Gemini (free key) > OpenRouter (free key) > Pollinations (no key)
+    AI Chat commands: /help /add /white /stats /reset /refresh
 ]]
 
-local AI_API_KEY = "PUT_KEY_HERE"
+-- ===== OPTIONAL FREE API KEYS (leave PUT_KEY_HERE to skip) =====
+local GROQ_KEY = "PUT_KEY_HERE"   -- free: console.groq.com (30 req/min, 14,400/day on 8B)
+local GROQ_MODEL = "llama-3.1-8b-instant"
+local GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+local GEMINI_KEY = "PUT_KEY_HERE" -- free: aistudio.google.com/apikey
+local GEMINI_MODEL = "gemini-2.5-flash"
+local GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+
+local AI_API_KEY = "PUT_KEY_HERE" -- OpenRouter key (free model below)
 local AI_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 local AI_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-local USE_FREE_FALLBACK = true
+local USE_FREE_FALLBACK = true    -- keyless Pollinations
 local POLLI_URL = "https://text.pollinations.ai/openai"
 local POLLI_MODEL = "openai"
 
 local CFG = {
-    AI_CONFIRM_STRONG = false, -- true = AI also double-checks clear low-severity hits (slower)
+    AI_CONFIRM_STRONG = false, -- true = AI also double-checks clear low-severity hits
     STRIKE_ALERT = 3,          -- alert + auto-copy evidence at this many strikes (then every +3)
-    AUTO_COPY_EVIDENCE = true, -- auto copy evidence to clipboard on repeat offender / severity 5
-    WORKERS = 2,               -- parallel AI checks
+    AUTO_COPY_EVIDENCE = true, -- auto copy on repeat offender / severity 5
+    WORKERS = 2,
     QUEUE_MAX = 8,
     CONTEXT_LINES = 4,
-    LEARN_VOTES = 2,           -- AI confirmations before a new word is learned
-    TAG_LEARN_VOTES = 2,       -- times Roblox must tag a word before it is learned
+    LEARN_VOTES = 2,
+    TAG_LEARN_VOTES = 2,
     SAVE_FILE = "PhantomOS_data.json",
+
+    -- Internet lists (downloaded at start, cached)
+    REMOTE_ENABLED = true,
+    REMOTE_REFRESH_HOURS = 24,
+    REMOTE_CACHE = "PhantomOS_remote.json",
+    REMOTE_WORD_URLS = {
+        "https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en",
+        "https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/hi",
+    },
+    REMOTE_PHRASE_URLS = {
+        -- add raw .txt URLs here: one spam/scam phrase per line (e.g. your own GitHub raw list)
+    },
 }
 
 -- ============================== SERVICES ==============================
@@ -156,6 +178,10 @@ local function countKeys(t)
         n += 1
     end
     return n
+end
+
+local function hasKey(k)
+    return type(k) == "string" and k ~= "" and k ~= "PUT_KEY_HERE"
 end
 
 -- ============================== GUI ROOT ==============================
@@ -299,7 +325,7 @@ local content = create("Frame", {
     ClipsDescendants = true,
 }, main)
 
-local tabNames = { "Live Mod", "Strikes", "Appeals", "AI Chat" }
+local tabNames = { "Live Mod", "Strikes", "Reports", "AI Chat" }
 local pages, tabButtons = {}, {}
 
 local function selectTab(name)
@@ -438,7 +464,6 @@ local function skeleton(t)
     return s
 end
 
--- Merges runs of 3+ single letters ("t m c" / "c h u d a") into one token
 local function tokenize(norm)
     local raw = {}
     for t in norm:gmatch("%a+") do
@@ -486,11 +511,9 @@ local GROUPS = {
         "=lodu", "jhaatu", "jhatu", "=jhant", "=jhaant", "=tatti", "=chinal", "=chinaal", "=hijra", "=hijda",
         "madarjat",
     } },
-    -- abbreviations of "teri maa ki ..." style abuse: flagged, then AI confirms from context
     { cat = "hindi", sev = 3, ambig = true, list = {
         "=tmc", "=tmkc", "=tmb", "=tmx", "=tmkb", "=tmkx", "=tmsb", "=bkc", "=mcbc", "=bcmc", "=mkb",
     } },
-    -- evasion spellings / words with innocent meanings (cud, chod = leave, bc = because, mc = Minecraft)
     { cat = "hindi", sev = 2, ambig = true, list = {
         "=cud", "=cuda", "=chud", "=chuda", "=chudai", "=cudai", "=chod", "=choda", "=chodu", "=chodna",
         "=chudna", "=bc", "=mc", "=chudo", "=cudo",
@@ -516,21 +539,32 @@ local GROUPS = {
     } },
 }
 
+-- Spam / scam-script patterns (plain text, checked on the raw lowercased message)
+local SCAM_PATTERNS = {
+    { "loadstring", "scam", 4 }, { "httpget", "scam", 4 }, { "pastebin.com", "scam", 3 },
+    { "discord.gg/", "offsite", 2 }, { "discord.com/invite", "offsite", 2 }, { "dsc.gg/", "offsite", 2 },
+    { "t.me/", "offsite", 2 }, { "bit.ly/", "offsite", 2 }, { "tinyurl.com", "offsite", 2 },
+}
+local SCRIPT_WORDS = { "script", "exploit", "executor", "hack", "cheat", "aimbot", "injector" }
+local PUSH_WORDS = { "free", "download", "dm me", "link in", "join my", "get it", "get the", "best ", "paste", "click" }
+local ROBUX_WORDS = { "robux", "rbx", "limiteds" }
+local GIFT_WORDS = { "free", "giveaway", "claim", "generator", "gift", "winner" }
+
 local REASONS = {
     profanity = "Roblox Community Standards – Civility and Respect / Terms of Use: Abusive and profane language in chat.",
     hindi = "Roblox Community Standards – Civility and Respect / Terms of Use: Abusive language (Hindi/Hinglish insults, abbreviations or evasion spellings) used to insult or harass other users.",
     sexual = "Roblox Community Standards – Sexual Content and Adult Material / Terms of Use: Sexual or adult content in chat.",
-    scam = "Roblox Community Standards – Fraud, Scams and Deceptive Practices / Terms of Use: Promotion of scams, free-Robux schemes, or exploit advertising.",
+    scam = "Roblox Community Standards – Fraud, Scams and Deceptive Practices / Terms of Use: Promotion of scams, free-Robux schemes, or exploit/script advertising.",
     harass = "Roblox Community Standards – Bullying and Harassment / Terms of Use: Targeted harassment or encouraging self-harm.",
     threat = "Roblox Community Standards – Threats and Violent Content / Terms of Use: Threats, doxxing or attacks against a user.",
     hate = "Roblox Community Standards – Hate Speech and Discrimination / Terms of Use: Use of discriminatory or hateful language.",
-    spam = "Roblox Community Standards – Spam and Disruptive Behavior / Terms of Use: Chat flooding or repeated message spam.",
+    spam = "Roblox Community Standards – Spam and Disruptive Behavior / Terms of Use: Chat flooding, copy-paste spam waves or symbol floods.",
+    offsite = "Roblox Community Standards – Off-Platform Communication / Terms of Use: Sharing off-platform invite links in chat.",
     filtered = "Roblox Community Standards – Civility and Respect / Terms of Use: Message was blocked/tagged (####) by Roblox's own chat filter as inappropriate.",
 }
 
-local VALID_CAT = { profanity = true, hindi = true, harass = true, hate = true, sexual = true, scam = true, threat = true, spam = true }
+local VALID_CAT = { profanity = true, hindi = true, harass = true, hate = true, sexual = true, scam = true, threat = true, spam = true, offsite = true }
 
--- Phrases that may hide an insult / grooming / off-platform push (sent to AI, not auto-flagged)
 local SUSPECT_PHRASES = {
     "teri maa", "teri ma ", "tere maa", "maa ki", "ma ki", "behen ki", "bhen ki",
     "your mom", "ur mom", "ur mother", "your mother", "yo mama", "yo momma",
@@ -560,6 +594,8 @@ about after again because before really good nice cool okay yeah well]]):gmatch(
 end
 
 local exactSet, builtin, substrList, suspectList, SKEL = {}, {}, {}, {}, {}
+local remoteSet, remotePhrases = {}, {}
+local remoteStats = { words = 0, phrases = 0, status = "not loaded" }
 
 local function addExact(token, cat, sev, ambig, isBuiltin)
     local e = { cat = cat, sev = sev, ambig = ambig }
@@ -605,6 +641,7 @@ end
 
 -- ============================== RECORDS ==============================
 local strikes, chatLog, flood = {}, {}, {}
+local wave, waveN = {}, 0
 local scheduleStrikeRefresh, updateStatus -- forward declarations
 
 local function keyOf(player)
@@ -634,6 +671,16 @@ local function getRecord(player)
     return rec
 end
 
+local function anyIn(s, list)
+    for _, v in ipairs(list) do
+        if s:find(v, 1, true) then
+            return v
+        end
+    end
+    return nil
+end
+
+-- returns sev, cats, hits, doubt, hint, ctoks, targeted
 local function analyze(player, msg, stateless)
     local norm = normalize(msg)
     local glued = (norm:gsub(SYMS, ""))
@@ -681,7 +728,9 @@ local function analyze(player, msg, stateless)
                     addDoubt(tok, "'" .. tok .. "' may be a Hindi abuse abbreviation/evasion spelling or harmless")
                 end
             elseif not whitelist[tok] then
-                if #tok >= 5 and SKEL[skeleton(tok)] then
+                if #tok >= 4 and (remoteSet[tok] or remoteSet[c1(tok)]) and not STOP[tok] then
+                    addDoubt(tok, "'" .. tok .. "' is on public bad-word lists (may be harmless)")
+                elseif #tok >= 5 and SKEL[skeleton(tok)] then
                     hit("hindi", 3, tok)
                     addDoubt(tok, "'" .. tok .. "' sounds like Hindi abuse '" .. SKEL[skeleton(tok)] .. "'")
                 elseif #tok >= 3 and #tok <= 6 and not tok:find("[aeiouy]") and not CONSONANT_OK[tok] then
@@ -705,6 +754,38 @@ local function analyze(player, msg, stateless)
                 addDoubt(nil, "phrase '" .. p .. "' may hide an insult or unsafe request")
                 break
             end
+        end
+    end
+
+    -- Spam / scam-script detection (raw text)
+    local rawLow = foldUnicode(msg):lower()
+    for _, p in ipairs(SCAM_PATTERNS) do
+        if rawLow:find(p[1], 1, true) then
+            hit(p[2], p[3], p[1])
+            if p[3] >= 3 then
+                addDoubt(nil, "contains '" .. p[1] .. "' (possible spam/scam script)")
+            end
+        end
+    end
+    if anyIn(rawLow, SCRIPT_WORDS) and anyIn(rawLow, PUSH_WORDS) then
+        hit("scam", 3, "script-ad")
+        addDoubt(nil, "looks like a script/exploit advertisement")
+    end
+    if anyIn(rawLow, ROBUX_WORDS) and anyIn(rawLow, GIFT_WORDS) then
+        hit("scam", 4, "robux-scam")
+        addDoubt(nil, "possible free-Robux scam")
+    end
+    for _, ph in ipairs(remotePhrases) do
+        if rawLow:find(ph, 1, true) then
+            hit("scam", 3, ph)
+            addDoubt(nil, "matches known spam phrase '" .. ph .. "'")
+            break
+        end
+    end
+    if #msg >= 60 then
+        local _, letters = msg:gsub("%a", "")
+        if letters / #msg < 0.35 then
+            hit("spam", 2, "symbol-flood")
         end
     end
 
@@ -734,13 +815,42 @@ local function analyze(player, msg, stateless)
             hit("spam", 2, "flood")
         end
 
+        -- coordinated copy-paste wave (3+ different players, same text)
+        if #msg >= 12 then
+            local wk = norm
+            local w = wave[wk]
+            if not w or now - w.t > 20 then
+                if not w then
+                    waveN += 1
+                end
+                w = { t = now, players = {}, n = 0 }
+                wave[wk] = w
+            end
+            if not w.players[player] then
+                w.players[player] = true
+                w.n += 1
+            end
+            if w.n >= 3 then
+                hit("spam", 3, "wave")
+                addDoubt(nil, "same text posted by " .. w.n .. " different players (spam wave)")
+            end
+            if waveN > 80 then
+                for k, v in pairs(wave) do
+                    if now - v.t > 30 then
+                        wave[k] = nil
+                    end
+                end
+                waveN = countKeys(wave)
+            end
+        end
+
         local rec = strikes[keyOf(player)]
         if rec and rec.count >= 3 and sev > 0 then
             sev = math.min(5, sev + 1)
         end
     end
 
-    return sev, cats, hits, doubt, table.concat(hints, "; "), ctoks
+    return sev, cats, hits, doubt, table.concat(hints, "; "), ctoks, targeted
 end
 
 local function quickSeverity(msg)
@@ -821,7 +931,7 @@ local function findRaw(player, taggedText)
     return nil
 end
 
--- ============================== EVIDENCE BUILDERS ==============================
+-- ============================== REPORT / EVIDENCE BUILDERS ==============================
 local function reasonText(cats)
     local parts = {}
     for _, c in ipairs(cats) do
@@ -834,24 +944,9 @@ local function gameInfo()
     return "Game PlaceId: " .. tostring(game.PlaceId) .. " | JobId: " .. tostring(game.JobId)
 end
 
-local function buildSingle(name, msg, sev, cats, extra)
-    if #msg > 300 then
-        msg = msg:sub(1, 300) .. "..."
-    end
-    local out = "REPORT — User: " .. name .. " | Time: " .. os.date("%H:%M:%S") .. "\n"
-        .. gameInfo() .. "\n"
-        .. "Severity: " .. sev .. "/5 | Categories: " .. table.concat(cats, ", ") .. "\n"
-        .. "Violation: " .. reasonText(cats) .. "\n"
-        .. "Message: \"" .. msg .. "\""
-    if extra and extra ~= "" then
-        out = out .. "\n" .. extra
-    end
-    return out
-end
-
-local function buildLogText(rec)
-    local log = chatLog[rec.key] or {}
-    local lines = { "CHAT LOG — " .. rec.name .. " (UserId " .. tostring(rec.userId) .. ") | " .. gameInfo() }
+local function buildLogTextFor(key, name, userId)
+    local log = chatLog[key] or {}
+    local lines = { "CHAT LOG — " .. tostring(name) .. " (UserId " .. tostring(userId) .. ") | " .. gameInfo() }
     if #log == 0 then
         lines[#lines + 1] = "(no messages captured)"
     end
@@ -865,6 +960,194 @@ local function buildLogText(rec)
         lines[#lines + 1] = line
     end
     return table.concat(lines, "\n")
+end
+
+local function buildLogText(rec)
+    return buildLogTextFor(rec.key, rec.name, rec.userId)
+end
+
+local POLICY = {
+    profanity = {
+        title = "Civility and Respect",
+        desc = "used profane and abusive language in public chat",
+        rule = "Abusive or profane language toward or around other players is not permitted under the Roblox Community Standards and Terms of Use.",
+    },
+    hindi = {
+        title = "Civility and Respect",
+        desc = "used abusive Hindi/Hinglish language, including abbreviations or altered spellings meant to get around the chat filter",
+        rule = "Insults and abuse are not permitted in any language, and deliberately disguising them (abbreviations, altered spellings) to avoid the filter is itself a violation.",
+    },
+    sexual = {
+        title = "Sexual Content and Adult Material",
+        desc = "posted sexual or adult content in public chat",
+        rule = "Sexual or adult content is not permitted in chat on the platform.",
+    },
+    scam = {
+        title = "Fraud, Scams and Deceptive Practices",
+        desc = "posted a scam, free-Robux, or exploit/script advertisement in chat",
+        rule = "Promoting scams, fake giveaways, or exploit scripts is a deceptive practice that puts other players' accounts at risk.",
+    },
+    harass = {
+        title = "Bullying and Harassment",
+        desc = "harassed another player and/or encouraged self-harm in chat",
+        rule = "Harassment, bullying, and encouraging self-harm are not permitted.",
+    },
+    threat = {
+        title = "Threats and Violent Content",
+        desc = "made threats or doxxing/attack-related statements in chat",
+        rule = "Threats and attempts to expose or attack other users are not permitted.",
+    },
+    hate = {
+        title = "Hate Speech and Discrimination",
+        desc = "used hateful or discriminatory language in chat",
+        rule = "Hate speech and discriminatory language are not permitted.",
+    },
+    spam = {
+        title = "Spam and Disruptive Behavior",
+        desc = "spammed the chat (flooding, repeated or copy-paste messages)",
+        rule = "Flooding or repeatedly posting the same content disrupts other players' experience.",
+    },
+    offsite = {
+        title = "Off-Platform Communication",
+        desc = "posted an off-platform invite link in chat",
+        rule = "Directing players to external platforms through chat is not permitted.",
+    },
+    filtered = {
+        title = "Civility and Respect",
+        desc = "wrote a message that Roblox's own chat filter tagged as inappropriate",
+        rule = "The message was blocked/tagged by Roblox's automated chat filter as inappropriate.",
+    },
+}
+
+-- info = {name, display, userId, age, key, msg, sev, cats, cat, time, tagged, tagText, targeted, extra, count, tags}
+local function buildShortReport(info)
+    local p = POLICY[info.cat] or POLICY.profanity
+    local m = info.msg
+    if #m > 90 then
+        m = m:sub(1, 90) .. "..."
+    end
+    local s = "Reporting " .. info.name .. " (UserId " .. tostring(info.userId) .. ") who " .. p.desc
+        .. ". Message: \"" .. m .. "\" at " .. info.time .. ". "
+    if info.targeted then
+        s = s .. "It was aimed at another player. "
+    end
+    if info.count and info.count > 1 then
+        s = s .. "This is flagged message #" .. info.count .. " from this user this session. "
+    end
+    if info.tagged then
+        s = s .. "Roblox's own filter also tagged it. "
+    end
+    return s .. "Violates the Community Standards (" .. p.title .. ")."
+end
+
+local function buildFullReport(info)
+    local p = POLICY[info.cat] or POLICY.profanity
+    local m = info.msg
+    if #m > 300 then
+        m = m:sub(1, 300) .. "..."
+    end
+    local lines = {
+        "Subject: Chat report — " .. info.name .. " (UserId " .. tostring(info.userId) .. ")",
+        "",
+        "Hello Roblox Trust & Safety,",
+        "",
+        "I am reporting the user " .. info.name .. " (display name: " .. tostring(info.display) .. ", UserId: "
+            .. tostring(info.userId) .. ", account age: " .. tostring(info.age or 0) .. " days) for violating the Roblox Community Standards ("
+            .. p.title .. ").",
+        "",
+        "What happened:",
+        "- At " .. info.time .. " in experience PlaceId " .. tostring(game.PlaceId) .. " (server JobId " .. tostring(game.JobId)
+            .. "), the user " .. p.desc .. ".",
+        "- Exact message: \"" .. m .. "\"",
+    }
+    if info.targeted then
+        lines[#lines + 1] = "- The message was directed at another player."
+    else
+        lines[#lines + 1] = "- The message was posted in public chat, visible to other players in the server."
+    end
+    if info.count and info.count > 1 then
+        lines[#lines + 1] = "- This is not an isolated incident: " .. info.count .. " flagged messages from this user were captured in this session."
+    end
+    if info.tagged then
+        lines[#lines + 1] = "- Roblox's automated chat filter also tagged at least one of this user's messages (" .. tostring(info.tags or 1) .. " tag(s))."
+    end
+    if info.extra and info.extra ~= "" then
+        lines[#lines + 1] = "- " .. info.extra
+    end
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "Why this violates the rules: " .. p.rule
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "A timestamped chat log captured live is included below as evidence."
+    lines[#lines + 1] = "Please review this report and take action consistent with your policies. Thank you."
+    return table.concat(lines, "\n")
+end
+
+local function buildReportPack(info)
+    local out = {
+        "=== SHORT REPORT (paste in the report comment box) ===",
+        buildShortReport(info),
+        "",
+        "=== FULL REPORT (support form / email) ===",
+        buildFullReport(info),
+        "",
+        "=== EVIDENCE ===",
+        "Severity: " .. tostring(info.sev) .. "/5 | Categories: " .. table.concat(info.cats, ", "),
+        "Rule: " .. reasonText(info.cats),
+        gameInfo(),
+        "",
+        buildLogTextFor(info.key, info.name, info.userId),
+    }
+    return table.concat(out, "\n")
+end
+
+local function makeInfo(player, name, msg, sev, cats, opts)
+    opts = opts or {}
+    local isInst = typeof(player) == "Instance"
+    local rec = strikes[keyOf(player)]
+    return {
+        name = name,
+        display = isInst and player.DisplayName or name,
+        userId = isInst and player.UserId or 0,
+        age = isInst and player.AccountAge or 0,
+        key = keyOf(player),
+        msg = msg,
+        sev = sev,
+        cats = cats,
+        cat = cats[1] or "profanity",
+        time = opts.time or os.date("%H:%M:%S"),
+        tagged = opts.tagged,
+        tagText = opts.tagText,
+        targeted = opts.targeted,
+        extra = opts.extra,
+        count = rec and rec.count or 1,
+        tags = rec and rec.tags or 0,
+    }
+end
+
+local function infoFromRec(rec)
+    local best
+    for _, x in ipairs(rec.incidents) do
+        if not best or x.sev >= best.sev then
+            best = x
+        end
+    end
+    best = best or { msg = "(see chat log)", sev = rec.maxSev, cat = "profanity", time = os.date("%H:%M:%S") }
+    return {
+        name = rec.name,
+        display = rec.display,
+        userId = rec.userId,
+        age = rec.age,
+        key = rec.key,
+        msg = best.msg,
+        sev = best.sev,
+        cats = { best.cat },
+        cat = best.cat,
+        time = best.time,
+        tagged = rec.tags > 0,
+        targeted = best.targeted,
+        count = rec.count,
+        tags = rec.tags,
+    }
 end
 
 local function buildEvidence(rec)
@@ -902,7 +1185,7 @@ local function addTag(player)
     updateStatus()
 end
 
-local function registerFlag(player, name, msg, cats, sev, blocked, tagged)
+local function registerFlag(player, name, msg, cats, sev, blocked, tagged, targeted)
     local rec = getRecord(player)
     rec.count += 1
     if tagged then
@@ -912,7 +1195,13 @@ local function registerFlag(player, name, msg, cats, sev, blocked, tagged)
     if sev > rec.maxSev then
         rec.maxSev = sev
     end
-    local incident = { time = os.date("%H:%M:%S"), msg = msg:sub(1, 200), cat = cats[1] or "harass", sev = sev }
+    local incident = {
+        time = os.date("%H:%M:%S"),
+        msg = msg:sub(1, 200),
+        cat = cats[1] or "harass",
+        sev = sev,
+        targeted = targeted or false,
+    }
     table.insert(rec.incidents, incident)
     if #rec.incidents > 20 then
         table.remove(rec.incidents, 1)
@@ -925,12 +1214,12 @@ local function registerFlag(player, name, msg, cats, sev, blocked, tagged)
             rec.nextAlert = rec.count + 3
             notify("🚨 REPEAT OFFENDER: " .. name .. " (" .. rec.count .. " strikes). Report + Block now!")
             if CFG.AUTO_COPY_EVIDENCE then
-                copyToClipboard(buildEvidence(rec))
+                copyToClipboard(buildReportPack(infoFromRec(rec)))
             end
         elseif sev >= 5 then
-            notify("🚨 SEVERE: " .. name .. " — " .. table.concat(cats, "+") .. ". Evidence copied.")
+            notify("🚨 SEVERE: " .. name .. " — " .. table.concat(cats, "+") .. ". Report pack copied.")
             if CFG.AUTO_COPY_EVIDENCE then
-                copyToClipboard(buildSingle(name, msg, sev, cats))
+                copyToClipboard(buildReportPack(infoFromRec(rec)))
             end
         elseif sev >= 4 then
             notify(name .. " flagged (SEV " .. sev .. "): " .. table.concat(cats, "+"))
@@ -973,17 +1262,9 @@ end
 local strikeScroll = makeScroll(pages["Strikes"], UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, 0))
 local strikeRows = {}
 local strikeDirty = false
+local refreshReports -- forward declaration (Reports tab)
 
-local function refreshStrikes()
-    strikeDirty = false
-    if not alive then
-        return
-    end
-    for _, r in ipairs(strikeRows) do
-        r:Destroy()
-    end
-    table.clear(strikeRows)
-
+local function sortedOffenders()
     local list = {}
     for _, d in pairs(strikes) do
         table.insert(list, d)
@@ -997,6 +1278,19 @@ local function refreshStrikes()
         end
         return a.name < b.name
     end)
+    return list
+end
+
+local function refreshStrikes()
+    if not alive then
+        return
+    end
+    for _, r in ipairs(strikeRows) do
+        r:Destroy()
+    end
+    table.clear(strikeRows)
+
+    local list = sortedOffenders()
 
     if #list == 0 then
         strikeRows[1] = create("TextLabel", {
@@ -1071,12 +1365,23 @@ local function refreshStrikes()
     end
 end
 
+local function refreshAll()
+    strikeDirty = false
+    if not alive then
+        return
+    end
+    refreshStrikes()
+    if refreshReports then
+        refreshReports()
+    end
+end
+
 scheduleStrikeRefresh = function()
     if strikeDirty then
         return
     end
     strikeDirty = true
-    task.delay(0.5, refreshStrikes)
+    task.delay(0.5, refreshAll)
 end
 
 refreshStrikes()
@@ -1161,7 +1466,10 @@ local function addChatEntry(player, name, msg, sev, cats, blocked, doubt, incide
     local curSev, curCats = sev, cats
     local tagged = flags.tagged or false
     local taggedOnly = flags.taggedOnly or false
-    local clip = sev > 0 and buildSingle(name, msg, sev, cats) or nil
+    local tagText = flags.tagText
+    local targeted = flags.targeted or false
+    local stamp = os.date("%H:%M:%S")
+    local extraLine = ""
     local shown = msg
     if #shown > 150 then
         shown = shown:sub(1, 150) .. "..."
@@ -1276,13 +1584,16 @@ local function addChatEntry(player, name, msg, sev, cats, blocked, doubt, incide
 
     local busy = false
     btn.Activated:Connect(function()
-        if busy or curSev == 0 or not clip then
+        if busy or curSev == 0 then
             return
         end
         busy = true
-        local ok = copyToClipboard(clip)
-        btn.Text = ok and "✅ COPIED" or "⚠ NO CLIPBOARD"
-        task.delay(1.2, function()
+        local info = makeInfo(player, name, msg, curSev, curCats, {
+            time = stamp, tagged = tagged, tagText = tagText, targeted = targeted, extra = extraLine,
+        })
+        local ok = copyToClipboard(buildReportPack(info))
+        btn.Text = ok and "✅ REPORT PACK COPIED" or "⚠ NO CLIPBOARD"
+        task.delay(1.4, function()
             if alive and btn.Parent then
                 btn.Text = btnText
             end
@@ -1299,21 +1610,20 @@ local function addChatEntry(player, name, msg, sev, cats, blocked, doubt, incide
         end
     end
 
-    -- Called when Roblox's filter later tags a message we already showed in raw form
-    function handle.markTagged(tagText)
+    function handle.markTagged(tText)
         if not alive or not row.Parent then
             return
         end
         tagged = true
+        tagText = tText
         noteTag = "🏷 Roblox's own filter tagged this message (original shown)."
         checking = false
         if curSev == 0 then
             curSev = 3
             curCats = { "filtered" }
             if player then
-                incident = registerFlag(player, name, msg, curCats, curSev, blocked, true)
+                incident = registerFlag(player, name, msg, curCats, curSev, blocked, true, targeted)
             end
-            setRed()
         else
             if curSev < 3 then
                 curSev = 3
@@ -1328,9 +1638,9 @@ local function addChatEntry(player, name, msg, sev, cats, blocked, doubt, incide
             if player then
                 addTag(player)
             end
-            setRed()
         end
-        clip = buildSingle(name, msg, curSev, curCats, "Roblox filter tagged this message as: " .. tostring(tagText))
+        setRed()
+        extraLine = "Roblox filter tagged this message as: " .. tostring(tText)
         refreshNote()
         render()
         row.Visible = true
@@ -1357,10 +1667,10 @@ local function addChatEntry(player, name, msg, sev, cats, blocked, doubt, incide
                 curSev = res.severity
                 curCats = { res.category }
                 if player and not blocked then
-                    incident = registerFlag(player, name, msg, curCats, curSev, blocked, false)
+                    incident = registerFlag(player, name, msg, curCats, curSev, blocked, false, targeted)
                 end
             end
-            clip = buildSingle(name, msg, curSev, curCats, "AI review: " .. res.reason)
+            extraLine = "AI review confirmed: " .. res.reason
             noteAI = "🤖 AI ✅ " .. res.reason
             setRed()
         else
@@ -1375,7 +1685,7 @@ local function addChatEntry(player, name, msg, sev, cats, blocked, doubt, incide
                 btn.BackgroundColor3 = ORANGE
                 btnText = "🟠 REPORT (AI doubts)"
                 btn.Text = btnText
-                clip = buildSingle(name, msg, curSev, curCats, "AI doubts this: " .. res.reason)
+                extraLine = "Note: an AI review doubted this: " .. res.reason
                 noteAI = "🤖 AI ❓ likely OK: " .. res.reason
             end
         end
@@ -1396,20 +1706,32 @@ local function addChatEntry(player, name, msg, sev, cats, blocked, doubt, incide
     return handle
 end
 
--- ============================== AI CORE (fast + free) ==============================
+-- ============================== AI CORE (multi-provider rotation) ==============================
 local function getRequester()
     return (syn and syn.request) or (http and http.request) or http_request or request or (fluxus and fluxus.request)
 end
 
+-- Per-provider adaptive rate limiter
 local rate = {
-    OpenRouter = { gap = 1.5, min = 1.0, max = 8, nextAt = 0 },
-    Pollinations = { gap = 6, min = 4, max = 20, nextAt = 0 },
+    Groq = { gap = 2.2, min = 2.1, max = 30, nextAt = 0, coolUntil = 0, pen = 0 },
+    Gemini = { gap = 6, min = 4, max = 40, nextAt = 0, coolUntil = 0, pen = 1 },
+    OpenRouter = { gap = 3.3, min = 3, max = 30, nextAt = 0, coolUntil = 0, pen = 2 },
+    Pollinations = { gap = 6, min = 4, max = 25, nextAt = 0, coolUntil = 0, pen = 4 },
 }
 
 local function getProviders()
     local list = {}
-    if AI_API_KEY ~= "" and AI_API_KEY ~= "PUT_KEY_HERE" then
-        list[#list + 1] = { name = "OpenRouter", url = AI_URL, model = AI_MODEL, key = AI_API_KEY }
+    if hasKey(GROQ_KEY) then
+        list[#list + 1] = { name = "Groq", url = GROQ_URL, model = GROQ_MODEL, key = GROQ_KEY }
+    end
+    if hasKey(GEMINI_KEY) then
+        list[#list + 1] = {
+            name = "Gemini", url = GEMINI_URL, model = GEMINI_MODEL, key = GEMINI_KEY,
+            extra = { reasoning_effort = "none" }, minTokens = 200,
+        }
+    end
+    if hasKey(AI_API_KEY) then
+        list[#list + 1] = { name = "OpenRouter", url = AI_URL, model = AI_MODEL, key = AI_API_KEY, openrouter = true }
     end
     if USE_FREE_FALLBACK then
         list[#list + 1] = { name = "Pollinations", url = POLLI_URL, model = POLLI_MODEL }
@@ -1417,7 +1739,27 @@ local function getProviders()
     return list
 end
 
--- Reserves a request slot per provider (adaptive rate limiter shared by all workers)
+local function orderedProviders()
+    local now = os.clock()
+    local ready, cooling = {}, {}
+    for _, p in ipairs(getProviders()) do
+        local r = rate[p.name]
+        if r.coolUntil > now then
+            cooling[#cooling + 1] = p
+        else
+            ready[#ready + 1] = p
+        end
+    end
+    table.sort(ready, function(a, b)
+        local ra, rb = rate[a.name], rate[b.name]
+        return math.max(ra.nextAt, now) + ra.pen < math.max(rb.nextAt, now) + rb.pen
+    end)
+    for _, p in ipairs(cooling) do
+        ready[#ready + 1] = p
+    end
+    return ready
+end
+
 local function waitSlot(name)
     local r = rate[name]
     local now = os.clock()
@@ -1428,76 +1770,105 @@ local function waitSlot(name)
     end
 end
 
+-- returns content, err, code
+local function tryProvider(p, requester, messages, maxTokens)
+    local r = rate[p.name]
+    local headers = { ["Content-Type"] = "application/json" }
+    if p.key then
+        headers["Authorization"] = "Bearer " .. p.key
+    end
+    if p.openrouter then
+        headers["HTTP-Referer"] = "https://www.roblox.com"
+        headers["X-Title"] = "Phantom OS"
+    end
+
+    local lastErr, lastCode = p.name .. ": failed", 0
+    for attempt = 1, (p.extra and 2 or 1) do
+        local payload = {
+            model = p.model,
+            messages = messages,
+            max_tokens = math.max(maxTokens or 300, p.minTokens or 0),
+            temperature = 0,
+        }
+        if p.extra and attempt == 1 then
+            for k, v in pairs(p.extra) do
+                payload[k] = v
+            end
+        end
+        local okEnc, body = pcall(HttpService.JSONEncode, HttpService, payload)
+        if not okEnc then
+            return nil, p.name .. ": encode error", 0
+        end
+
+        waitSlot(p.name)
+        local ok, res = pcall(requester, { Url = p.url, Method = "POST", Headers = headers, Body = body })
+        if ok and type(res) == "table" then
+            local code = res.StatusCode or res.status_code or (res.Success and 200) or 0
+            local raw = res.Body or ""
+            local okD, data = pcall(HttpService.JSONDecode, HttpService, raw)
+            local content, err
+            if okD and type(data) == "table" then
+                local ch = data.choices and data.choices[1]
+                if ch and ch.message and type(ch.message.content) == "string" then
+                    content = ch.message.content
+                elseif data.error then
+                    err = type(data.error) == "table" and (data.error.message or "api error") or tostring(data.error)
+                end
+            end
+            if not content and not err and code >= 200 and code < 300 and type(raw) == "string" and raw ~= "" then
+                content = raw
+            end
+            if content and content ~= "" then
+                r.gap = math.max(r.min, r.gap * 0.92)
+                return content, nil, code
+            end
+            lastCode = code
+            lastErr = p.name .. ": " .. tostring(err or ("HTTP " .. tostring(code)))
+            if code == 429 then
+                r.gap = math.min(r.max, r.gap * 2)
+                r.coolUntil = os.clock() + 30
+                return nil, p.name .. ": rate limited (429)", code
+            elseif code == 401 or code == 403 then
+                r.coolUntil = os.clock() + 300
+                return nil, p.name .. ": key rejected (" .. code .. ")", code
+            end
+            if not (code == 400 and p.extra and attempt == 1) then
+                break
+            end
+        else
+            r.coolUntil = os.clock() + 10
+            return nil, p.name .. ": request failed", 0
+        end
+    end
+    return nil, lastErr, lastCode
+end
+
 -- returns text, providerName, errString, httpCode
 local function callAI(messages, maxTokens)
     local requester = getRequester()
     if not requester then
         return nil, nil, "Executor has no HTTP request function.", 0
     end
-    local providers = getProviders()
-    if #providers == 0 then
+    local order = orderedProviders()
+    if #order == 0 then
         return nil, nil, "No AI provider enabled.", 0
     end
-
     local lastErr, lastCode = "unknown error", 0
-    for _, p in ipairs(providers) do
-        local r = rate[p.name]
-        local headers = { ["Content-Type"] = "application/json" }
-        if p.key then
-            headers["Authorization"] = "Bearer " .. p.key
-            headers["HTTP-Referer"] = "https://www.roblox.com"
-            headers["X-Title"] = "Phantom OS"
+    for _, p in ipairs(order) do
+        local content, err, code = tryProvider(p, requester, messages, maxTokens)
+        if content then
+            return content, p.name, nil, code
         end
-        local okEnc, body = pcall(HttpService.JSONEncode, HttpService, {
-            model = p.model,
-            messages = messages,
-            max_tokens = maxTokens or 300,
-            temperature = 0,
-        })
-        if okEnc then
-            waitSlot(p.name)
-            local ok, res = pcall(requester, { Url = p.url, Method = "POST", Headers = headers, Body = body })
-            if ok and type(res) == "table" then
-                local code = res.StatusCode or res.status_code or (res.Success and 200) or 0
-                local raw = res.Body or ""
-                local okD, data = pcall(HttpService.JSONDecode, HttpService, raw)
-                local content, err
-                if okD and type(data) == "table" then
-                    local ch = data.choices and data.choices[1]
-                    if ch and ch.message and type(ch.message.content) == "string" then
-                        content = ch.message.content
-                    elseif data.error then
-                        err = type(data.error) == "table" and (data.error.message or "api error") or tostring(data.error)
-                    end
-                end
-                if not content and not err and code >= 200 and code < 300 and type(raw) == "string" and raw ~= "" then
-                    content = raw
-                end
-                if content and content ~= "" then
-                    r.gap = math.max(r.min, r.gap * 0.9)
-                    return content, p.name, nil, code
-                end
-                lastCode = code
-                lastErr = p.name .. ": " .. tostring(err or ("HTTP " .. tostring(code)))
-                if code == 429 then
-                    r.gap = math.min(r.max, r.gap * 2)
-                    r.nextAt = os.clock() + r.gap
-                    lastErr = p.name .. ": rate limited (429)"
-                elseif code == 401 then
-                    lastErr = p.name .. ": invalid API key (401)"
-                end
-            else
-                lastErr = p.name .. ": request failed"
-            end
-        end
+        lastErr, lastCode = err or lastErr, code or lastCode
     end
     return nil, nil, lastErr, lastCode
 end
 
 local JUDGE_SYSTEM = "Roblox chat moderator. Players write English/Hindi/Hinglish. Abbreviations or misspellings can hide Hindi abuse "
     .. "(tmc/tmkc=teri maa ki.., mc/bc/bkl/bsdk, chuda/cuda/chud=chudai abuse, lund, gand) but may be harmless "
-    .. "(bc=because, mc=Minecraft, cud=cud, chod=leave). Use recent chat for context. Friendly banter is not a violation. "
-    .. "Reply ONLY JSON: {\"v\":0|1,\"c\":\"profanity|hindi|harass|hate|sexual|scam|threat|spam|none\",\"s\":0-5,\"r\":\"max 8 words\"}"
+    .. "(bc=because, mc=Minecraft, cud=cud, chod=leave). Also flag scam/spam scripts (free robux, loadstring, script ads, invite spam). "
+    .. "Use recent chat for context. Friendly banter is not a violation. "
+    .. "Reply ONLY JSON: {\"v\":0|1,\"c\":\"profanity|hindi|harass|hate|sexual|scam|threat|spam|offsite|none\",\"s\":0-5,\"r\":\"max 8 words\"}"
 
 local recentChat = {}
 local function pushRecent(name, msg)
@@ -1658,6 +2029,105 @@ for _ = 1, CFG.WORKERS do
     end)
 end
 
+-- ============================== INTERNET LISTS ==============================
+local function httpGet(url)
+    local requester = getRequester()
+    if requester then
+        local ok, res = pcall(requester, { Url = url, Method = "GET" })
+        if ok and type(res) == "table" and type(res.Body) == "string" and res.Body ~= "" then
+            local code = res.StatusCode or res.status_code or (res.Success and 200) or 0
+            if code >= 200 and code < 300 then
+                return res.Body
+            end
+        end
+    end
+    local ok, body = pcall(function()
+        return game:HttpGet(url)
+    end)
+    if ok and type(body) == "string" and body ~= "" then
+        return body
+    end
+    return nil
+end
+
+local function loadRemote(force)
+    if not CFG.REMOTE_ENABLED then
+        remoteStats.status = "off"
+        return
+    end
+    remoteStats.status = "loading..."
+
+    if not force and isfile and readfile then
+        local ok, d = pcall(function()
+            if isfile(CFG.REMOTE_CACHE) then
+                return HttpService:JSONDecode(readfile(CFG.REMOTE_CACHE))
+            end
+        end)
+        if ok and type(d) == "table" and type(d.t) == "number" and type(d.words) == "table"
+            and os.time() - d.t < CFG.REMOTE_REFRESH_HOURS * 3600 then
+            for _, w in ipairs(d.words) do
+                remoteSet[w] = true
+            end
+            for _, ph in ipairs(d.phrases or {}) do
+                remotePhrases[#remotePhrases + 1] = ph
+            end
+            remoteStats.words = #d.words
+            remoteStats.phrases = #remotePhrases
+            remoteStats.status = "cached"
+            return
+        end
+    end
+
+    local words, phrases, n = {}, {}, 0
+    local okAny = false
+    for _, url in ipairs(CFG.REMOTE_WORD_URLS) do
+        local body = httpGet(url)
+        if body then
+            okAny = true
+            for line in body:gmatch("[^\r\n]+") do
+                local w = line:lower():gsub("^%s+", ""):gsub("%s+$", "")
+                if w:match("^%a+$") and #w >= 4 and #w <= 14 and not STOP[w] and not builtin[w] then
+                    local k = c2(w)
+                    if not remoteSet[k] and n < 3500 then
+                        remoteSet[k] = true
+                        words[#words + 1] = k
+                        n += 1
+                    end
+                end
+            end
+        end
+    end
+    for _, url in ipairs(CFG.REMOTE_PHRASE_URLS) do
+        local body = httpGet(url)
+        if body then
+            okAny = true
+            for line in body:gmatch("[^\r\n]+") do
+                local ph = foldUnicode(line):lower():gsub("^%s+", ""):gsub("%s+$", "")
+                if #ph >= 6 and #ph <= 60 and #phrases < 300 then
+                    phrases[#phrases + 1] = ph
+                    remotePhrases[#remotePhrases + 1] = ph
+                end
+            end
+        end
+    end
+
+    remoteStats.words = n
+    remoteStats.phrases = #remotePhrases
+    remoteStats.status = okAny and "downloaded" or "offline (no list fetched)"
+    if okAny and writefile then
+        pcall(function()
+            writefile(CFG.REMOTE_CACHE, HttpService:JSONEncode({ t = os.time(), words = words, phrases = phrases }))
+        end)
+    end
+end
+
+task.spawn(function()
+    pcall(loadRemote, false)
+    if alive then
+        notify("🌐 Lists: " .. remoteStats.words .. " words / " .. remoteStats.phrases .. " phrases (" .. remoteStats.status .. ")")
+    end
+end)
+
 -- ============================== CHAT INTAKE ==============================
 local pendingTagged = {}
 
@@ -1675,8 +2145,8 @@ local function takePending(player, raw)
     return nil
 end
 
-local function learnFromTag(raw, tagText)
-    local words, total = filteredWords(raw, tagText)
+local function learnFromTag(raw, tText)
+    local words, total = filteredWords(raw, tText)
     if #words == 0 or #words > 2 or #words >= total then
         return
     end
@@ -1695,7 +2165,7 @@ end
 
 local function commitMessage(player, msg, blocked, tagText, taggedOnly)
     local name = (typeof(player) == "Instance" and player.Name) or tostring(player)
-    local sev, cats, _, doubt, hint, ctoks = analyze(player, msg)
+    local sev, cats, _, doubt, hint, ctoks, targeted = analyze(player, msg)
     local tagged = (tagText ~= nil) or taggedOnly or false
 
     if tagged then
@@ -1705,7 +2175,7 @@ local function commitMessage(player, msg, blocked, tagText, taggedOnly)
         if #cats == 0 then
             cats = { "filtered" }
         end
-        doubt = false -- Roblox's own filter already confirmed it
+        doubt = false
     end
     if blocked and sev == 0 then
         sev, cats = 3, { "profanity" }
@@ -1715,10 +2185,12 @@ local function commitMessage(player, msg, blocked, tagText, taggedOnly)
 
     local incident
     if sev > 0 then
-        incident = registerFlag(player, name, msg, cats, sev, blocked, tagged)
+        incident = registerFlag(player, name, msg, cats, sev, blocked, tagged, targeted)
     end
 
-    local handle = addChatEntry(player, name, msg, sev, cats, blocked, doubt, incident, { tagged = tagged, taggedOnly = taggedOnly })
+    local handle = addChatEntry(player, name, msg, sev, cats, blocked, doubt, incident, {
+        tagged = tagged, taggedOnly = taggedOnly, tagText = tagText, targeted = targeted,
+    })
     entry.handle = handle
 
     local ctx = recentSnapshot()
@@ -1731,9 +2203,9 @@ local function commitMessage(player, msg, blocked, tagText, taggedOnly)
 
     if handle and aiMode ~= "OFF" and not blocked and not tagged and player ~= LocalPlayer then
         local pri
-        if sev == 0 and doubt then
+        if sev > 0 and doubt then
             pri = 1
-        elseif sev > 0 and doubt then
+        elseif sev == 0 and doubt then
             pri = 2
         elseif sev > 0 and CFG.AI_CONFIRM_STRONG and sev <= 3 then
             pri = 2
@@ -1744,9 +2216,9 @@ local function commitMessage(player, msg, blocked, tagText, taggedOnly)
             local key = normalize(msg)
             local cached = verdictCache[key]
             if cached then
-                handle.applyAI(cached) -- instant
+                handle.applyAI(cached)
             else
-                if pri == 2 then
+                if sev > 0 then
                     handle.setVerifying()
                 end
                 enqueue({
@@ -1784,7 +2256,6 @@ local function onChat(player, msg, blocked, source)
 
     if isTagged(msg) then
         if source == "display" then
-            -- Roblox filtered text arrived: try to match the raw message we already captured
             local e = findRaw(player, msg)
             if e then
                 e.tagged = true
@@ -1795,7 +2266,6 @@ local function onChat(player, msg, blocked, source)
                 learnFromTag(e.text, msg)
                 return
             end
-            -- raw may still be on its way: wait briefly before showing a tagged-only row
             local list = pendingTagged[player]
             if not list then
                 list = {}
@@ -1888,7 +2358,140 @@ pcall(function()
     oldNamecall = hookmetamethod(game, "__namecall", newcclosure and newcclosure(handler) or handler)
 end)
 
--- ============================== TAB 3: APPEALS (60) ==============================
+-- ============================== TAB 3: REPORTS (builder + my appeals) ==============================
+local repPage = pages["Reports"]
+
+local subBuilder = create("TextButton", {
+    Position = UDim2.new(0, 0, 0, 0),
+    Size = UDim2.new(0.5, -2, 0, 20),
+    BackgroundColor3 = NEON_DARK,
+    Text = "📝 Report Builder",
+    TextColor3 = WHITE,
+    Font = Enum.Font.GothamBold,
+    TextSize = 10,
+}, repPage)
+corner(subBuilder, 5)
+
+local subAppeal = create("TextButton", {
+    Position = UDim2.new(0.5, 2, 0, 0),
+    Size = UDim2.new(0.5, -2, 0, 20),
+    BackgroundColor3 = BG3,
+    Text = "⚖ My Appeals",
+    TextColor3 = WHITE,
+    Font = Enum.Font.GothamBold,
+    TextSize = 10,
+}, repPage)
+corner(subAppeal, 5)
+
+local builderScroll = makeScroll(repPage, UDim2.new(0, 0, 0, 24), UDim2.new(1, 0, 1, -24))
+local appealsScroll = makeScroll(repPage, UDim2.new(0, 0, 0, 24), UDim2.new(1, 0, 1, -24))
+appealsScroll.Visible = false
+
+local function showSub(which)
+    builderScroll.Visible = (which == "b")
+    appealsScroll.Visible = (which == "a")
+    subBuilder.BackgroundColor3 = which == "b" and NEON_DARK or BG3
+    subAppeal.BackgroundColor3 = which == "a" and NEON_DARK or BG3
+end
+subBuilder.Activated:Connect(function()
+    showSub("b")
+end)
+subAppeal.Activated:Connect(function()
+    showSub("a")
+end)
+
+local builderRows = {}
+
+refreshReports = function()
+    if not alive then
+        return
+    end
+    for _, r in ipairs(builderRows) do
+        r:Destroy()
+    end
+    table.clear(builderRows)
+
+    local hint = create("TextLabel", {
+        Size = UDim2.new(1, -8, 0, 30),
+        BackgroundTransparency = 1,
+        Text = "Ready-made reports from captured evidence. Only report what really happened — Roblox decides the action.",
+        TextColor3 = Color3.fromRGB(150, 220, 255),
+        Font = Enum.Font.Gotham,
+        TextSize = 10,
+        TextWrapped = true,
+        LayoutOrder = 0,
+    }, builderScroll)
+    builderRows[#builderRows + 1] = hint
+
+    local list = sortedOffenders()
+    if #list == 0 then
+        builderRows[#builderRows + 1] = create("TextLabel", {
+            Size = UDim2.new(1, -8, 0, 30),
+            BackgroundTransparency = 1,
+            Text = "No flagged users yet.",
+            TextColor3 = NEON,
+            Font = Enum.Font.Gotham,
+            TextSize = 12,
+            LayoutOrder = 1,
+        }, builderScroll)
+        return
+    end
+
+    for i = 1, math.min(#list, 15) do
+        local d = list[i]
+        local rowF = create("Frame", {
+            Size = UDim2.new(1, -8, 0, 54),
+            BackgroundColor3 = BG3,
+            BorderSizePixel = 0,
+            LayoutOrder = i,
+        }, builderScroll)
+        corner(rowF, 6)
+
+        create("TextLabel", {
+            Position = UDim2.new(0, 5, 0, 2),
+            Size = UDim2.new(1, -10, 0, 28),
+            BackgroundTransparency = 1,
+            Text = ((d.count >= CFG.STRIKE_ALERT) and "🚨 " or "") .. d.name .. " — " .. d.count .. " strikes, max SEV " .. d.maxSev,
+            TextColor3 = d.maxSev >= 4 and RED_TXT or (d.maxSev >= 2 and ORANGE_TXT or WHITE),
+            Font = Enum.Font.Gotham,
+            TextSize = 11,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextWrapped = true,
+        }, rowF)
+
+        local actions = {
+            { "📝 Short", function()
+                return buildShortReport(infoFromRec(d))
+            end },
+            { "📄 Full", function()
+                return buildFullReport(infoFromRec(d))
+            end },
+            { "📦 Pack", function()
+                return buildReportPack(infoFromRec(d))
+            end },
+        }
+        for k, a in ipairs(actions) do
+            local b = create("TextButton", {
+                Position = UDim2.new((k - 1) / 3, 2, 0, 31),
+                Size = UDim2.new(1 / 3, -4, 0, 20),
+                BackgroundColor3 = BG2,
+                Text = a[1],
+                TextColor3 = WHITE,
+                Font = Enum.Font.GothamBold,
+                TextSize = 10,
+            }, rowF)
+            corner(b, 5)
+            b.Activated:Connect(function()
+                flash(b, copyToClipboard(a[2]()), BG2)
+            end)
+        end
+        builderRows[#builderRows + 1] = rowF
+    end
+end
+
+refreshReports()
+
+-- ---------- My Appeals (60 templates, for appealing action on YOUR own account) ----------
 local appealCats = {
     { "Exploit Spam", "Community Standards (Spam and Disruptive Behavior) and the Terms of Use", "the repeated or automated messages attributed to my account" },
     { "Hate Speech", "Community Standards (Hate Speech and Discrimination)", "the chat content classified as discriminatory" },
@@ -1937,8 +2540,6 @@ local appealVariants = {
             .. "I ask that this be considered under the " .. c[2] .. " and that the action be reviewed accordingly."
     end },
 }
-
-local appealsScroll = makeScroll(pages["Appeals"], UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, 0))
 
 local function buildAppealText(c, variant)
     return "Subject: Formal Appeal – " .. c[1] .. " Moderation Action\n"
@@ -2066,6 +2667,14 @@ end
 
 addBubble("sys", "Free AI ready. Live chat is auto-checked in the Live Mod tab. Type /help for commands.")
 
+local function providerNames()
+    local t = {}
+    for _, p in ipairs(getProviders()) do
+        t[#t + 1] = p.name
+    end
+    return #t > 0 and table.concat(t, " > ") or "none"
+end
+
 local function handleCommand(text)
     local cmd, arg = text:match("^/(%a+)%s*(.-)%s*$")
     cmd = (cmd or ""):lower()
@@ -2082,6 +2691,7 @@ local function handleCommand(text)
         whitelist[arg] = true
         custom[arg] = nil
         learned[arg] = nil
+        remoteSet[arg] = nil
         local k2 = c2(arg)
         if not builtin[k2] then
             exactSet[k2] = nil
@@ -2091,16 +2701,26 @@ local function handleCommand(text)
         addBubble("sys", "'" .. arg .. "' is now ignored (whitelisted).")
     elseif cmd == "stats" then
         addBubble("sys", "Flagged: " .. flaggedCount .. " | Offenders: " .. countKeys(strikes) .. " | Roblox tags: " .. tagTotal
-            .. " | Learned words: " .. countKeys(learned) .. " | Custom: " .. countKeys(custom)
-            .. " | AI cache: " .. cacheN .. " | AI via: " .. aiLast)
+            .. " | Learned: " .. countKeys(learned) .. " | Custom: " .. countKeys(custom)
+            .. " | Internet list: " .. remoteStats.words .. " words / " .. remoteStats.phrases .. " phrases (" .. remoteStats.status .. ")"
+            .. " | AI providers: " .. providerNames() .. " | last: " .. aiLast .. " | cache: " .. cacheN)
+    elseif cmd == "refresh" then
+        addBubble("sys", "Re-downloading internet lists...")
+        task.spawn(function()
+            remoteSet, remotePhrases = {}, {}
+            pcall(loadRemote, true)
+            if alive then
+                addBubble("sys", "Lists: " .. remoteStats.words .. " words / " .. remoteStats.phrases .. " phrases (" .. remoteStats.status .. ")")
+            end
+        end)
     elseif cmd == "reset" then
         strikes, chatLog = {}, {}
         flaggedCount, tagTotal, lastFlagged = 0, 0, nil
-        refreshStrikes()
+        refreshAll()
         updateStatus()
         addBubble("sys", "Strikes and logs cleared.")
     else
-        addBubble("sys", "Commands: /add <word> • /white <word> • /stats • /reset")
+        addBubble("sys", "Commands: /add <word> • /white <word> • /stats • /refresh • /reset")
     end
 end
 
