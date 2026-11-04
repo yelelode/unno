@@ -2588,7 +2588,7 @@ local aiInput = new("TextBox", {
     Position = UDim2.new(0, 0, 1, -34), Size = UDim2.new(1, -64, 0, 32), BackgroundColor3 = CARD, Text = "",
     PlaceholderText = "Ask AI or type /help", PlaceholderColor3 = MUTED, TextColor3 = TXT, Font = Enum.Font.Gotham,
     TextSize = 12, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left, BorderSizePixel = 0,
-})
+}, aiPage)
 round(aiInput, 8)
 outline(aiInput, NEON, 1, 0.5)
 pad(aiInput, 8, 0, 8, 0)
@@ -2621,6 +2621,7 @@ local function addBubble(role, text)
     end
     return l
 end
+
 addBubble("sys", "Free AI ready. Live chat is auto-checked in the Live tab. Use the chips below or type /help.")
 
 local function providerNames()
