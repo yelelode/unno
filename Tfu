@@ -1,0 +1,2896 @@
+--[[
+    🔮 PHANTOM OS v6 — Pro Moderation Suite (Mobile)
+    Tabs: Live | Strikes | Reports | AI Chat | Setup
+    • One-tap report (with confirm) → Players:ReportAbuse, fallback = report pack copied
+    • AI rotation: Groq > Gemini > OpenRouter > Pollinations (keyless)
+    • Resizable / draggable / collapsible UI, toasts, animated tabs
+]]
+
+-- ===== OPTIONAL FREE API KEYS (leave PUT_KEY_HERE to skip) =====
+local GROQ_KEY = "PUT_KEY_HERE"   -- free: console.groq.com
+local GROQ_MODEL = "llama-3.1-8b-instant"
+local GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+local GEMINI_KEY = "PUT_KEY_HERE" -- free: aistudio.google.com/apikey
+local GEMINI_MODEL = "gemini-2.5-flash"
+local GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+
+local AI_API_KEY = "PUT_KEY_HERE" -- OpenRouter
+local AI_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+local AI_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+local USE_FREE_FALLBACK = true    -- keyless Pollinations
+local POLLI_URL = "https://text.pollinations.ai/openai"
+local POLLI_MODEL = "openai"
+
+local CFG = {
+    AI_CONFIRM_STRONG = false,
+    STRIKE_ALERT = 3,
+    AUTO_COPY_EVIDENCE = true,
+    WORKERS = 2,
+    QUEUE_MAX = 8,
+    CONTEXT_LINES = 4,
+    LEARN_VOTES = 2,
+    TAG_LEARN_VOTES = 2,
+    SAVE_FILE = "PhantomOS_data.json",
+
+    REPORT_COOLDOWN = 12, -- seconds between direct reports (anti-misclick / anti-spam)
+    -- category -> Roblox ReportAbuse reason. Missing category = no direct report (pack is copied instead)
+    REPORT_REASON = {
+        profanity = "Swearing", hindi = "Swearing", filtered = "Swearing",
+        harass = "Bullying", hate = "Bullying", threat = "Bullying",
+        scam = "Scamming", offsite = "Offsite Links",
+    },
+
+    REMOTE_ENABLED = true,
+    REMOTE_REFRESH_HOURS = 24,
+    REMOTE_CACHE = "PhantomOS_remote.json",
+    REMOTE_WORD_URLS = {
+        "https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en",
+        "https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/hi",
+    },
+    REMOTE_PHRASE_URLS = {},
+}
+
+-- ============================== SERVICES ==============================
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local Players = game:GetService("Players")
+while not Players.LocalPlayer do task.wait() end
+
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local TextChatService = game:GetService("TextChatService")
+local StarterGui = game:GetService("StarterGui")
+local LocalPlayer = Players.LocalPlayer
+
+local env = (getgenv and getgenv()) or _G
+if env.PhantomOS_Cleanup then
+    pcall(env.PhantomOS_Cleanup)
+end
+
+-- ============================== THEME ==============================
+local BG = Color3.fromRGB(13, 14, 20)
+local PANEL = Color3.fromRGB(20, 22, 31)
+local CARD = Color3.fromRGB(28, 31, 42)
+local LINE = Color3.fromRGB(48, 52, 68)
+local TXT = Color3.fromRGB(232, 235, 242)
+local MUTED = Color3.fromRGB(135, 142, 162)
+local NEON = Color3.fromRGB(0, 235, 145)
+local NEON_DARK = Color3.fromRGB(0, 110, 75)
+local RED = Color3.fromRGB(228, 62, 80)
+local AMBER = Color3.fromRGB(240, 165, 50)
+local BLUE = Color3.fromRGB(70, 160, 255)
+local GREEN = Color3.fromRGB(44, 190, 105)
+local RED_TXT = Color3.fromRGB(255, 130, 130)
+local AMBER_TXT = Color3.fromRGB(255, 205, 120)
+local WHITE = Color3.fromRGB(255, 255, 255)
+
+-- ============================== STATE ==============================
+local alive = true
+local conns = {}
+local selfGuard = true
+local onlyFlagged = false
+local aiMode = "SMART" -- SMART | STRICT | OFF
+local aiLast = "-"
+local flaggedCount = 0
+local tagTotal = 0
+local lastFlagged = nil
+local lastReportAt = -1e9
+
+local function track(signal, fn)
+    local c = signal:Connect(fn)
+    table.insert(conns, c)
+    return c
+end
+
+-- ============================== UI TOOLKIT ==============================
+local function new(class, props, parent)
+    local inst = Instance.new(class)
+    for k, v in pairs(props) do
+        inst[k] = v
+    end
+    if parent then
+        inst.Parent = parent
+    end
+    return inst
+end
+
+local function round(inst, r)
+    return new("UICorner", { CornerRadius = UDim.new(0, r or 8) }, inst)
+end
+
+local function outline(inst, color, th, tr)
+    return new("UIStroke", {
+        Color = color or LINE, Thickness = th or 1, Transparency = tr or 0,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+    }, inst)
+end
+
+local function pad(inst, l, t, r, b)
+    return new("UIPadding", {
+        PaddingLeft = UDim.new(0, l or 0), PaddingTop = UDim.new(0, t or 0),
+        PaddingRight = UDim.new(0, r or 0), PaddingBottom = UDim.new(0, b or 0),
+    }, inst)
+end
+
+local function tw(inst, props, t, style)
+    pcall(function()
+        TweenService:Create(inst, TweenInfo.new(t or 0.15, style or Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
+    end)
+end
+
+local function label(parent, text, size, color, font, props)
+    local l = new("TextLabel", {
+        BackgroundTransparency = 1, Text = text, TextSize = size or 12, TextColor3 = color or TXT,
+        Font = font or Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left,
+        TextWrapped = true, RichText = false,
+    }, parent)
+    if props then
+        for k, v in pairs(props) do
+            l[k] = v
+        end
+    end
+    return l
+end
+
+local function attachFx(btn)
+    btn.AutoButtonColor = false
+    btn:SetAttribute("base", btn.BackgroundColor3)
+    local function base()
+        return btn:GetAttribute("base") or btn.BackgroundColor3
+    end
+    btn.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+            tw(btn, { BackgroundColor3 = base():Lerp(WHITE, 0.2) }, 0.06)
+        elseif i.UserInputType == Enum.UserInputType.MouseMovement then
+            tw(btn, { BackgroundColor3 = base():Lerp(WHITE, 0.08) }, 0.1)
+        end
+    end)
+    btn.InputEnded:Connect(function()
+        tw(btn, { BackgroundColor3 = base() }, 0.12)
+    end)
+end
+
+local function setBtn(btn, text, color)
+    if text then
+        btn.Text = text
+    end
+    if color then
+        btn:SetAttribute("base", color)
+        tw(btn, { BackgroundColor3 = color }, 0.12)
+    end
+end
+
+local function button(parent, text, color, size, pos, onClick, textSize)
+    local b = new("TextButton", {
+        Text = text, BackgroundColor3 = color, TextColor3 = TXT, Font = Enum.Font.GothamBold,
+        TextSize = textSize or 11, Size = size, Position = pos or UDim2.new(), BorderSizePixel = 0,
+    }, parent)
+    round(b, 7)
+    attachFx(b)
+    if onClick then
+        b.Activated:Connect(onClick)
+    end
+    return b
+end
+
+local function makeScroll(parent, pos, size)
+    local sf = new("ScrollingFrame", {
+        Position = pos, Size = size, BackgroundTransparency = 1, BorderSizePixel = 0,
+        ScrollBarThickness = 3, ScrollBarImageColor3 = NEON, CanvasSize = UDim2.new(),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollingDirection = Enum.ScrollingDirection.Y,
+    }, parent)
+    new("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, sf)
+    pad(sf, 0, 0, 5, 4)
+    return sf
+end
+
+local function autoScroll(sf)
+    track(sf:GetPropertyChangedSignal("AbsoluteCanvasSize"), function()
+        sf.CanvasPosition = Vector2.new(0, math.max(0, sf.AbsoluteCanvasSize.Y - sf.AbsoluteWindowSize.Y))
+    end)
+end
+
+local function segmented(parent, options, initial, onChange, pos, size)
+    local f = new("Frame", { Position = pos, Size = size, BackgroundColor3 = PANEL, BorderSizePixel = 0 }, parent)
+    round(f, 7)
+    outline(f, LINE, 1, 0.3)
+    local btns, obj = {}, {}
+    local function paint(v)
+        for _, o in ipairs(options) do
+            local act = (o == v)
+            btns[o].BackgroundColor3 = act and NEON_DARK or PANEL
+            btns[o].TextColor3 = act and WHITE or MUTED
+        end
+    end
+    for i, o in ipairs(options) do
+        local b = new("TextButton", {
+            Position = UDim2.new((i - 1) / #options, 2, 0, 2), Size = UDim2.new(1 / #options, -4, 1, -4),
+            BackgroundColor3 = PANEL, Text = o, TextSize = 10, Font = Enum.Font.GothamBold,
+            TextColor3 = MUTED, AutoButtonColor = false, BorderSizePixel = 0,
+        }, f)
+        round(b, 5)
+        btns[o] = b
+        b.Activated:Connect(function()
+            paint(o)
+            if onChange then
+                onChange(o)
+            end
+        end)
+    end
+    function obj.set(v)
+        paint(v)
+    end
+    obj.frame = f
+    paint(initial)
+    return obj
+end
+
+local function toggleRow(parent, text, initial, onChange, order)
+    local row = new("Frame", { Size = UDim2.new(1, -6, 0, 34), BackgroundColor3 = CARD, BorderSizePixel = 0, LayoutOrder = order or 0 }, parent)
+    round(row, 8)
+    label(row, text, 12, TXT, Enum.Font.GothamMedium, { Position = UDim2.new(0, 10, 0, 0), Size = UDim2.new(1, -66, 1, 0), TextWrapped = false })
+    local sw = new("TextButton", {
+        Text = "", Size = UDim2.new(0, 40, 0, 20), Position = UDim2.new(1, -50, 0.5, -10),
+        BackgroundColor3 = LINE, AutoButtonColor = false, BorderSizePixel = 0,
+    }, row)
+    round(sw, 10)
+    local knob = new("Frame", { Size = UDim2.new(0, 16, 0, 16), Position = UDim2.new(0, 2, 0.5, -8), BackgroundColor3 = WHITE, BorderSizePixel = 0 }, sw)
+    round(knob, 8)
+    local state = initial
+    local function paint()
+        tw(sw, { BackgroundColor3 = state and NEON_DARK or LINE }, 0.12)
+        tw(knob, { Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8) }, 0.12)
+    end
+    paint()
+    sw.Activated:Connect(function()
+        state = not state
+        paint()
+        onChange(state)
+    end)
+    return { set = function(v) state = v; paint() end }
+end
+
+local function segRow(parent, text, options, initial, onChange, order)
+    local row = new("Frame", { Size = UDim2.new(1, -6, 0, 36), BackgroundColor3 = CARD, BorderSizePixel = 0, LayoutOrder = order or 0 }, parent)
+    round(row, 8)
+    label(row, text, 12, TXT, Enum.Font.GothamMedium, { Position = UDim2.new(0, 10, 0, 0), Size = UDim2.new(0.4, 0, 1, 0), TextWrapped = false })
+    return segmented(row, options, initial, onChange, UDim2.new(0.4, 0, 0.5, -12), UDim2.new(0.6, -8, 0, 24))
+end
+
+local function sectionLabel(parent, text, order)
+    return label(parent, string.upper(text), 10, MUTED, Enum.Font.GothamBold, {
+        Size = UDim2.new(1, -6, 0, 16), LayoutOrder = order or 0, TextWrapped = false,
+    })
+end
+
+local function countKeys(t)
+    local n = 0
+    for _ in pairs(t) do
+        n += 1
+    end
+    return n
+end
+
+local function hasKey(k)
+    return type(k) == "string" and k ~= "" and k ~= "PUT_KEY_HERE"
+end
+
+local function copyToClipboard(text)
+    local fn = setclipboard or toclipboard or (syn and syn.write_clipboard) or (Clipboard and Clipboard.set)
+    if not fn then
+        return false
+    end
+    return (pcall(fn, text))
+end
+
+-- ============================== GUI ROOT ==============================
+local gui = Instance.new("ScreenGui")
+gui.Name = "PhantomOS"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.IgnoreGuiInset = true
+
+pcall(function()
+    if syn and syn.protect_gui then
+        syn.protect_gui(gui)
+    end
+end)
+local parented = false
+pcall(function()
+    if gethui then
+        gui.Parent = gethui()
+        parented = gui.Parent ~= nil
+    end
+end)
+if not parented then
+    pcall(function()
+        gui.Parent = game:GetService("CoreGui")
+        parented = gui.Parent ~= nil
+    end)
+end
+if not parented then
+    gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local main = new("Frame", {
+    Name = "Main", Size = UDim2.new(0, 300, 0, 380), Position = UDim2.new(0, 8, 0.5, -190),
+    BackgroundColor3 = BG, BorderSizePixel = 0, Active = true, ClipsDescendants = true,
+}, gui)
+round(main, 14)
+outline(main, NEON, 1.5, 0.15)
+local lastFull = main.Size
+
+-- Header
+local header = new("Frame", { Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = PANEL, BorderSizePixel = 0 }, main)
+new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(28, 33, 46), Color3.fromRGB(16, 18, 26)), Rotation = 90 }, header)
+new("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = NEON, BackgroundTransparency = 0.6, BorderSizePixel = 0 }, header)
+label(header, "🔮 PHANTOM OS", 15, NEON, Enum.Font.GothamBlack, { Position = UDim2.new(0, 12, 0, 4), Size = UDim2.new(1, -120, 0, 20), TextWrapped = false })
+label(header, "AI Moderation Suite • v6", 9, MUTED, Enum.Font.Gotham, { Position = UDim2.new(0, 12, 0, 23), Size = UDim2.new(1, -120, 0, 12), TextWrapped = false })
+
+local statusDot = new("Frame", { Size = UDim2.new(0, 8, 0, 8), Position = UDim2.new(1, -92, 0, 16), BackgroundColor3 = GREEN, BorderSizePixel = 0 }, header)
+round(statusDot, 4)
+
+local miniBtn = button(header, "—", CARD, UDim2.new(0, 26, 0, 24), UDim2.new(1, -62, 0, 8), nil, 13)
+local closeBtn = button(header, "✕", RED, UDim2.new(0, 26, 0, 24), UDim2.new(1, -32, 0, 8), nil, 12)
+
+-- Drag (header)
+do
+    local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
+    track(header.InputBegan, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging, dragStart, startPos = true, input.Position, main.Position
+            local c
+            c = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    if c then
+                        c:Disconnect()
+                    end
+                end
+            end)
+        end
+    end)
+    track(header.InputChanged, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    track(UserInputService.InputChanged, function(input)
+        if dragging and input == dragInput and dragStart and startPos then
+            local d = input.Position - dragStart
+            tw(main, { Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y) }, 0.07)
+        end
+    end)
+end
+
+-- Tabs
+local tabNames = { "Live", "Strikes", "Reports", "AI Chat", "Setup" }
+local pages, tabButtons = {}, {}
+local tabBar = new("Frame", { Position = UDim2.new(0, 8, 0, 46), Size = UDim2.new(1, -16, 0, 28), BackgroundColor3 = PANEL, BorderSizePixel = 0 }, main)
+round(tabBar, 8)
+local indicator = new("Frame", {
+    Size = UDim2.new(1 / #tabNames, -8, 0, 2), Position = UDim2.new(0, 4, 1, -3), BackgroundColor3 = NEON, BorderSizePixel = 0,
+}, tabBar)
+round(indicator, 1)
+
+local content = new("Frame", {
+    Position = UDim2.new(0, 8, 0, 80), Size = UDim2.new(1, -16, 1, -88), BackgroundTransparency = 1, ClipsDescendants = true,
+}, main)
+
+local function selectTab(name)
+    for i, n in ipairs(tabNames) do
+        pages[n].Visible = (n == name)
+        tabButtons[n].TextColor3 = (n == name) and NEON or MUTED
+        if n == name then
+            tw(indicator, { Position = UDim2.new((i - 1) / #tabNames, 4, 1, -3) }, 0.18)
+        end
+    end
+end
+
+for i, name in ipairs(tabNames) do
+    local b = new("TextButton", {
+        Position = UDim2.new((i - 1) / #tabNames, 0, 0, 0), Size = UDim2.new(1 / #tabNames, 0, 1, -2),
+        BackgroundTransparency = 1, Text = name, TextColor3 = MUTED, Font = Enum.Font.GothamBold, TextSize = 10,
+        AutoButtonColor = false,
+    }, tabBar)
+    tabButtons[name] = b
+    pages[name] = new("Frame", { Name = name, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Visible = false }, content)
+    b.Activated:Connect(function()
+        selectTab(name)
+    end)
+end
+
+-- Resize grip + minimize
+local grip = new("TextButton", {
+    Text = "◢", Size = UDim2.new(0, 24, 0, 24), Position = UDim2.new(1, -24, 1, -24), BackgroundTransparency = 1,
+    TextColor3 = MUTED, TextSize = 14, Font = Enum.Font.GothamBold, ZIndex = 30, AutoButtonColor = false,
+}, main)
+do
+    local rs, rInput, rStart, rSize = false, nil, nil, nil
+    track(grip.InputBegan, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            rs, rStart, rSize = true, input.Position, main.AbsoluteSize
+            local c
+            c = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    rs = false
+                    if c then
+                        c:Disconnect()
+                    end
+                end
+            end)
+        end
+    end)
+    track(grip.InputChanged, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            rInput = input
+        end
+    end)
+    track(UserInputService.InputChanged, function(input)
+        if rs and input == rInput and rStart and rSize then
+            local d = input.Position - rStart
+            main.Size = UDim2.new(0, math.clamp(rSize.X + d.X, 260, 480), 0, math.clamp(rSize.Y + d.Y, 300, 560))
+        end
+    end)
+end
+
+local minimized = false
+miniBtn.Activated:Connect(function()
+    minimized = not minimized
+    if minimized then
+        lastFull = main.Size
+        tabBar.Visible, content.Visible, grip.Visible = false, false, false
+        setBtn(miniBtn, "+")
+        tw(main, { Size = UDim2.new(0, main.AbsoluteSize.X, 0, 40) }, 0.18)
+    else
+        setBtn(miniBtn, "—")
+        tw(main, { Size = lastFull }, 0.18)
+        task.delay(0.12, function()
+            if alive then
+                tabBar.Visible, content.Visible, grip.Visible = true, true, true
+            end
+        end)
+    end
+end)
+
+-- Toasts
+local toastLayer = new("Frame", {
+    AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 8, 1, -28), Size = UDim2.new(1, -16, 0, 120),
+    BackgroundTransparency = 1, ZIndex = 40,
+}, main)
+new("UIListLayout", { VerticalAlignment = Enum.VerticalAlignment.Bottom, Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, toastLayer)
+local toastN = 0
+
+local function toast(text, color)
+    if not alive then
+        return
+    end
+    toastN += 1
+    local t = new("Frame", {
+        Size = UDim2.new(1, 0, 0, 26), BackgroundColor3 = CARD, BorderSizePixel = 0, LayoutOrder = toastN, ZIndex = 41,
+    }, toastLayer)
+    round(t, 8)
+    local st = outline(t, color or NEON, 1, 0.2)
+    label(t, text, 11, TXT, Enum.Font.GothamMedium, {
+        Size = UDim2.new(1, -12, 1, 0), Position = UDim2.new(0, 8, 0, 0), TextWrapped = false, ZIndex = 42,
+    })
+    local kids = toastLayer:GetChildren()
+    local count = 0
+    for _, k in ipairs(kids) do
+        if k:IsA("Frame") then
+            count += 1
+        end
+    end
+    if count > 3 then
+        for _, k in ipairs(kids) do
+            if k:IsA("Frame") and k ~= t then
+                k:Destroy()
+                break
+            end
+        end
+    end
+    task.delay(2.6, function()
+        if t.Parent then
+            tw(t, { BackgroundTransparency = 1 }, 0.25)
+            tw(st, { Transparency = 1 }, 0.25)
+            task.wait(0.28)
+            t:Destroy()
+        end
+    end)
+end
+
+local function notify(text)
+    toast(text, AMBER)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", { Title = "🔮 Phantom OS", Text = text, Duration = 5 })
+    end)
+end
+
+local function flashBtn(btn, ok, original)
+    setBtn(btn, nil, ok and GREEN or RED)
+    task.delay(0.7, function()
+        if alive and btn.Parent then
+            setBtn(btn, nil, original)
+        end
+    end)
+end
+
+-- ============================== PERSISTENCE ==============================
+local learned, whitelist, custom = {}, {}, {}
+local saveQueued = false
+
+local function markSave()
+    if saveQueued or not writefile then
+        return
+    end
+    saveQueued = true
+    task.delay(3, function()
+        saveQueued = false
+        pcall(function()
+            writefile(CFG.SAVE_FILE, HttpService:JSONEncode({ learned = learned, whitelist = whitelist, custom = custom }))
+        end)
+    end)
+end
+
+pcall(function()
+    if isfile and readfile and isfile(CFG.SAVE_FILE) then
+        local d = HttpService:JSONDecode(readfile(CFG.SAVE_FILE))
+        if type(d) == "table" then
+            if type(d.learned) == "table" then learned = d.learned end
+            if type(d.whitelist) == "table" then whitelist = d.whitelist end
+            if type(d.custom) == "table" then custom = d.custom end
+        end
+    end
+end)
+
+-- ============================== TEXT NORMALIZATION ==============================
+local HOMO = {
+    [0x430] = "a", [0x435] = "e", [0x43E] = "o", [0x440] = "p", [0x441] = "c", [0x445] = "x", [0x443] = "y",
+    [0x456] = "i", [0x455] = "s", [0x4CF] = "l",
+    [0x410] = "a", [0x415] = "e", [0x41E] = "o", [0x420] = "p", [0x421] = "c", [0x425] = "x", [0x423] = "y",
+    [0x406] = "i", [0x405] = "s", [0x3BF] = "o", [0x3B1] = "a", [0x3B9] = "i", [0x3BD] = "v",
+    [0xE0] = "a", [0xE1] = "a", [0xE2] = "a", [0xE3] = "a", [0xE4] = "a", [0xE5] = "a",
+    [0xE8] = "e", [0xE9] = "e", [0xEA] = "e", [0xEB] = "e", [0xEC] = "i", [0xED] = "i", [0xEE] = "i", [0xEF] = "i",
+    [0xF2] = "o", [0xF3] = "o", [0xF4] = "o", [0xF5] = "o", [0xF6] = "o",
+    [0xF9] = "u", [0xFA] = "u", [0xFB] = "u", [0xFC] = "u", [0xE7] = "c", [0xF1] = "n",
+}
+local ZERO = { [0x200B] = true, [0x200C] = true, [0x200D] = true, [0x200E] = true, [0x200F] = true, [0x2060] = true, [0xFEFF] = true, [0xAD] = true }
+
+local function foldUnicode(s)
+    if not s:find("[\128-\255]") then
+        return s
+    end
+    if not utf8.len(s) then
+        return (s:gsub("[\128-\255]", " "))
+    end
+    local out = {}
+    for _, cp in utf8.codes(s) do
+        if not ZERO[cp] then
+            if cp < 128 then
+                out[#out + 1] = string.char(cp)
+            elseif cp >= 0xFF01 and cp <= 0xFF5E then
+                out[#out + 1] = string.char(cp - 0xFEE0)
+            elseif HOMO[cp] then
+                out[#out + 1] = HOMO[cp]
+            else
+                out[#out + 1] = " "
+            end
+        end
+    end
+    return table.concat(out)
+end
+
+local function c2(s)
+    return (s:gsub("(%a)%1%1+", "%1%1"))
+end
+local function c1(s)
+    return (s:gsub("(%a)%1+", "%1"))
+end
+
+local LEET = { ["0"] = "o", ["1"] = "i", ["3"] = "e", ["4"] = "a", ["5"] = "s", ["@"] = "a", ["$"] = "s" }
+
+local function normalize(msg)
+    local s = foldUnicode(msg):lower():gsub("[01345@%$]", function(ch)
+        return LEET[ch] or ch
+    end)
+    return c2(s)
+end
+
+local SYMS = "[%*%.%-_~'`%^%+|\\/\"%(%)%[%]{}<>,;:]"
+
+local function skeleton(t)
+    local s = t:gsub("[aeiouyh]", "")
+    s = s:gsub("(.)%1+", "%1")
+    return s
+end
+
+local function tokenize(norm)
+    local raw = {}
+    for t in norm:gmatch("%a+") do
+        raw[#raw + 1] = t
+    end
+    local out, run = {}, {}
+    local function flush()
+        if #run >= 3 then
+            out[#out + 1] = table.concat(run)
+        else
+            for _, r in ipairs(run) do
+                out[#out + 1] = r
+            end
+        end
+        run = {}
+    end
+    for _, t in ipairs(raw) do
+        if #t == 1 then
+            run[#run + 1] = t
+        else
+            flush()
+            out[#out + 1] = t
+        end
+    end
+    flush()
+    return out
+end
+
+-- ============================== DICTIONARY ==============================
+local GROUPS = {
+    { cat = "profanity", sev = 2, list = {
+        "fuck", "fuk", "fck", "fuq", "fvck", "phuck", "fuxk", "fxck", "=fu", "=foad", "=fk", "=mf", "=mofo",
+        "shit", "bitch", "biatch", "bytch", "=btch", "asshole", "=ass", "=azz", "dick", "=dik", "=cock", "=cocks",
+        "cunt", "bastard", "slut", "whore", "pussy", "wanker", "motherfucker", "=stfu",
+        "dumbass", "jackass", "bullshit", "dipshit", "=fuckin", "=fuking",
+    } },
+    { cat = "hindi", sev = 2, list = {
+        "=mkc", "=bkl", "=bsdk", "=bsdke", "=bhosdk", "chutiya", "chutiye", "chutia", "chutya", "chootiya",
+        "chutiyapa", "=chut", "=choot", "=chutad", "madarchod", "madharchod", "maderchod", "madrchod",
+        "behenchod", "bhenchod", "behnchod", "benchod", "bhnchod", "bahenchod", "bhosdike", "bhosdika",
+        "bhosdi", "bhosda", "bhosad", "bhosri", "gandu", "gaandu", "=gand", "=gaand", "gandfat", "gaandfat",
+        "=randi", "=raand", "=rundi", "randwa", "harami", "haramzada", "haramkhor", "kamina", "kamine", "kamini",
+        "=kutta", "=kutti", "=kuttey", "kuttiya", "=lund", "=lunds", "lauda", "lavda", "lawda", "=lode", "=loda",
+        "=lodu", "jhaatu", "jhatu", "=jhant", "=jhaant", "=tatti", "=chinal", "=chinaal", "=hijra", "=hijda",
+        "madarjat",
+    } },
+    { cat = "hindi", sev = 3, ambig = true, list = {
+        "=tmc", "=tmkc", "=tmb", "=tmx", "=tmkb", "=tmkx", "=tmsb", "=bkc", "=mcbc", "=bcmc", "=mkb",
+    } },
+    { cat = "hindi", sev = 2, ambig = true, list = {
+        "=cud", "=cuda", "=chud", "=chuda", "=chudai", "=cudai", "=chod", "=choda", "=chodu", "=chodna",
+        "=chudna", "=bc", "=mc", "=chudo", "=cudo",
+    } },
+    { cat = "sexual", sev = 3, list = { "nudes", "porn", "onlyfans", "sexting", "=horny", "=nude", "=sex", "=erp" } },
+    { cat = "scam", sev = 4, list = {
+        "railway", "freerobux", "free robux", "robux generator", "robuxgenerator", "free limiteds", "freelimiteds", "free rbx",
+    } },
+    { cat = "harass", sev = 4, list = {
+        "=kys", "killyourself", "kill yourself", "go die", "nobody likes you", "everyone hates you",
+        "unalive yourself", "neck yourself", "off yourself", "drink bleach", "rope yourself",
+    } },
+    { cat = "threat", sev = 5, list = {
+        "kill you", "i will find you", "your address", "=dox", "=doxx", "doxxing", "=swat", "=swatting", "=ddos",
+        "ip grab", "ipgrab", "your ip",
+    } },
+    { cat = "hate", sev = 5, list = {
+        "nigger", "nigga", "faggot", "=fag", "=fags", "=retard", "=retards", "=retarded", "tranny", "=chink", "=spic", "=kike",
+    } },
+}
+
+local SCAM_PATTERNS = {
+    { "loadstring", "scam", 4 }, { "httpget", "scam", 4 }, { "pastebin.com", "scam", 3 },
+    { "discord.gg/", "offsite", 2 }, { "discord.com/invite", "offsite", 2 }, { "dsc.gg/", "offsite", 2 },
+    { "t.me/", "offsite", 2 }, { "bit.ly/", "offsite", 2 }, { "tinyurl.com", "offsite", 2 },
+}
+local SCRIPT_WORDS = { "script", "exploit", "executor", "hack", "cheat", "aimbot", "injector" }
+local PUSH_WORDS = { "free", "download", "dm me", "link in", "join my", "get it", "get the", "best ", "paste", "click" }
+local ROBUX_WORDS = { "robux", "rbx", "limiteds" }
+local GIFT_WORDS = { "free", "giveaway", "claim", "generator", "gift", "winner" }
+
+local REASONS = {
+    profanity = "Roblox Community Standards – Civility and Respect / Terms of Use: Abusive and profane language in chat.",
+    hindi = "Roblox Community Standards – Civility and Respect / Terms of Use: Abusive language (Hindi/Hinglish insults, abbreviations or evasion spellings) used to insult or harass other users.",
+    sexual = "Roblox Community Standards – Sexual Content and Adult Material / Terms of Use: Sexual or adult content in chat.",
+    scam = "Roblox Community Standards – Fraud, Scams and Deceptive Practices / Terms of Use: Promotion of scams, free-Robux schemes, or exploit/script advertising.",
+    harass = "Roblox Community Standards – Bullying and Harassment / Terms of Use: Targeted harassment or encouraging self-harm.",
+    threat = "Roblox Community Standards – Threats and Violent Content / Terms of Use: Threats, doxxing or attacks against a user.",
+    hate = "Roblox Community Standards – Hate Speech and Discrimination / Terms of Use: Use of discriminatory or hateful language.",
+    spam = "Roblox Community Standards – Spam and Disruptive Behavior / Terms of Use: Chat flooding, copy-paste spam waves or symbol floods.",
+    offsite = "Roblox Community Standards – Off-Platform Communication / Terms of Use: Sharing off-platform invite links in chat.",
+    filtered = "Roblox Community Standards – Civility and Respect / Terms of Use: Message was blocked/tagged (####) by Roblox's own chat filter as inappropriate.",
+}
+
+local VALID_CAT = { profanity = true, hindi = true, harass = true, hate = true, sexual = true, scam = true, threat = true, spam = true, offsite = true }
+
+local SUSPECT_PHRASES = {
+    "teri maa", "teri ma ", "tere maa", "maa ki", "ma ki", "behen ki", "bhen ki",
+    "your mom", "ur mom", "ur mother", "your mother", "yo mama", "yo momma",
+    "unalive", "un alive", "sleep forever", "delete yourself", "uninstall yourself",
+    "do us a favor", "end it all", "nobody asked", "no one asked",
+    "send pic", "send pics", "show pic", "are you a girl", "are you a boy", "how old are you",
+    "where do you live", "what school", "add me on", "dm me", "snapchat", "whats your snap",
+}
+
+local CONSONANT_OK = {}
+for w in ([[brb lol idk omg smh tbh imo wtf ngl fyi pls plz thx lmao rofl tbf irl afk btw nvm hmm hmmm mhm shh psst
+pfft tsk grr brr tmrw tmr ppl bcz sry gtg ttyl hbu wbu lmfao thnks ctrl lmk dnd bbl nps hmph]]):gmatch("%a+") do
+    CONSONANT_OK[w] = true
+end
+
+local TARGET_WORDS = {
+    you = true, u = true, ur = true, your = true, youre = true,
+    tu = true, tum = true, tera = true, teri = true, tere = true, tujhe = true, tumhe = true,
+}
+
+local STOP = {}
+for w in ([[the and you are for that this with have not but what all can your was get got its just like how why who yes now out
+one two let lets hey hello please thanks bro dude man guys game play join team help come here there then they them was were
+will would could should been being from into over some more very much too also only even still than when where which while
+about after again because before really good nice cool okay yeah well]]):gmatch("%a+") do
+    STOP[w] = true
+end
+
+local exactSet, builtin, substrList, suspectList, SKEL = {}, {}, {}, {}, {}
+local remoteSet, remotePhrases = {}, {}
+local remoteStats = { words = 0, phrases = 0, status = "not loaded" }
+
+local function addExact(token, cat, sev, ambig, isBuiltin)
+    local e = { cat = cat, sev = sev, ambig = ambig }
+    local k2 = c2(token)
+    exactSet[k2] = e
+    local k1 = c1(token)
+    if #k1 >= 4 then
+        exactSet[k1] = e
+    end
+    if isBuiltin then
+        builtin[k2] = true
+        builtin[k1] = true
+    end
+end
+
+for _, g in ipairs(GROUPS) do
+    for _, w in ipairs(g.list) do
+        if w:sub(1, 1) == "=" then
+            addExact(w:sub(2), g.cat, g.sev, g.ambig, true)
+        else
+            local w2, w1 = c2(w), c1(w)
+            table.insert(substrList, { w2, g.cat, g.sev, (w2:gsub("[^%a]", "")), (#w1 >= 4) and w1 or nil })
+        end
+    end
+end
+for _, p in ipairs(SUSPECT_PHRASES) do
+    table.insert(suspectList, c2(p))
+end
+for _, root in ipairs({ "madarchod", "behenchod", "bhosdike" }) do
+    SKEL[skeleton(root)] = root
+end
+for tok, v in pairs(learned) do
+    if type(v) == "table" then
+        addExact(tok, v.cat or "profanity", v.sev or 2, nil, false)
+    end
+end
+for tok, v in pairs(custom) do
+    if type(v) == "table" then
+        addExact(tok, v.cat or "profanity", v.sev or 3, nil, false)
+    end
+end
+
+-- ============================== RECORDS / ANALYSIS ==============================
+local strikes, chatLog, flood = {}, {}, {}
+local wave, waveN = {}, 0
+local scheduleStrikeRefresh, updateStatus, refreshReports -- forward declarations
+
+local function keyOf(player)
+    return (typeof(player) == "Instance" and player.UserId) or tostring(player)
+end
+
+local function getRecord(player)
+    local k = keyOf(player)
+    local rec = strikes[k]
+    if not rec then
+        local isInst = typeof(player) == "Instance"
+        rec = {
+            key = k, player = isInst and player or nil,
+            name = isInst and player.Name or tostring(player),
+            display = isInst and player.DisplayName or tostring(player),
+            userId = isInst and player.UserId or 0,
+            age = isInst and player.AccountAge or 0,
+            count = 0, tags = 0, reports = 0, maxSev = 0, nextAlert = CFG.STRIKE_ALERT, incidents = {},
+        }
+        strikes[k] = rec
+    end
+    return rec
+end
+
+local function anyIn(s, list)
+    for _, v in ipairs(list) do
+        if s:find(v, 1, true) then
+            return v
+        end
+    end
+    return nil
+end
+
+-- returns sev, cats, hits, doubt, hint, ctoks, targeted
+local function analyze(player, msg, stateless)
+    local norm = normalize(msg)
+    local glued = (norm:gsub(SYMS, ""))
+    local variants = { norm }
+    if glued ~= norm then
+        variants[2] = glued
+    end
+
+    local sev, catSet, cats, hits = 0, {}, {}, {}
+    local doubt, hints, ctoks, seenTok = false, {}, {}, {}
+    local function hit(cat, s, word)
+        if not catSet[cat] then
+            catSet[cat] = true
+            cats[#cats + 1] = cat
+        end
+        hits[#hits + 1] = word
+        if s > sev then
+            sev = s
+        end
+    end
+    local function addDoubt(tok, h)
+        doubt = true
+        hints[#hints + 1] = h
+        if tok and not seenTok[tok] then
+            seenTok[tok] = true
+            ctoks[#ctoks + 1] = tok
+        end
+    end
+
+    local targeted = false
+    for _, vs in ipairs(variants) do
+        local tokens = tokenize(vs)
+        local joined = table.concat(tokens, " ")
+        local joinedSq = c1(joined)
+        local compact = (joined:gsub("[^%a]", ""))
+
+        for _, tok in ipairs(tokens) do
+            local e = exactSet[tok]
+            if not e and #tok >= 4 then
+                e = exactSet[c1(tok)]
+            end
+            if e then
+                hit(e.cat, e.sev, tok)
+                if e.ambig then
+                    addDoubt(tok, "'" .. tok .. "' may be a Hindi abuse abbreviation/evasion spelling or harmless")
+                end
+            elseif not whitelist[tok] then
+                if #tok >= 4 and (remoteSet[tok] or remoteSet[c1(tok)]) and not STOP[tok] then
+                    addDoubt(tok, "'" .. tok .. "' is on public bad-word lists (may be harmless)")
+                elseif #tok >= 5 and SKEL[skeleton(tok)] then
+                    hit("hindi", 3, tok)
+                    addDoubt(tok, "'" .. tok .. "' sounds like Hindi abuse '" .. SKEL[skeleton(tok)] .. "'")
+                elseif #tok >= 3 and #tok <= 6 and not tok:find("[aeiouy]") and not CONSONANT_OK[tok] then
+                    addDoubt(tok, "unknown abbreviation '" .. tok .. "'")
+                end
+            end
+            if TARGET_WORDS[tok] then
+                targeted = true
+            end
+        end
+
+        for _, e in ipairs(substrList) do
+            local w, cat, s, wc, w1 = e[1], e[2], e[3], e[4], e[5]
+            if joined:find(w, 1, true) or (w1 and joinedSq:find(w1, 1, true)) or (#wc >= 7 and compact:find(wc, 1, true)) then
+                hit(cat, s, w)
+            end
+        end
+        for _, p in ipairs(suspectList) do
+            if joined:find(p, 1, true) then
+                addDoubt(nil, "phrase '" .. p .. "' may hide an insult or unsafe request")
+                break
+            end
+        end
+    end
+
+    local rawLow = foldUnicode(msg):lower()
+    for _, p in ipairs(SCAM_PATTERNS) do
+        if rawLow:find(p[1], 1, true) then
+            hit(p[2], p[3], p[1])
+            if p[3] >= 3 then
+                addDoubt(nil, "contains '" .. p[1] .. "' (possible spam/scam script)")
+            end
+        end
+    end
+    if anyIn(rawLow, SCRIPT_WORDS) and anyIn(rawLow, PUSH_WORDS) then
+        hit("scam", 3, "script-ad")
+        addDoubt(nil, "looks like a script/exploit advertisement")
+    end
+    if anyIn(rawLow, ROBUX_WORDS) and anyIn(rawLow, GIFT_WORDS) then
+        hit("scam", 4, "robux-scam")
+        addDoubt(nil, "possible free-Robux scam")
+    end
+    for _, ph in ipairs(remotePhrases) do
+        if rawLow:find(ph, 1, true) then
+            hit("scam", 3, ph)
+            addDoubt(nil, "matches known spam phrase '" .. ph .. "'")
+            break
+        end
+    end
+    if #msg >= 60 then
+        local _, letters = msg:gsub("%a", "")
+        if letters / #msg < 0.35 then
+            hit("spam", 2, "symbol-flood")
+        end
+    end
+
+    if sev >= 2 and targeted then
+        sev = math.min(5, sev + 1)
+    end
+
+    if not stateless and typeof(player) == "Instance" then
+        local now = os.clock()
+        local f = flood[player]
+        if not f then
+            f = { times = {}, last = "", lastT = 0, dup = 0 }
+            flood[player] = f
+        end
+        table.insert(f.times, now)
+        while #f.times > 0 and now - f.times[1] > 6 do
+            table.remove(f.times, 1)
+        end
+        local low = msg:lower()
+        if low == f.last and now - f.lastT < 20 then
+            f.dup += 1
+        else
+            f.dup = 1
+        end
+        f.last, f.lastT = low, now
+        if #f.times >= 5 or f.dup >= 3 then
+            hit("spam", 2, "flood")
+        end
+
+        if #msg >= 12 then
+            local w = wave[norm]
+            if not w or now - w.t > 20 then
+                if not w then
+                    waveN += 1
+                end
+                w = { t = now, players = {}, n = 0 }
+                wave[norm] = w
+            end
+            if not w.players[player] then
+                w.players[player] = true
+                w.n += 1
+            end
+            if w.n >= 3 then
+                hit("spam", 3, "wave")
+                addDoubt(nil, "same text posted by " .. w.n .. " different players (spam wave)")
+            end
+            if waveN > 80 then
+                for k, v in pairs(wave) do
+                    if now - v.t > 30 then
+                        wave[k] = nil
+                    end
+                end
+                waveN = countKeys(wave)
+            end
+        end
+
+        local rec = strikes[keyOf(player)]
+        if rec and rec.count >= 3 and sev > 0 then
+            sev = math.min(5, sev + 1)
+        end
+    end
+
+    return sev, cats, hits, doubt, table.concat(hints, "; "), ctoks, targeted
+end
+
+local function quickSeverity(msg)
+    local s = analyze(nil, msg, true)
+    return s
+end
+
+-- ---------- Tag (####) helpers ----------
+local function isTagged(text)
+    return text:find("###", 1, true) ~= nil
+end
+
+local function posMatch(tagged, raw)
+    if #tagged ~= #raw then
+        return false
+    end
+    local anyTag = false
+    for i = 1, #tagged do
+        local a = tagged:sub(i, i)
+        if a == "#" then
+            anyTag = true
+        elseif a ~= raw:sub(i, i) then
+            return false
+        end
+    end
+    return anyTag
+end
+
+local function filteredWords(raw, tagged)
+    local out, total = {}, 0
+    for s, w, e in raw:gmatch("()(%a+)()") do
+        total += 1
+        if tagged:sub(s, e - 1):find("#", 1, true) then
+            out[#out + 1] = w:lower()
+        end
+    end
+    return out, total
+end
+
+local function logMessage(player, msg, opts)
+    local k = keyOf(player)
+    local log = chatLog[k]
+    if not log then
+        log = {}
+        chatLog[k] = log
+    end
+    local entry = {
+        t = os.clock(), time = os.date("%H:%M:%S"), text = msg,
+        tagged = opts.tagged or false, tagText = opts.tagText, taggedOnly = opts.taggedOnly or false,
+    }
+    log[#log + 1] = entry
+    if #log > 15 then
+        table.remove(log, 1)
+    end
+    return entry
+end
+
+local function findRaw(player, taggedText)
+    local log = chatLog[keyOf(player)]
+    if not log then
+        return nil
+    end
+    local now = os.clock()
+    for i = #log, 1, -1 do
+        local e = log[i]
+        if now - e.t > 6 then
+            break
+        end
+        if not e.tagged and not e.taggedOnly and posMatch(taggedText, e.text) then
+            return e
+        end
+    end
+    return nil
+end
+
+-- ============================== REPORT / EVIDENCE BUILDERS ==============================
+local function reasonText(cats)
+    local parts = {}
+    for _, c in ipairs(cats) do
+        parts[#parts + 1] = REASONS[c] or c
+    end
+    return table.concat(parts, " ")
+end
+
+local function gameInfo()
+    return "Game PlaceId: " .. tostring(game.PlaceId) .. " | JobId: " .. tostring(game.JobId)
+end
+
+local function buildLogTextFor(key, name, userId)
+    local log = chatLog[key] or {}
+    local lines = { "CHAT LOG — " .. tostring(name) .. " (UserId " .. tostring(userId) .. ") | " .. gameInfo() }
+    if #log == 0 then
+        lines[#lines + 1] = "(no messages captured)"
+    end
+    for _, e in ipairs(log) do
+        local line = "[" .. e.time .. "] " .. e.text
+        if e.taggedOnly then
+            line = line .. "   ← TAGGED by Roblox (original hidden)"
+        elseif e.tagged then
+            line = line .. "   ← TAGGED by Roblox as: " .. tostring(e.tagText)
+        end
+        lines[#lines + 1] = line
+    end
+    return table.concat(lines, "\n")
+end
+
+local POLICY = {
+    profanity = { title = "Civility and Respect", desc = "used profane and abusive language in public chat",
+        rule = "Abusive or profane language toward or around other players is not permitted under the Roblox Community Standards and Terms of Use." },
+    hindi = { title = "Civility and Respect", desc = "used abusive Hindi/Hinglish language, including abbreviations or altered spellings meant to get around the chat filter",
+        rule = "Insults and abuse are not permitted in any language, and deliberately disguising them (abbreviations, altered spellings) to avoid the filter is itself a violation." },
+    sexual = { title = "Sexual Content and Adult Material", desc = "posted sexual or adult content in public chat",
+        rule = "Sexual or adult content is not permitted in chat on the platform." },
+    scam = { title = "Fraud, Scams and Deceptive Practices", desc = "posted a scam, free-Robux, or exploit/script advertisement in chat",
+        rule = "Promoting scams, fake giveaways, or exploit scripts is a deceptive practice that puts other players' accounts at risk." },
+    harass = { title = "Bullying and Harassment", desc = "harassed another player and/or encouraged self-harm in chat",
+        rule = "Harassment, bullying, and encouraging self-harm are not permitted." },
+    threat = { title = "Threats and Violent Content", desc = "made threats or doxxing/attack-related statements in chat",
+        rule = "Threats and attempts to expose or attack other users are not permitted." },
+    hate = { title = "Hate Speech and Discrimination", desc = "used hateful or discriminatory language in chat",
+        rule = "Hate speech and discriminatory language are not permitted." },
+    spam = { title = "Spam and Disruptive Behavior", desc = "spammed the chat (flooding, repeated or copy-paste messages)",
+        rule = "Flooding or repeatedly posting the same content disrupts other players' experience." },
+    offsite = { title = "Off-Platform Communication", desc = "posted an off-platform invite link in chat",
+        rule = "Directing players to external platforms through chat is not permitted." },
+    filtered = { title = "Civility and Respect", desc = "wrote a message that Roblox's own chat filter tagged as inappropriate",
+        rule = "The message was blocked/tagged by Roblox's automated chat filter as inappropriate." },
+}
+
+local function buildShortReport(info)
+    local p = POLICY[info.cat] or POLICY.profanity
+    local m = info.msg
+    if #m > 90 then
+        m = m:sub(1, 90) .. "..."
+    end
+    local s = "Reporting " .. info.name .. " (UserId " .. tostring(info.userId) .. ") who " .. p.desc
+        .. ". Message: \"" .. m .. "\" at " .. info.time .. ". "
+    if info.targeted then
+        s = s .. "It was aimed at another player. "
+    end
+    if info.count and info.count > 1 then
+        s = s .. "This is flagged message #" .. info.count .. " from this user this session. "
+    end
+    if info.tagged then
+        s = s .. "Roblox's own filter also tagged it. "
+    end
+    return s .. "Violates the Community Standards (" .. p.title .. ")."
+end
+
+local function buildTinyReport(info)
+    local m = info.msg
+    if #m > 80 then
+        m = m:sub(1, 80) .. "..."
+    end
+    local s = "\"" .. m .. "\" at " .. info.time .. "."
+    if info.targeted then
+        s = s .. " Aimed at a player."
+    end
+    if info.count and info.count > 1 then
+        s = s .. " Flagged x" .. info.count .. " this session."
+    end
+    if info.tagged then
+        s = s .. " Roblox filter tagged it."
+    end
+    return s:sub(1, 190)
+end
+
+local function buildFullReport(info)
+    local p = POLICY[info.cat] or POLICY.profanity
+    local m = info.msg
+    if #m > 300 then
+        m = m:sub(1, 300) .. "..."
+    end
+    local lines = {
+        "Subject: Chat report — " .. info.name .. " (UserId " .. tostring(info.userId) .. ")",
+        "",
+        "Hello Roblox Trust & Safety,",
+        "",
+        "I am reporting the user " .. info.name .. " (display name: " .. tostring(info.display) .. ", UserId: "
+            .. tostring(info.userId) .. ", account age: " .. tostring(info.age or 0) .. " days) for violating the Roblox Community Standards ("
+            .. p.title .. ").",
+        "",
+        "What happened:",
+        "- At " .. info.time .. " in experience PlaceId " .. tostring(game.PlaceId) .. " (server JobId " .. tostring(game.JobId)
+            .. "), the user " .. p.desc .. ".",
+        "- Exact message: \"" .. m .. "\"",
+    }
+    if info.targeted then
+        lines[#lines + 1] = "- The message was directed at another player."
+    else
+        lines[#lines + 1] = "- The message was posted in public chat, visible to other players in the server."
+    end
+    if info.count and info.count > 1 then
+        lines[#lines + 1] = "- This is not an isolated incident: " .. info.count .. " flagged messages from this user were captured in this session."
+    end
+    if info.tagged then
+        lines[#lines + 1] = "- Roblox's automated chat filter also tagged at least one of this user's messages (" .. tostring(info.tags or 1) .. " tag(s))."
+    end
+    if info.extra and info.extra ~= "" then
+        lines[#lines + 1] = "- " .. info.extra
+    end
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "Why this violates the rules: " .. p.rule
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "A timestamped chat log captured live is included below as evidence."
+    lines[#lines + 1] = "Please review this report and take action consistent with your policies. Thank you."
+    return table.concat(lines, "\n")
+end
+
+local function buildReportPack(info)
+    return table.concat({
+        "=== SHORT REPORT (paste in the report comment box) ===",
+        buildShortReport(info),
+        "",
+        "=== FULL REPORT (support form / email) ===",
+        buildFullReport(info),
+        "",
+        "=== EVIDENCE ===",
+        "Severity: " .. tostring(info.sev) .. "/5 | Categories: " .. table.concat(info.cats, ", "),
+        "Rule: " .. reasonText(info.cats),
+        gameInfo(),
+        "",
+        buildLogTextFor(info.key, info.name, info.userId),
+    }, "\n")
+end
+
+local function makeInfo(player, name, msg, sev, cats, opts)
+    opts = opts or {}
+    local isInst = typeof(player) == "Instance"
+    local rec = strikes[keyOf(player)]
+    return {
+        name = name, display = isInst and player.DisplayName or name,
+        userId = isInst and player.UserId or 0, age = isInst and player.AccountAge or 0,
+        key = keyOf(player), msg = msg, sev = sev, cats = cats, cat = cats[1] or "profanity",
+        time = opts.time or os.date("%H:%M:%S"), tagged = opts.tagged, tagText = opts.tagText,
+        targeted = opts.targeted, extra = opts.extra,
+        count = rec and rec.count or 1, tags = rec and rec.tags or 0,
+    }
+end
+
+local function infoFromRec(rec)
+    local best
+    for _, x in ipairs(rec.incidents) do
+        if not best or x.sev >= best.sev then
+            best = x
+        end
+    end
+    best = best or { msg = "(see chat log)", sev = rec.maxSev, cat = "profanity", time = os.date("%H:%M:%S") }
+    return {
+        name = rec.name, display = rec.display, userId = rec.userId, age = rec.age, key = rec.key,
+        msg = best.msg, sev = best.sev, cats = { best.cat }, cat = best.cat, time = best.time,
+        tagged = rec.tags > 0, targeted = best.targeted, count = rec.count, tags = rec.tags,
+    }
+end
+
+local function buildEvidence(rec)
+    local lines = {
+        "PHANTOM OS EVIDENCE REPORT", gameInfo(),
+        "Reported user: " .. rec.name .. " (Display: " .. rec.display .. ", UserId: " .. tostring(rec.userId)
+            .. ", Account age: " .. tostring(rec.age) .. " days)",
+        "Total strikes: " .. rec.count .. " | Roblox-filter tags: " .. rec.tags .. " | Highest severity: " .. rec.maxSev .. "/5",
+        "Incidents (latest 10):",
+    }
+    local catSeen, catList = {}, {}
+    for i = math.max(1, #rec.incidents - 9), #rec.incidents do
+        local x = rec.incidents[i]
+        lines[#lines + 1] = string.format("[%s] (%s, SEV %d) \"%s\"", x.time, x.cat, x.sev, x.msg)
+    end
+    for _, x in ipairs(rec.incidents) do
+        if not catSeen[x.cat] then
+            catSeen[x.cat] = true
+            catList[#catList + 1] = x.cat
+        end
+    end
+    lines[#lines + 1] = "Applicable rules: " .. reasonText(catList)
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = buildLogTextFor(rec.key, rec.name, rec.userId)
+    return table.concat(lines, "\n")
+end
+
+-- ---------- Direct report (one tap + confirm) ----------
+-- returns status: "sent" | "noreason" | "gone" | "self" | "failed"
+local function submitReport(info, player)
+    local reason = CFG.REPORT_REASON[info.cat]
+    if not reason then
+        return "noreason"
+    end
+    if typeof(player) ~= "Instance" or not player.Parent then
+        return "gone"
+    end
+    if player == LocalPlayer then
+        return "self"
+    end
+    local ok = pcall(function()
+        Players:ReportAbuse(player, reason, buildTinyReport(info))
+    end)
+    return ok and "sent" or "failed"
+end
+
+local REPORT_MSG = {
+    noreason = "No matching Roblox reason for this category — pack copied, report manually.",
+    gone = "Player left the server — pack copied.",
+    self = "You can't report yourself.",
+    failed = "Direct report blocked on this executor — pack copied. Paste it in Roblox's report menu.",
+}
+
+-- Binds the two-step (arm → confirm) report logic to a button
+local function bindReport(btn, getInfo, getPlayer, onDone)
+    local armed, token, done = false, 0, false
+    btn.Activated:Connect(function()
+        if done then
+            return
+        end
+        if not armed then
+            armed = true
+            token += 1
+            local my = token
+            setBtn(btn, "⚠ Confirm?", AMBER)
+            task.delay(3, function()
+                if alive and armed and my == token and btn.Parent then
+                    armed = false
+                    setBtn(btn, "⚡ Report", RED)
+                end
+            end)
+            return
+        end
+        armed = false
+        token += 1
+        local wait = CFG.REPORT_COOLDOWN - (os.clock() - lastReportAt)
+        if wait > 0 then
+            toast("Cooldown: " .. math.ceil(wait) .. "s", AMBER)
+            setBtn(btn, "⚡ Report", RED)
+            return
+        end
+        local info = getInfo()
+        local status = submitReport(info, getPlayer())
+        if status == "sent" then
+            lastReportAt = os.clock()
+            done = true
+            setBtn(btn, "✅ Reported", GREEN)
+            toast("✅ Report sent: " .. info.name, GREEN)
+            if onDone then
+                onDone()
+            end
+        else
+            if status ~= "self" then
+                copyToClipboard(buildReportPack(info))
+            end
+            setBtn(btn, "📋 Pack copied", BLUE)
+            toast(REPORT_MSG[status] or "Report failed.", AMBER)
+            task.delay(2.5, function()
+                if alive and btn.Parent and not done then
+                    setBtn(btn, "⚡ Report", RED)
+                end
+            end)
+        end
+    end)
+end
+
+local function markReported(player)
+    local rec = typeof(player) == "Instance" and strikes[keyOf(player)] or nil
+    if rec then
+        rec.reports = (rec.reports or 0) + 1
+        scheduleStrikeRefresh()
+    end
+end
+
+-- ============================== STRIKE BOOKKEEPING ==============================
+local function addTag(player)
+    local rec = getRecord(player)
+    rec.tags += 1
+    tagTotal += 1
+    scheduleStrikeRefresh()
+    updateStatus()
+end
+
+local function registerFlag(player, name, msg, cats, sev, blocked, tagged, targeted)
+    local rec = getRecord(player)
+    rec.count += 1
+    if tagged then
+        rec.tags += 1
+        tagTotal += 1
+    end
+    if sev > rec.maxSev then
+        rec.maxSev = sev
+    end
+    local incident = {
+        time = os.date("%H:%M:%S"), msg = msg:sub(1, 200), cat = cats[1] or "harass", sev = sev, targeted = targeted or false,
+    }
+    table.insert(rec.incidents, incident)
+    if #rec.incidents > 20 then
+        table.remove(rec.incidents, 1)
+    end
+    flaggedCount += 1
+    lastFlagged = { name = name, msg = msg, cats = cats, sev = sev }
+
+    if not blocked then
+        if rec.count >= rec.nextAlert then
+            rec.nextAlert = rec.count + 3
+            notify("🚨 REPEAT OFFENDER: " .. name .. " (" .. rec.count .. " strikes)")
+            if CFG.AUTO_COPY_EVIDENCE then
+                copyToClipboard(buildReportPack(infoFromRec(rec)))
+            end
+        elseif sev >= 5 then
+            notify("🚨 SEVERE: " .. name .. " — " .. table.concat(cats, "+"))
+            if CFG.AUTO_COPY_EVIDENCE then
+                copyToClipboard(buildReportPack(infoFromRec(rec)))
+            end
+        elseif sev >= 4 then
+            toast(name .. " flagged (SEV " .. sev .. "): " .. table.concat(cats, "+"), RED)
+        end
+    end
+    scheduleStrikeRefresh()
+    updateStatus()
+    return incident
+end
+
+local function undoFlag(player, incident)
+    local rec = strikes[keyOf(player)]
+    if not rec or not incident then
+        return
+    end
+    for i, x in ipairs(rec.incidents) do
+        if x == incident then
+            table.remove(rec.incidents, i)
+            break
+        end
+    end
+    rec.count = math.max(0, rec.count - 1)
+    local m = 0
+    for _, x in ipairs(rec.incidents) do
+        if x.sev > m then
+            m = x.sev
+        end
+    end
+    rec.maxSev = m
+    if rec.count == 0 and rec.tags == 0 then
+        strikes[keyOf(player)] = nil
+    end
+    flaggedCount = math.max(0, flaggedCount - 1)
+    scheduleStrikeRefresh()
+    updateStatus()
+end
+
+-- ============================== OFFENDER CARDS (Strikes + Reports) ==============================
+local function sevColor(s)
+    return s >= 4 and RED or (s >= 1 and AMBER or LINE)
+end
+
+local function sortedOffenders()
+    local list = {}
+    for _, d in pairs(strikes) do
+        table.insert(list, d)
+    end
+    table.sort(list, function(a, b)
+        if a.count ~= b.count then
+            return a.count > b.count
+        end
+        if a.tags ~= b.tags then
+            return a.tags > b.tags
+        end
+        return a.name < b.name
+    end)
+    return list
+end
+
+local function avatar(parent, userId, size, pos)
+    local img = new("ImageLabel", {
+        Size = UDim2.new(0, size, 0, size), Position = pos, BackgroundColor3 = LINE, BorderSizePixel = 0,
+        Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(userId) .. "&w=60&h=60",
+    }, parent)
+    round(img, size)
+    return img
+end
+
+local function offenderCard(parent, d, order, specs)
+    local alert = d.count >= CFG.STRIKE_ALERT
+    local card = new("Frame", { Size = UDim2.new(1, -6, 0, 84), BackgroundColor3 = CARD, BorderSizePixel = 0, LayoutOrder = order }, parent)
+    round(card, 10)
+    outline(card, alert and RED or LINE, 1, 0.35)
+    if d.userId ~= 0 then
+        avatar(card, d.userId, 34, UDim2.new(0, 8, 0, 8))
+    end
+    label(card, (alert and "🚨 " or "") .. d.name, 13, TXT, Enum.Font.GothamBold, {
+        Position = UDim2.new(0, 50, 0, 8), Size = UDim2.new(1, -118, 0, 16), TextWrapped = false,
+    })
+    label(card, d.count .. " strikes · 🏷 " .. d.tags .. " · 📨 " .. (d.reports or 0) .. " sent", 10, MUTED, Enum.Font.Gotham, {
+        Position = UDim2.new(0, 50, 0, 26), Size = UDim2.new(1, -60, 0, 14), TextWrapped = false,
+    })
+    local pill = label(card, "SEV " .. d.maxSev, 9, WHITE, Enum.Font.GothamBold, {
+        Position = UDim2.new(1, -54, 0, 9), Size = UDim2.new(0, 46, 0, 16), BackgroundTransparency = 0,
+        BackgroundColor3 = sevColor(d.maxSev), TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = false,
+    })
+    round(pill, 8)
+    local n = #specs
+    for k, s in ipairs(specs) do
+        local b = button(card, s.text, s.color or PANEL, UDim2.new(1 / n, -6, 0, 26), UDim2.new((k - 1) / n, 4, 0, 52), s.fn, 10)
+        if s.setup then
+            s.setup(b)
+        end
+    end
+    return card
+end
+
+-- ============================== TAB: STRIKES ==============================
+local strikeScroll = makeScroll(pages["Strikes"], UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, 0))
+local strikeRows = {}
+local strikeDirty = false
+
+local function emptyState(parent, icon, text, order)
+    return label(parent, icon .. "\n" .. text, 12, MUTED, Enum.Font.Gotham, {
+        Size = UDim2.new(1, -6, 0, 70), TextXAlignment = Enum.TextXAlignment.Center, LayoutOrder = order or 1,
+    })
+end
+
+local function refreshStrikes()
+    for _, r in ipairs(strikeRows) do
+        r:Destroy()
+    end
+    table.clear(strikeRows)
+    local list = sortedOffenders()
+    if #list == 0 then
+        strikeRows[1] = emptyState(strikeScroll, "🎉", "No strikes yet. Chat is clean.")
+        return
+    end
+    for i = 1, math.min(#list, 25) do
+        local d = list[i]
+        strikeRows[#strikeRows + 1] = offenderCard(strikeScroll, d, i, {
+            { text = "📋 Evidence", fn = function()
+                toast(copyToClipboard(buildEvidence(d)) and "📋 Evidence copied" or "⚠ No clipboard", NEON)
+            end },
+            { text = "📜 Log", fn = function()
+                toast(copyToClipboard(buildLogTextFor(d.key, d.name, d.userId)) and "📜 Chat log copied" or "⚠ No clipboard", NEON)
+            end },
+            { text = "🚫 Block", fn = function()
+                if d.player and d.player.Parent then
+                    local ok = pcall(function()
+                        StarterGui:SetCore("PromptBlockPlayer", d.player)
+                    end)
+                    if not ok then
+                        toast("Block prompt unavailable here", AMBER)
+                    end
+                else
+                    toast(d.name .. " left the server", AMBER)
+                end
+            end },
+        })
+    end
+end
+
+local function refreshAll()
+    strikeDirty = false
+    if not alive then
+        return
+    end
+    refreshStrikes()
+    if refreshReports then
+        refreshReports()
+    end
+end
+
+scheduleStrikeRefresh = function()
+    if strikeDirty then
+        return
+    end
+    strikeDirty = true
+    task.delay(0.5, refreshAll)
+end
+
+refreshStrikes()
+
+-- ============================== TAB: LIVE ==============================
+local livePage = pages["Live"]
+local queue = {}
+
+local statsStrip = new("Frame", { Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1 }, livePage)
+local function statCard(i, caption)
+    local c = new("Frame", {
+        Position = UDim2.new((i - 1) / 4, 2, 0, 0), Size = UDim2.new(0.25, -4, 1, 0), BackgroundColor3 = CARD, BorderSizePixel = 0,
+    }, statsStrip)
+    round(c, 8)
+    local v = label(c, "0", 15, NEON, Enum.Font.GothamBlack, {
+        Size = UDim2.new(1, 0, 0, 20), Position = UDim2.new(0, 0, 0, 3), TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = false,
+    })
+    local cap = label(c, caption, 9, MUTED, Enum.Font.Gotham, {
+        Size = UDim2.new(1, 0, 0, 12), Position = UDim2.new(0, 0, 0, 24), TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = false,
+    })
+    return v, cap
+end
+local statFlag = statCard(1, "FLAGGED")
+local statUsers = statCard(2, "OFFENDERS")
+local statTags = statCard(3, "🏷 TAGS")
+local statAI, statAICap = statCard(4, "AI")
+
+updateStatus = function()
+    statFlag.Text = tostring(flaggedCount)
+    statUsers.Text = tostring(countKeys(strikes))
+    statTags.Text = tostring(tagTotal)
+    statAI.Text = "q" .. #queue
+    statAICap.Text = "AI·" .. tostring(aiLast):sub(1, 6)
+end
+
+local aiSeg, aiSegSetup -- live + setup segmented controls
+local function setAiMode(v)
+    aiMode = v:upper()
+    local shown = v:sub(1, 1):upper() .. v:sub(2):lower()
+    if aiSeg then
+        aiSeg.set(shown)
+    end
+    if aiSegSetup then
+        aiSegSetup.set(shown)
+    end
+end
+
+aiSeg = segmented(livePage, { "Smart", "Strict", "Off" }, "Smart", setAiMode, UDim2.new(0, 0, 0, 44), UDim2.new(0.62, -3, 0, 26))
+
+local flagChip = button(livePage, "Flagged only", PANEL, UDim2.new(0.38, -3, 0, 26), UDim2.new(0.62, 3, 0, 44), nil, 10)
+outline(flagChip, LINE, 1, 0.3)
+
+local liveScroll = makeScroll(livePage, UDim2.new(0, 0, 0, 76), UDim2.new(1, 0, 1, -76))
+autoScroll(liveScroll)
+
+local MAX_HISTORY = 30
+local liveEntries = {}
+local liveOrder = 0
+
+flagChip.Activated:Connect(function()
+    onlyFlagged = not onlyFlagged
+    setBtn(flagChip, onlyFlagged and "✔ Flagged only" or "Flagged only", onlyFlagged and NEON_DARK or PANEL)
+    for _, e in ipairs(liveEntries) do
+        e.frame.Visible = (not onlyFlagged) or e.isFlagged()
+    end
+end)
+
+local function addChatEntry(player, name, msg, sev, cats, blocked, doubt, incident, flags)
+    if not alive then
+        return nil
+    end
+    flags = flags or {}
+    liveOrder += 1
+
+    local curSev, curCats = sev, cats
+    local tagged, taggedOnly = flags.tagged or false, flags.taggedOnly or false
+    local tagText, targeted = flags.tagText, flags.targeted or false
+    local stamp = os.date("%H:%M")
+    local stampFull = os.date("%H:%M:%S")
+    local extraLine, noteAI = "", ""
+    local checking = (sev == 0 and doubt) and true or false
+    local isInst = typeof(player) == "Instance"
+    local shown = #msg > 160 and (msg:sub(1, 160) .. "...") or msg
+
+    local card = new("Frame", {
+        Size = UDim2.new(1, -6, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = CARD,
+        BorderSizePixel = 0, LayoutOrder = liveOrder, Visible = (not onlyFlagged) or sev > 0,
+    }, liveScroll)
+    round(card, 10)
+    local cStroke = outline(card, LINE, 1, 0.5)
+    pad(card, 8, 7, 8, 7)
+    new("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, card)
+
+    local head = new("Frame", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, LayoutOrder = 1 }, card)
+    local nameX = 0
+    if isInst then
+        avatar(head, player.UserId, 20, UDim2.new(0, 0, 0, 0))
+        nameX = 26
+    end
+    label(head, name, 12, TXT, Enum.Font.GothamBold, {
+        Position = UDim2.new(0, nameX, 0, 0), Size = UDim2.new(1, -nameX - 100, 1, 0), TextWrapped = false,
+    })
+    label(head, stamp, 9, MUTED, Enum.Font.Gotham, {
+        Position = UDim2.new(1, -96, 0, 3), Size = UDim2.new(0, 44, 0, 14), TextXAlignment = Enum.TextXAlignment.Right, TextWrapped = false,
+    })
+    local pill = label(head, "", 9, WHITE, Enum.Font.GothamBold, {
+        Position = UDim2.new(1, -48, 0, 2), Size = UDim2.new(0, 48, 0, 16), BackgroundTransparency = 0,
+        BackgroundColor3 = LINE, TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = false, Visible = false,
+    })
+    round(pill, 8)
+
+    local msgLabel = label(card, "", 12, TXT, Enum.Font.Gotham, {
+        Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2,
+    })
+    local chips = label(card, "", 10, BLUE, Enum.Font.Gotham, {
+        Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3, Visible = false,
+    })
+
+    local actions = new("Frame", { Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1, LayoutOrder = 4, Visible = false }, card)
+    local function getInfo()
+        return makeInfo(player, name, msg, curSev, curCats, {
+            time = stampFull, tagged = tagged, tagText = tagText, targeted = targeted, extra = extraLine,
+        })
+    end
+    local repBtn = button(actions, "⚡ Report", RED, UDim2.new(0.4, -3, 1, 0), UDim2.new(0, 0, 0, 0), nil, 10)
+    bindReport(repBtn, getInfo, function()
+        return player
+    end, function()
+        markReported(player)
+    end)
+    button(actions, "📦 Pack", PANEL, UDim2.new(0.3, -3, 1, 0), UDim2.new(0.4, 2, 0, 0), function()
+        toast(copyToClipboard(buildReportPack(getInfo())) and "📦 Report pack copied" or "⚠ No clipboard", NEON)
+    end, 10)
+    button(actions, "🚫 Block", PANEL, UDim2.new(0.3, -3, 1, 0), UDim2.new(0.7, 4, 0, 0), function()
+        if isInst and player.Parent then
+            if not pcall(function()
+                StarterGui:SetCore("PromptBlockPlayer", player)
+            end) then
+                toast("Block prompt unavailable here", AMBER)
+            end
+        else
+            toast("Player not available", AMBER)
+        end
+    end, 10)
+
+    local function render()
+        local active = curSev > 0 or checking
+        local col = checking and AMBER or sevColor(curSev)
+        cStroke.Color = active and col or LINE
+        cStroke.Transparency = active and 0.2 or 0.5
+        pill.Visible = curSev > 0
+        pill.Text = "SEV " .. curSev
+        pill.BackgroundColor3 = sevColor(curSev)
+        msgLabel.Text = (blocked and "🛡 [Blocked — not sent] " or "") .. shown
+        msgLabel.TextColor3 = curSev >= 4 and RED_TXT or (curSev > 0 and AMBER_TXT or TXT)
+        local parts = {}
+        if curSev > 0 then
+            parts[#parts + 1] = "● " .. table.concat(curCats, ", ")
+        end
+        if tagged then
+            parts[#parts + 1] = taggedOnly and "🏷 Roblox hid the text" or "🏷 Tagged by Roblox"
+        end
+        if checking then
+            parts[#parts + 1] = "🟡 AI checking…"
+        end
+        if noteAI ~= "" then
+            parts[#parts + 1] = noteAI
+        end
+        chips.Text = table.concat(parts, "  •  ")
+        chips.Visible = #parts > 0
+        actions.Visible = curSev > 0 and not blocked
+    end
+    render()
+
+    card.BackgroundTransparency = 1
+    tw(card, { BackgroundTransparency = 0 }, 0.2)
+
+    local handle = {}
+
+    function handle.setVerifying()
+        if curSev > 0 then
+            noteAI = "🟡 AI verifying…"
+            render()
+        end
+    end
+
+    function handle.markTagged(tText)
+        if not alive or not card.Parent then
+            return
+        end
+        tagged, tagText, checking = true, tText, false
+        if curSev == 0 then
+            curSev, curCats = 3, { "filtered" }
+            if player then
+                incident = registerFlag(player, name, msg, curCats, curSev, blocked, true, targeted)
+            end
+        else
+            if curSev < 3 then
+                curSev = 3
+                if incident then
+                    incident.sev = 3
+                end
+                local rec = player and strikes[keyOf(player)]
+                if rec and rec.maxSev < 3 then
+                    rec.maxSev = 3
+                end
+            end
+            if player then
+                addTag(player)
+            end
+        end
+        extraLine = "Roblox filter tagged this message as: " .. tostring(tText)
+        render()
+        card.Visible = true
+    end
+
+    function handle.applyAI(res)
+        if not alive or not card.Parent then
+            return
+        end
+        local wasChecking = checking
+        checking = false
+        if not res then
+            noteAI = ""
+            render()
+            return
+        end
+        if res.violation then
+            if curSev == 0 then
+                curSev, curCats = res.severity, { res.category }
+                if player and not blocked then
+                    incident = registerFlag(player, name, msg, curCats, curSev, blocked, false, targeted)
+                end
+            end
+            extraLine = "AI review confirmed: " .. res.reason
+            noteAI = "🤖 ✅ " .. res.reason
+        else
+            if curSev == 0 then
+                noteAI = "🤖 ⚪ " .. res.reason
+            else
+                if curSev <= 3 and incident and player and not tagged then
+                    undoFlag(player, incident)
+                    incident = nil
+                end
+                extraLine = "Note: an AI review doubted this: " .. res.reason
+                noteAI = "🤖 ❓ likely OK: " .. res.reason
+            end
+        end
+        render()
+        if wasChecking and onlyFlagged then
+            card.Visible = curSev > 0
+        end
+    end
+
+    table.insert(liveEntries, { frame = card, isFlagged = function() return curSev > 0 end })
+    if #liveEntries > MAX_HISTORY then
+        local old = table.remove(liveEntries, 1)
+        if old and old.frame then
+            old.frame:Destroy()
+        end
+    end
+    return handle
+end
+
+-- ============================== AI CORE ==============================
+local function getRequester()
+    return (syn and syn.request) or (http and http.request) or http_request or request or (fluxus and fluxus.request)
+end
+
+local rate = {
+    Groq = { gap = 2.2, min = 2.1, max = 30, nextAt = 0, coolUntil = 0, pen = 0 },
+    Gemini = { gap = 6, min = 4, max = 40, nextAt = 0, coolUntil = 0, pen = 1 },
+    OpenRouter = { gap = 3.3, min = 3, max = 30, nextAt = 0, coolUntil = 0, pen = 2 },
+    Pollinations = { gap = 6, min = 4, max = 25, nextAt = 0, coolUntil = 0, pen = 4 },
+}
+
+local function getProviders()
+    local list = {}
+    if hasKey(GROQ_KEY) then
+        list[#list + 1] = { name = "Groq", url = GROQ_URL, model = GROQ_MODEL, key = GROQ_KEY }
+    end
+    if hasKey(GEMINI_KEY) then
+        list[#list + 1] = { name = "Gemini", url = GEMINI_URL, model = GEMINI_MODEL, key = GEMINI_KEY, extra = { reasoning_effort = "none" }, minTokens = 200 }
+    end
+    if hasKey(AI_API_KEY) then
+        list[#list + 1] = { name = "OpenRouter", url = AI_URL, model = AI_MODEL, key = AI_API_KEY, openrouter = true }
+    end
+    if USE_FREE_FALLBACK then
+        list[#list + 1] = { name = "Pollinations", url = POLLI_URL, model = POLLI_MODEL }
+    end
+    return list
+end
+
+local function orderedProviders()
+    local now = os.clock()
+    local ready, cooling = {}, {}
+    for _, p in ipairs(getProviders()) do
+        if rate[p.name].coolUntil > now then
+            cooling[#cooling + 1] = p
+        else
+            ready[#ready + 1] = p
+        end
+    end
+    table.sort(ready, function(a, b)
+        local ra, rb = rate[a.name], rate[b.name]
+        return math.max(ra.nextAt, now) + ra.pen < math.max(rb.nextAt, now) + rb.pen
+    end)
+    for _, p in ipairs(cooling) do
+        ready[#ready + 1] = p
+    end
+    return ready
+end
+
+local function waitSlot(name)
+    local r = rate[name]
+    local now = os.clock()
+    local at = math.max(now, r.nextAt)
+    r.nextAt = at + r.gap
+    if at > now then
+        task.wait(at - now)
+    end
+end
+
+local function tryProvider(p, requester, messages, maxTokens)
+    local r = rate[p.name]
+    local headers = { ["Content-Type"] = "application/json" }
+    if p.key then
+        headers["Authorization"] = "Bearer " .. p.key
+    end
+    if p.openrouter then
+        headers["HTTP-Referer"] = "https://www.roblox.com"
+        headers["X-Title"] = "Phantom OS"
+    end
+    local lastErr, lastCode = p.name .. ": failed", 0
+    for attempt = 1, (p.extra and 2 or 1) do
+        local payload = { model = p.model, messages = messages, max_tokens = math.max(maxTokens or 300, p.minTokens or 0), temperature = 0 }
+        if p.extra and attempt == 1 then
+            for k, v in pairs(p.extra) do
+                payload[k] = v
+            end
+        end
+        local okEnc, body = pcall(HttpService.JSONEncode, HttpService, payload)
+        if not okEnc then
+            return nil, p.name .. ": encode error", 0
+        end
+        waitSlot(p.name)
+        local ok, res = pcall(requester, { Url = p.url, Method = "POST", Headers = headers, Body = body })
+        if ok and type(res) == "table" then
+            local code = res.StatusCode or res.status_code or (res.Success and 200) or 0
+            local raw = res.Body or ""
+            local okD, data = pcall(HttpService.JSONDecode, HttpService, raw)
+            local content, err
+            if okD and type(data) == "table" then
+                local ch = data.choices and data.choices[1]
+                if ch and ch.message and type(ch.message.content) == "string" then
+                    content = ch.message.content
+                elseif data.error then
+                    err = type(data.error) == "table" and (data.error.message or "api error") or tostring(data.error)
+                end
+            end
+            if not content and not err and code >= 200 and code < 300 and type(raw) == "string" and raw ~= "" then
+                content = raw
+            end
+            if content and content ~= "" then
+                r.gap = math.max(r.min, r.gap * 0.92)
+                return content, nil, code
+            end
+            lastCode = code
+            lastErr = p.name .. ": " .. tostring(err or ("HTTP " .. tostring(code)))
+            if code == 429 then
+                r.gap = math.min(r.max, r.gap * 2)
+                r.coolUntil = os.clock() + 30
+                return nil, p.name .. ": rate limited (429)", code
+            elseif code == 401 or code == 403 then
+                r.coolUntil = os.clock() + 300
+                return nil, p.name .. ": key rejected (" .. code .. ")", code
+            end
+            if not (code == 400 and p.extra and attempt == 1) then
+                break
+            end
+        else
+            r.coolUntil = os.clock() + 10
+            return nil, p.name .. ": request failed", 0
+        end
+    end
+    return nil, lastErr, lastCode
+end
+
+local function callAI(messages, maxTokens)
+    local requester = getRequester()
+    if not requester then
+        return nil, nil, "Executor has no HTTP request function.", 0
+    end
+    local order = orderedProviders()
+    if #order == 0 then
+        return nil, nil, "No AI provider enabled.", 0
+    end
+    local lastErr, lastCode = "unknown error", 0
+    for _, p in ipairs(order) do
+        local content, err, code = tryProvider(p, requester, messages, maxTokens)
+        if content then
+            return content, p.name, nil, code
+        end
+        lastErr, lastCode = err or lastErr, code or lastCode
+    end
+    return nil, nil, lastErr, lastCode
+end
+
+local JUDGE_SYSTEM = "Roblox chat moderator. Players write English/Hindi/Hinglish. Abbreviations or misspellings can hide Hindi abuse "
+    .. "(tmc/tmkc=teri maa ki.., mc/bc/bkl/bsdk, chuda/cuda/chud=chudai abuse, lund, gand) but may be harmless "
+    .. "(bc=because, mc=Minecraft, cud=cud, chod=leave). Also flag scam/spam scripts (free robux, loadstring, script ads, invite spam). "
+    .. "Use recent chat for context. Friendly banter is not a violation. "
+    .. "Reply ONLY JSON: {\"v\":0|1,\"c\":\"profanity|hindi|harass|hate|sexual|scam|threat|spam|offsite|none\",\"s\":0-5,\"r\":\"max 8 words\"}"
+
+local recentChat = {}
+local function pushRecent(name, msg)
+    recentChat[#recentChat + 1] = name .. ": " .. msg:sub(1, 70)
+    if #recentChat > 6 then
+        table.remove(recentChat, 1)
+    end
+end
+
+local function recentSnapshot()
+    local n = #recentChat
+    local t = {}
+    for i = math.max(1, n - CFG.CONTEXT_LINES + 1), n do
+        t[#t + 1] = recentChat[i]
+    end
+    return table.concat(t, "\n")
+end
+
+local verdictCache, cacheN = {}, 0
+local learnVotes, safeVotes, tagVotes = {}, {}, {}
+
+local function judge(item)
+    local prompt = "Chat:\n" .. (item.ctx ~= "" and item.ctx or "(none)")
+        .. "\nJudge " .. item.name .. ": \"" .. item.msg:sub(1, 160) .. "\""
+        .. (item.hint ~= "" and ("\nNotes: " .. item.hint:sub(1, 160)) or "")
+    local text, prov = callAI({
+        { role = "system", content = JUDGE_SYSTEM },
+        { role = "user", content = prompt },
+    }, 60)
+    if not text then
+        return nil
+    end
+    aiLast = prov or "-"
+
+    local data
+    local j = text:match("%b{}")
+    if j then
+        local ok, d = pcall(HttpService.JSONDecode, HttpService, j)
+        if ok and type(d) == "table" then
+            data = d
+        end
+    end
+
+    local violation, category, severity, reason
+    if data then
+        local v = data.v
+        if v == nil then
+            v = data.violation
+        end
+        violation = (v == 1) or (v == true) or (v == "1") or (v == "true")
+        category = tostring(data.c or data.category or "none"):lower()
+        severity = tonumber(data.s or data.severity) or 0
+        reason = tostring(data.r or data.reason or "")
+    else
+        local low = text:lower()
+        violation = (low:find("violation%W+true") ~= nil) or (low:find("\"v\"%W+1") ~= nil)
+        category, severity, reason = "none", violation and 3 or 0, text:sub(1, 60)
+    end
+    if violation then
+        if not VALID_CAT[category] then
+            category = "harass"
+        end
+        severity = math.clamp(math.floor(severity + 0.5), 1, 5)
+    end
+    if #reason > 80 then
+        reason = reason:sub(1, 80)
+    end
+    if reason == "" then
+        reason = violation and "violates chat rules" or "looks fine"
+    end
+    local res = { violation = violation, category = category, severity = severity, reason = reason }
+    cacheN += 1
+    if cacheN > 150 then
+        verdictCache, cacheN = {}, 1
+    end
+    verdictCache[item.key] = res
+    return res
+end
+
+local function learnFromVerdict(item, res)
+    if not res or not item.ctoks then
+        return
+    end
+    for _, tok in ipairs(item.ctoks) do
+        if not builtin[tok] and #tok >= 3 and #tok <= 14 then
+            if res.violation then
+                learnVotes[tok] = (learnVotes[tok] or 0) + 1
+                if learnVotes[tok] >= CFG.LEARN_VOTES and not exactSet[tok] then
+                    local cat = VALID_CAT[res.category] and res.category or "hindi"
+                    local sev = math.clamp(res.severity, 2, 4)
+                    addExact(tok, cat, sev, nil, false)
+                    learned[tok] = { cat = cat, sev = sev }
+                    markSave()
+                    toast("🧠 Learned new word: " .. tok, NEON)
+                end
+            else
+                safeVotes[tok] = (safeVotes[tok] or 0) + 1
+                if safeVotes[tok] >= 2 then
+                    whitelist[tok] = true
+                    markSave()
+                end
+            end
+        end
+    end
+end
+
+local function enqueue(item)
+    if #queue >= CFG.QUEUE_MAX then
+        local worstPri, wi = 0, nil
+        for i, q in ipairs(queue) do
+            if q.pri > worstPri then
+                worstPri, wi = q.pri, i
+            end
+        end
+        if wi and worstPri >= item.pri then
+            local dropped = table.remove(queue, wi)
+            pcall(dropped.handle.applyAI, nil)
+        else
+            pcall(item.handle.applyAI, nil)
+            return
+        end
+    end
+    local pos = #queue + 1
+    for i, q in ipairs(queue) do
+        if q.pri > item.pri then
+            pos = i
+            break
+        end
+    end
+    table.insert(queue, pos, item)
+    updateStatus()
+end
+
+for _ = 1, CFG.WORKERS do
+    task.spawn(function()
+        while alive do
+            local item = table.remove(queue, 1)
+            if item then
+                if os.clock() - item.t > 40 then
+                    pcall(item.handle.applyAI, nil)
+                else
+                    local res = judge(item)
+                    if alive then
+                        pcall(item.handle.applyAI, res)
+                        learnFromVerdict(item, res)
+                        updateStatus()
+                    end
+                end
+            else
+                task.wait(0.25)
+            end
+        end
+    end)
+end
+
+-- ============================== INTERNET LISTS ==============================
+local function httpGet(url)
+    local requester = getRequester()
+    if requester then
+        local ok, res = pcall(requester, { Url = url, Method = "GET" })
+        if ok and type(res) == "table" and type(res.Body) == "string" and res.Body ~= "" then
+            local code = res.StatusCode or res.status_code or (res.Success and 200) or 0
+            if code >= 200 and code < 300 then
+                return res.Body
+            end
+        end
+    end
+    local ok, body = pcall(function()
+        return game:HttpGet(url)
+    end)
+    if ok and type(body) == "string" and body ~= "" then
+        return body
+    end
+    return nil
+end
+
+local function loadRemote(force)
+    if not CFG.REMOTE_ENABLED then
+        remoteStats.status = "off"
+        return
+    end
+    remoteStats.status = "loading..."
+    if not force and isfile and readfile then
+        local ok, d = pcall(function()
+            if isfile(CFG.REMOTE_CACHE) then
+                return HttpService:JSONDecode(readfile(CFG.REMOTE_CACHE))
+            end
+        end)
+        if ok and type(d) == "table" and type(d.t) == "number" and type(d.words) == "table"
+            and os.time() - d.t < CFG.REMOTE_REFRESH_HOURS * 3600 then
+            for _, w in ipairs(d.words) do
+                remoteSet[w] = true
+            end
+            for _, ph in ipairs(d.phrases or {}) do
+                remotePhrases[#remotePhrases + 1] = ph
+            end
+            remoteStats.words, remoteStats.phrases, remoteStats.status = "cached"
+            return
+        end
+    end
+
+    local words, phrases, n, okAny = {}, {}, 0, false
+    for _, url in ipairs(CFG.REMOTE_WORD_URLS) do
+        local body = httpGet(url)
+        if body then
+            okAny = true
+            for line in body:gmatch("[^\r\n]+") do
+                local w = line:lower():gsub("^%s+", ""):gsub("%s+$", "")
+                if w:match("^%a+$") and #w >= 4 and #w <= 14 and not STOP[w] and not builtin[w] then
+                    local k = c2(w)
+                    if not remoteSet[k] and n < 3500 then
+                        remoteSet[k] = true
+                        words[#words + 1] = k
+                        n += 1
+                    end
+                end
+            end
+        end
+    end
+    for _, url in ipairs(CFG.REMOTE_PHRASE_URLS) do
+        local body = httpGet(url)
+        if body then
+            okAny = true
+            for line in body:gmatch("[^\r\n]+") do
+                local ph = foldUnicode(line):lower():gsub("^%s+", ""):gsub("%s+$", "")
+                if #ph >= 6 and #ph <= 60 and #phrases < 300 then
+                    phrases[#phrases + 1] = ph
+                    remotePhrases[#remotePhrases + 1] = ph
+                end
+            end
+        end
+    end
+    remoteStats.words, remoteStats.phrases = n, #remotePhrases
+    remoteStats.status = okAny and "downloaded" or "offline (no list fetched)"
+    if okAny and writefile then
+        pcall(function()
+            writefile(CFG.REMOTE_CACHE, HttpService:JSONEncode({ t = os.time(), words = words, phrases = phrases }))
+        end)
+    end
+end
+
+task.spawn(function()
+    pcall(loadRemote, false)
+    if alive then
+        toast("🌐 Lists: " .. remoteStats.words .. " words / " .. remoteStats.phrases .. " phrases (" .. remoteStats.status .. ")", BLUE)
+    end
+end)
+
+-- ============================== CHAT INTAKE ==============================
+local pendingTagged = {}
+
+local function takePending(player, raw)
+    local list = pendingTagged[player]
+    if not list then
+        return nil
+    end
+    for _, p in ipairs(list) do
+        if not p.done and posMatch(p.text, raw) then
+            p.done = true
+            return p.text
+        end
+    end
+    return nil
+end
+
+local function learnFromTag(raw, tText)
+    local words, total = filteredWords(raw, tText)
+    if #words == 0 or #words > 2 or #words >= total then
+        return
+    end
+    for _, w in ipairs(words) do
+        if #w >= 3 and #w <= 14 and not STOP[w] and not exactSet[w] and not whitelist[w] then
+            tagVotes[w] = (tagVotes[w] or 0) + 1
+            if tagVotes[w] >= CFG.TAG_LEARN_VOTES then
+                addExact(w, "profanity", 2, nil, false)
+                learned[w] = { cat = "profanity", sev = 2 }
+                markSave()
+                toast("🏷 Roblox keeps tagging '" .. w .. "' — learned", NEON)
+            end
+        end
+    end
+end
+
+local function commitMessage(player, msg, blocked, tagText, taggedOnly)
+    local name = (typeof(player) == "Instance" and player.Name) or tostring(player)
+    local sev, cats, _, doubt, hint, ctoks, targeted = analyze(player, msg)
+    local tagged = (tagText ~= nil) or taggedOnly or false
+
+    if tagged then
+        if sev < 3 then
+            sev = 3
+        end
+        if #cats == 0 then
+            cats = { "filtered" }
+        end
+        doubt = false
+    end
+    if blocked and sev == 0 then
+        sev, cats = 3, { "profanity" }
+    end
+
+    local entry = logMessage(player, msg, { tagged = tagged, tagText = tagText, taggedOnly = taggedOnly })
+    local incident
+    if sev > 0 then
+        incident = registerFlag(player, name, msg, cats, sev, blocked, tagged, targeted)
+    end
+
+    local handle = addChatEntry(player, name, msg, sev, cats, blocked, doubt, incident, {
+        tagged = tagged, taggedOnly = taggedOnly, tagText = tagText, targeted = targeted,
+    })
+    entry.handle = handle
+
+    local ctx = recentSnapshot()
+    pushRecent(name, msg)
+    updateStatus()
+    if tagText then
+        learnFromTag(msg, tagText)
+    end
+
+    if handle and aiMode ~= "OFF" and not blocked and not tagged and player ~= LocalPlayer then
+        local pri
+        if sev > 0 and doubt then
+            pri = 1
+        elseif sev == 0 and doubt then
+            pri = 2
+        elseif sev > 0 and CFG.AI_CONFIRM_STRONG and sev <= 3 then
+            pri = 2
+        elseif aiMode == "STRICT" and sev == 0 and #queue < 3 and #msg >= 4 then
+            pri = 3
+        end
+        if pri then
+            local key = normalize(msg)
+            local cached = verdictCache[key]
+            if cached then
+                handle.applyAI(cached)
+            else
+                if sev > 0 then
+                    handle.setVerifying()
+                end
+                enqueue({ pri = pri, handle = handle, name = name, msg = msg, ctx = ctx, hint = hint, ctoks = ctoks, key = key, t = os.clock() })
+            end
+        end
+    end
+end
+
+local seen, seenCount = {}, 0
+
+local function onChat(player, msg, blocked, source)
+    if not alive or type(msg) ~= "string" or msg == "" then
+        return
+    end
+    local name = (typeof(player) == "Instance" and player.Name) or tostring(player)
+    local key = name .. "|" .. msg
+    local now = os.clock()
+    if seen[key] and now - seen[key] < 1.5 then
+        return
+    end
+    seen[key] = now
+    seenCount += 1
+    if seenCount > 60 then
+        for k, t in pairs(seen) do
+            if now - t > 3 then
+                seen[k] = nil
+            end
+        end
+        seenCount = 0
+    end
+
+    if isTagged(msg) then
+        if source == "display" then
+            local e = findRaw(player, msg)
+            if e then
+                e.tagged, e.tagText = true, msg
+                if e.handle then
+                    e.handle.markTagged(msg)
+                end
+                learnFromTag(e.text, msg)
+                return
+            end
+            local list = pendingTagged[player]
+            if not list then
+                list = {}
+                pendingTagged[player] = list
+            end
+            local p = { text = msg, done = false }
+            list[#list + 1] = p
+            if #list > 6 then
+                table.remove(list, 1)
+            end
+            task.delay(0.8, function()
+                if alive and not p.done then
+                    p.done = true
+                    commitMessage(player, msg, false, nil, true)
+                end
+            end)
+        else
+            commitMessage(player, msg, false, nil, true)
+        end
+        return
+    end
+
+    local tagText = takePending(player, msg)
+    commitMessage(player, msg, blocked, tagText, false)
+end
+
+local hooked = {}
+local function hookPlayer(player)
+    if hooked[player] then
+        return
+    end
+    hooked[player] = true
+    track(player.Chatted, function(msg)
+        onChat(player, msg, false, "chatted")
+    end)
+end
+for _, p in ipairs(Players:GetPlayers()) do
+    hookPlayer(p)
+end
+track(Players.PlayerAdded, hookPlayer)
+track(Players.PlayerRemoving, function(p)
+    hooked[p] = nil
+    flood[p] = nil
+    pendingTagged[p] = nil
+end)
+
+pcall(function()
+    if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+        track(TextChatService.MessageReceived, function(message)
+            local src = message.TextSource
+            if src then
+                local plr = Players:GetPlayerByUserId(src.UserId)
+                if plr then
+                    onChat(plr, message.Text, false, "display")
+                end
+            end
+        end)
+    end
+end)
+
+pcall(function()
+    if not (hookmetamethod and getnamecallmethod) then
+        return
+    end
+    local oldNamecall
+    local function handler(self, ...)
+        local method = getnamecallmethod()
+        if alive and (method == "FireServer" or method == "SendAsync") and typeof(self) == "Instance" then
+            local isLegacy = method == "FireServer" and self.Name == "SayMessageRequest"
+            local isNew = method == "SendAsync" and self.ClassName == "TextChannel"
+            if (isLegacy or isNew) and not (checkcaller and checkcaller()) then
+                local msg = ...
+                if type(msg) == "string" then
+                    if selfGuard then
+                        local okS, sev = pcall(quickSeverity, msg)
+                        if okS and type(sev) == "number" and sev >= 3 then
+                            task.defer(toast, "🛡 Message blocked — keep chat kind", AMBER)
+                            task.defer(onChat, LocalPlayer, msg, true, "hook")
+                            return
+                        end
+                    end
+                    task.defer(onChat, LocalPlayer, msg, false, "hook")
+                end
+            end
+        end
+        return oldNamecall(self, ...)
+    end
+    oldNamecall = hookmetamethod(game, "__namecall", newcclosure and newcclosure(handler) or handler)
+end)
+
+-- ============================== TAB: REPORTS ==============================
+local repPage = pages["Reports"]
+local builderScroll = makeScroll(repPage, UDim2.new(0, 0, 0, 32), UDim2.new(1, 0, 1, -32))
+local appealsScroll = makeScroll(repPage, UDim2.new(0, 0, 0, 32), UDim2.new(1, 0, 1, -32))
+appealsScroll.Visible = false
+
+segmented(repPage, { "Report Builder", "My Appeals" }, "Report Builder", function(v)
+    builderScroll.Visible = (v == "Report Builder")
+    appealsScroll.Visible = (v == "My Appeals")
+end, UDim2.new(0, 0, 0, 0), UDim2.new(1, -6, 0, 26))
+
+local builderRows = {}
+
+refreshReports = function()
+    for _, r in ipairs(builderRows) do
+        r:Destroy()
+    end
+    table.clear(builderRows)
+
+    builderRows[#builderRows + 1] = label(builderScroll,
+        "⚡ Report = one tap + confirm. Report only what really happened — Roblox decides the action.",
+        10, BLUE, Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 30), LayoutOrder = 0 })
+
+    local list = sortedOffenders()
+    if #list == 0 then
+        builderRows[#builderRows + 1] = emptyState(builderScroll, "📝", "No flagged users yet.", 1)
+        return
+    end
+    for i = 1, math.min(#list, 15) do
+        local d = list[i]
+        builderRows[#builderRows + 1] = offenderCard(builderScroll, d, i, {
+            { text = "⚡ Report", color = RED, setup = function(b)
+                bindReport(b, function()
+                    return infoFromRec(d)
+                end, function()
+                    return d.player
+                end, function()
+                    markReported(d.player)
+                end)
+            end },
+            { text = "📝 Short", fn = function()
+                toast(copyToClipboard(buildShortReport(infoFromRec(d))) and "📝 Short report copied" or "⚠ No clipboard", NEON)
+            end },
+            { text = "📄 Full", fn = function()
+                toast(copyToClipboard(buildFullReport(infoFromRec(d))) and "📄 Full report copied" or "⚠ No clipboard", NEON)
+            end },
+            { text = "📦 Pack", fn = function()
+                toast(copyToClipboard(buildReportPack(infoFromRec(d))) and "📦 Report pack copied" or "⚠ No clipboard", NEON)
+            end },
+        })
+    end
+end
+refreshReports()
+
+-- ---------- My Appeals (for YOUR own account) ----------
+local appealCats = {
+    { "Exploit Spam", "Community Standards (Spam and Disruptive Behavior) and the Terms of Use", "the repeated or automated messages attributed to my account" },
+    { "Hate Speech", "Community Standards (Hate Speech and Discrimination)", "the chat content classified as discriminatory" },
+    { "NSFW Content", "Community Standards (Sexual Content and Adult Material)", "the content classified as inappropriate for the platform" },
+    { "Scamming", "Community Standards (Fraud, Scams and Deceptive Practices)", "the messages classified as an attempt to deceive other users" },
+    { "Harassment", "Community Standards (Bullying and Harassment)", "the interactions classified as harassing toward another user" },
+    { "Threats", "Community Standards (Threats and Violent Content)", "the statement classified as a threat" },
+    { "Off-Platform Links", "Community Standards (Off-Platform Communication and Links)", "the external link or reference that was shared" },
+    { "Personal Information", "Community Standards (Privacy and Personal Information)", "the information classified as personally identifiable" },
+    { "Filter Bypass", "Community Standards (Chat Filter Circumvention)", "the text classified as an attempt to evade the chat filter" },
+    { "Unsolicited Ads", "Community Standards (Unsolicited Advertising)", "the promotional messages attributed to my account" },
+    { "Impersonation", "Community Standards (Impersonation and Misrepresentation)", "the name or behavior classified as impersonating another party" },
+    { "Inappropriate Content", "Community Standards (User-Generated Content)", "the user-generated content that was removed or flagged" },
+}
+
+local appealVariants = {
+    { "Context Review", function(c)
+        return "I am writing to formally appeal the moderation action taken against my account for " .. c[1]
+            .. ". I respectfully submit that the action appears to rest on a misreading of context. In reference to "
+            .. c[3] .. ", my intent was not to violate the " .. c[2]
+            .. ", and I believe a full reading of the surrounding conversation will demonstrate this. "
+            .. "I ask that a human reviewer examine the complete context rather than an isolated excerpt, and that the action be reversed if no violation is found."
+    end },
+    { "Acknowledgment", function(c)
+        return "I am submitting this appeal regarding the " .. c[1] .. " action on my account. I have carefully reviewed the "
+            .. c[2] .. " and I understand why " .. c[3] .. " was reviewed. "
+            .. "I take responsibility for my conduct, I have taken steps to ensure it does not recur, and I commit to full compliance going forward. "
+            .. "I respectfully request that the penalty be lifted or reduced in light of my acknowledgment and commitment."
+    end },
+    { "Proportionality", function(c)
+        return "I respectfully appeal the sanction imposed for " .. c[1] .. ". Without disputing that moderators acted in good faith, "
+            .. "I submit that the severity of the penalty is disproportionate when weighed against " .. c[3]
+            .. ", my history on the platform, and the guidance set out in the " .. c[2] .. ". "
+            .. "I request that the penalty be reconsidered in line with the principle of proportionality, and that a warning or shorter restriction be applied instead."
+    end },
+    { "Evidence Request", function(c)
+        return "This letter constitutes a formal request for review of the " .. c[1] .. " action against my account. "
+            .. "To prepare a complete response, I request the specific content, timestamps, and policy provision relied upon regarding "
+            .. c[3] .. ". Under the " .. c[2] .. ", I believe I am entitled to a clear explanation of the basis for the decision. "
+            .. "Upon receipt, I will provide any further clarification required, and I ask that the action be paused pending review."
+    end },
+    { "Account Security", function(c)
+        return "[Use only if this is genuinely true for your situation.] I am appealing the " .. c[1]
+            .. " action on my account. I have reason to believe my account security may have been compromised, or that the account was used without my authorization, in connection with "
+            .. c[3] .. ". I have since changed my password, enabled two-step verification, and removed unrecognized sessions. "
+            .. "I ask that this be considered under the " .. c[2] .. " and that the action be reviewed accordingly."
+    end },
+}
+
+local function buildAppealText(c, variant)
+    return "Subject: Formal Appeal – " .. c[1] .. " Moderation Action\n"
+        .. "Account: [YOUR USERNAME] | User ID: [YOUR USER ID] | Reference: [TICKET / ACTION ID]\n"
+        .. "To: Roblox Trust & Safety – Moderation Appeals Team\n\n"
+        .. "Dear Review Team,\n\n" .. variant[2](c)
+        .. "\n\nI respectfully request written confirmation of the outcome of this review and the reasoning behind it. "
+        .. "Thank you for your time and consideration.\n\nRespectfully submitted,\n[YOUR USERNAME]"
+end
+
+local appealIndex = 0
+for _, c in ipairs(appealCats) do
+    for _, v in ipairs(appealVariants) do
+        appealIndex += 1
+        local text = buildAppealText(c, v)
+        local b = button(appealsScroll, string.format("#%02d  %s\n%s · tap to copy", appealIndex, c[1], v[1]), CARD,
+            UDim2.new(1, -6, 0, 42), nil, nil, 11)
+        b.LayoutOrder = appealIndex
+        b.TextWrapped = true
+        b.TextXAlignment = Enum.TextXAlignment.Left
+        b.Font = Enum.Font.Gotham
+        pad(b, 10, 0, 6, 0)
+        b.Activated:Connect(function()
+            local ok = copyToClipboard(text)
+            flashBtn(b, ok, CARD)
+            toast(ok and "⚖ Appeal #" .. appealIndex .. " copied" or "⚠ No clipboard", NEON)
+        end)
+    end
+end
+
+-- ============================== TAB: AI CHAT ==============================
+local aiPage = pages["AI Chat"]
+local aiScroll = makeScroll(aiPage, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, -98))
+autoScroll(aiScroll)
+
+local chipRow = new("Frame", { Position = UDim2.new(0, 0, 1, -94), Size = UDim2.new(1, 0, 0, 24), BackgroundTransparency = 1 }, aiPage)
+local analyzeBtn = button(aiPage, "🤖 Analyze last flagged message", NEON_DARK, UDim2.new(1, 0, 0, 26), UDim2.new(0, 0, 1, -66), nil, 11)
+
+local aiInput = new("TextBox", {
+    Position = UDim2.new(0, 0, 1, -34), Size = UDim2.new(1, -64, 0, 32), BackgroundColor3 = CARD, Text = "",
+    PlaceholderText = "Ask AI or type /help", PlaceholderColor3 = MUTED, TextColor3 = TXT, Font = Enum.Font.Gotham,
+    TextSize = 12, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left, BorderSizePixel = 0,
+}, aiPage)
+round(aiInput, 8)
+outline(aiInput, NEON, 1, 0.5)
+pad(aiInput, 8, 0, 8, 0)
+local sendBtn = button(aiPage, "Send", NEON, UDim2.new(0, 58, 0, 32), UDim2.new(1, -58, 1, -34), nil, 12)
+sendBtn.TextColor3 = BG
+
+local aiOrder = 0
+local aiBubbles = {}
+
+local function addBubble(role, text)
+    aiOrder += 1
+    local bg, col, prefix = CARD, TXT, "AI  "
+    if role == "user" then
+        bg, col, prefix = Color3.fromRGB(16, 52, 40), TXT, "You  "
+    elseif role == "sys" then
+        bg, col, prefix = PANEL, AMBER_TXT, "⚙  "
+    end
+    local l = label(aiScroll, prefix .. text, 12, col, Enum.Font.Gotham, {
+        Size = UDim2.new(1, -6, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 0,
+        BackgroundColor3 = bg, TextYAlignment = Enum.TextYAlignment.Top, LayoutOrder = aiOrder,
+    })
+    round(l, 10)
+    pad(l, 8, 6, 8, 6)
+    table.insert(aiBubbles, l)
+    if #aiBubbles > 50 then
+        local old = table.remove(aiBubbles, 1)
+        if old then
+            old:Destroy()
+        end
+    end
+    return l
+end
+
+addBubble("sys", "Free AI ready. Live chat is auto-checked in the Live tab. Use the chips below or type /help.")
+
+local function providerNames()
+    local t = {}
+    for _, p in ipairs(getProviders()) do
+        t[#t + 1] = p.name
+    end
+    return #t > 0 and table.concat(t, " > ") or "none"
+end
+
+local handleCommand
+local function runChip(text)
+    handleCommand(text)
+end
+for i, c in ipairs({ { "📊 Stats", "/stats" }, { "🔄 Lists", "/refresh" }, { "🧹 Reset", "/reset" }, { "ℹ Help", "/help" } }) do
+    button(chipRow, c[1], PANEL, UDim2.new(0.25, -4, 1, 0), UDim2.new((i - 1) / 4, 2, 0, 0), function()
+        runChip(c[2])
+    end, 10)
+end
+
+handleCommand = function(text)
+    local cmd, arg = text:match("^/(%a+)%s*(.-)%s*$")
+    cmd = (cmd or ""):lower()
+    arg = (arg or ""):lower()
+    arg = arg:gsub("[^%a]", "")
+
+    if cmd == "add" and #arg >= 2 then
+        custom[arg] = { cat = "profanity", sev = 3 }
+        addExact(arg, "profanity", 3, nil, false)
+        whitelist[arg] = nil
+        markSave()
+        addBubble("sys", "Added '" .. arg .. "' to the bad-word list.")
+    elseif cmd == "white" and #arg >= 2 then
+        whitelist[arg] = true
+        custom[arg] = nil
+        learned[arg] = nil
+        remoteSet[arg] = nil
+        if not builtin[c2(arg)] then
+            exactSet[c2(arg)] = nil
+            exactSet[c1(arg)] = nil
+        end
+        markSave()
+        addBubble("sys", "'" .. arg .. "' is now ignored (whitelisted).")
+    elseif cmd == "stats" then
+        addBubble("sys", "Flagged: " .. flaggedCount .. " | Offenders: " .. countKeys(strikes) .. " | Roblox tags: " .. tagTotal
+            .. " | Learned: " .. countKeys(learned) .. " | Custom: " .. countKeys(custom)
+            .. " | Lists: " .. remoteStats.words .. " words / " .. remoteStats.phrases .. " phrases (" .. remoteStats.status .. ")"
+            .. " | Providers: " .. providerNames() .. " | last: " .. aiLast)
+    elseif cmd == "refresh" then
+        addBubble("sys", "Re-downloading internet lists…")
+        task.spawn(function()
+            remoteSet, remotePhrases = {}, {}
+            pcall(loadRemote, true)
+            if alive then
+                addBubble("sys", "Lists: " .. remoteStats.words .. " words / " .. remoteStats.phrases .. " phrases (" .. remoteStats.status .. ")")
+            end
+        end)
+    elseif cmd == "reset" then
+        strikes, chatLog = {}, {}
+        flaggedCount, tagTotal, lastFlagged = 0, 0, nil
+        refreshAll()
+        updateStatus()
+        addBubble("sys", "Strikes and logs cleared.")
+    else
+        addBubble("sys", "Commands: /add <word> • /white <word> • /stats • /refresh • /reset")
+    end
+end
+
+local convo = {}
+local aiBusy = false
+
+local function sendChat(overrideText, shownText)
+    if aiBusy or not alive then
+        return
+    end
+    local text = overrideText or (aiInput.Text or ""):match("^%s*(.-)%s*$")
+    if not text or text == "" then
+        return
+    end
+    if not overrideText then
+        aiInput.Text = ""
+        if text:sub(1, 1) == "/" then
+            handleCommand(text)
+            return
+        end
+    end
+    addBubble("user", shownText or text)
+    table.insert(convo, { role = "user", content = text })
+
+    aiBusy = true
+    setBtn(sendBtn, "…")
+    local thinking = addBubble("ai", "thinking…")
+
+    task.spawn(function()
+        local messages = {
+            { role = "system", content = "You are a concise assistant inside a Roblox moderation tool that helps keep chats safe and kind. Keep answers short." },
+        }
+        for i = math.max(1, #convo - 9), #convo do
+            table.insert(messages, convo[i])
+        end
+        local reply, prov, err = callAI(messages, 300)
+        if reply then
+            table.insert(convo, { role = "assistant", content = reply })
+            aiLast = prov or aiLast
+            reply = reply .. "\n(" .. tostring(prov) .. ")"
+        else
+            reply = "Error: " .. tostring(err)
+        end
+        if alive then
+            if thinking and thinking.Parent then
+                thinking.Text = "AI  " .. reply
+            else
+                addBubble("ai", reply)
+            end
+            setBtn(sendBtn, "Send")
+            updateStatus()
+        end
+        aiBusy = false
+    end)
+end
+
+sendBtn.Activated:Connect(function()
+    sendChat()
+end)
+aiInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        sendChat()
+    end
+end)
+analyzeBtn.Activated:Connect(function()
+    if not lastFlagged then
+        addBubble("sys", "No flagged message yet.")
+        return
+    end
+    local m = lastFlagged
+    sendChat("Moderation review. Is this Roblox chat message a violation of Roblox Community Standards? Player: " .. m.name
+        .. ". Message: \"" .. m.msg:sub(1, 200) .. "\". Auto-detected: " .. table.concat(m.cats, ", ")
+        .. " (severity " .. m.sev .. "/5). Reply briefly: verdict, whether it could be a false positive, and best report category.",
+        "Analyze: " .. m.name .. ": " .. m.msg:sub(1, 60))
+end)
+
+-- ============================== TAB: SETUP ==============================
+local setScroll = makeScroll(pages["Setup"], UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, 0))
+local so = 0
+local function nextOrder()
+    so += 1
+    return so
+end
+
+sectionLabel(setScroll, "Protection", nextOrder())
+toggleRow(setScroll, "🛡 Self-Guard (block my abuse)", selfGuard, function(v)
+    selfGuard = v
+    toast("Self-Guard " .. (v and "ON" or "OFF"), NEON)
+end, nextOrder())
+toggleRow(setScroll, "📋 Auto-copy pack on alert", CFG.AUTO_COPY_EVIDENCE, function(v)
+    CFG.AUTO_COPY_EVIDENCE = v
+end, nextOrder())
+aiSegSetup = segRow(setScroll, "🤖 AI mode", { "Smart", "Strict", "Off" }, "Smart", setAiMode, nextOrder())
+segRow(setScroll, "🚨 Alert at strikes", { "2", "3", "5" }, tostring(CFG.STRIKE_ALERT), function(v)
+    CFG.STRIKE_ALERT = tonumber(v) or 3
+    toast("Alert threshold: " .. v, NEON)
+end, nextOrder())
+
+sectionLabel(setScroll, "AI providers (auto-rotation)", nextOrder())
+local provLabels = {}
+for _, name in ipairs({ "Groq", "Gemini", "OpenRouter", "Pollinations" }) do
+    local row = new("Frame", { Size = UDim2.new(1, -6, 0, 28), BackgroundColor3 = CARD, BorderSizePixel = 0, LayoutOrder = nextOrder() }, setScroll)
+    round(row, 8)
+    label(row, name, 12, TXT, Enum.Font.GothamMedium, { Position = UDim2.new(0, 10, 0, 0), Size = UDim2.new(0.5, 0, 1, 0), TextWrapped = false })
+    provLabels[name] = label(row, "", 11, MUTED, Enum.Font.Gotham, {
+        Position = UDim2.new(0.4, 0, 0, 0), Size = UDim2.new(0.6, -10, 1, 0), TextXAlignment = Enum.TextXAlignment.Right, TextWrapped = false,
+    })
+end
+label(setScroll, "Add free keys at the top of the script (Groq is the fastest). Keyless Pollinations always works as a fallback.", 10, MUTED,
+    Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 28), LayoutOrder = nextOrder() })
+
+sectionLabel(setScroll, "Internet lists", nextOrder())
+local listsLabel = label(setScroll, "", 11, TXT, Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 28), LayoutOrder = nextOrder() })
+button(setScroll, "🔄 Re-download lists", CARD, UDim2.new(1, -6, 0, 30), nil, function()
+    toast("Downloading lists…", BLUE)
+    task.spawn(function()
+        remoteSet, remotePhrases = {}, {}
+        pcall(loadRemote, true)
+        if alive then
+            toast("Lists: " .. remoteStats.words .. " words / " .. remoteStats.phrases .. " phrases", BLUE)
+        end
+    end)
+end, 11).LayoutOrder = nextOrder()
+
+sectionLabel(setScroll, "Data", nextOrder())
+button(setScroll, "📤 Copy learned words (JSON)", CARD, UDim2.new(1, -6, 0, 30), nil, function()
+    local ok = copyToClipboard(HttpService:JSONEncode({ learned = learned, custom = custom, whitelist = whitelist }))
+    toast(ok and "📤 Copied" or "⚠ No clipboard", NEON)
+end, 11).LayoutOrder = nextOrder()
+button(setScroll, "🧠 Clear learned words", CARD, UDim2.new(1, -6, 0, 30), nil, function()
+    for tok in pairs(learned) do
+        if not builtin[c2(tok)] then
+            exactSet[c2(tok)] = nil
+            exactSet[c1(tok)] = nil
+        end
+    end
+    learned = {}
+    markSave()
+    toast("🧠 Learned words cleared", AMBER)
+end, 11).LayoutOrder = nextOrder()
+button(setScroll, "🧹 Reset strikes & logs", RED, UDim2.new(1, -6, 0, 30), nil, function()
+    strikes, chatLog = {}, {}
+    flaggedCount, tagTotal, lastFlagged = 0, 0, nil
+    refreshAll()
+    updateStatus()
+    toast("🧹 Strikes and logs cleared", AMBER)
+end, 11).LayoutOrder = nextOrder()
+label(setScroll, "Reports are sent only when you tap and confirm. Report real violations only — Roblox decides the action.", 10, MUTED,
+    Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 30), LayoutOrder = nextOrder() })
+
+-- periodic status refresh (provider states, header dot, lists)
+local function refreshProviders()
+    local enabled = {
+        Groq = hasKey(GROQ_KEY), Gemini = hasKey(GEMINI_KEY), OpenRouter = hasKey(AI_API_KEY), Pollinations = USE_FREE_FALLBACK,
+    }
+    local now = os.clock()
+    local anyReady, anyCool = false, false
+    for name, lbl in pairs(provLabels) do
+        if not enabled[name] then
+            lbl.Text, lbl.TextColor3 = "○ off (no key)", MUTED
+        elseif rate[name].coolUntil > now then
+            anyCool = true
+            lbl.Text, lbl.TextColor3 = "● cooling " .. math.ceil(rate[name].coolUntil - now) .. "s", AMBER
+        else
+            anyReady = true
+            lbl.Text, lbl.TextColor3 = "● ready", GREEN
+        end
+    end
+    statusDot.BackgroundColor3 = anyReady and GREEN or (anyCool and AMBER or RED)
+    listsLabel.Text = "🌐 " .. remoteStats.words .. " words · " .. remoteStats.phrases .. " phrases · " .. remoteStats.status
+end
+
+task.spawn(function()
+    while alive do
+        pcall(refreshProviders)
+        task.wait(2)
+    end
+end)
+
+-- ============================== CLEANUP / START ==============================
+local function cleanup()
+    if not alive then
+        return
+    end
+    alive = false
+    for _, c in ipairs(conns) do
+        pcall(function()
+            c:Disconnect()
+        end)
+    end
+    table.clear(conns)
+    table.clear(queue)
+    if gui then
+        gui:Destroy()
+    end
+    env.PhantomOS_Cleanup = nil
+end
+
+env.PhantomOS_Cleanup = cleanup
+closeBtn.Activated:Connect(cleanup)
+
+updateStatus()
+selectTab("Live")
