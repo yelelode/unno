@@ -2608,4 +2608,285 @@ local function addBubble(role, text)
     end
     local l = label(aiScroll, prefix .. text, 12, col, Enum.Font.Gotham, {
         Size = UDim2.new(1, -6, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 0,
-        BackgroundColor3 = bg, TextYAlignment = En
+        BackgroundColor3 = bg, TextYAlignment = Enum.TextYAlignment.Top, LayoutOrder = aiOrder,
+    })
+    round(l, 10)
+    pad(l, 8, 6, 8, 6)
+    table.insert(aiBubbles, l)
+    if #aiBubbles > 50 then
+        local old = table.remove(aiBubbles, 1)
+        if old then
+            old:Destroy()
+        end
+    end
+    return l
+end
+
+addBubble("sys", "Free AI ready. Live chat is auto-checked in the Live tab. Use the chips below or type /help.")
+
+local function providerNames()
+    local t = {}
+    for _, p in ipairs(getProviders()) do
+        t[#t + 1] = p.name
+    end
+    return #t > 0 and table.concat(t, " > ") or "none"
+end
+
+local handleCommand
+local function runChip(text)
+    handleCommand(text)
+end
+for i, c in ipairs({ { "📊 Stats", "/stats" }, { "🔄 Lists", "/refresh" }, { "🧹 Reset", "/reset" }, { "ℹ Help", "/help" } }) do
+    button(chipRow, c[1], PANEL, UDim2.new(0.25, -4, 1, 0), UDim2.new((i - 1) / 4, 2, 0, 0), function()
+        runChip(c[2])
+    end, 10)
+end
+
+handleCommand = function(text)
+    local cmd, arg = text:match("^/(%a+)%s*(.-)%s*$")
+    cmd = (cmd or ""):lower()
+    arg = (arg or ""):lower()
+    arg = arg:gsub("[^%a]", "")
+
+    if cmd == "add" and #arg >= 2 then
+        custom[arg] = { cat = "profanity", sev = 3 }
+        addExact(arg, "profanity", 3, nil, false)
+        whitelist[arg] = nil
+        markSave()
+        addBubble("sys", "Added '" .. arg .. "' to the bad-word list.")
+    elseif cmd == "white" and #arg >= 2 then
+        whitelist[arg] = true
+        custom[arg] = nil
+        learned[arg] = nil
+        remoteSet[arg] = nil
+        if not builtin[c2(arg)] then
+            exactSet[c2(arg)] = nil
+            exactSet[c1(arg)] = nil
+        end
+        markSave()
+        addBubble("sys", "'" .. arg .. "' is now ignored (whitelisted).")
+    elseif cmd == "stats" then
+        addBubble("sys", "Flagged: " .. flaggedCount .. " | Offenders: " .. countKeys(strikes) .. " | Roblox tags: " .. tagTotal
+            .. " | Learned: " .. countKeys(learned) .. " | Custom: " .. countKeys(custom)
+            .. " | Lists: " .. remoteStats.words .. " words / " .. remoteStats.phrases .. " phrases (" .. remoteStats.status .. ")"
+            .. " | Providers: " .. providerNames() .. " | last: " .. aiLast)
+    elseif cmd == "refresh" then
+        addBubble("sys", "Re-downloading internet lists…")
+        task.spawn(function()
+            remoteSet, remotePhrases = {}, {}
+            pcall(loadRemote, true)
+            if alive then
+                addBubble("sys", "Lists: " .. remoteStats.words .. " words / " .. remoteStats.phrases .. " phrases (" .. remoteStats.status .. ")")
+            end
+        end)
+    elseif cmd == "reset" then
+        strikes, chatLog = {}, {}
+        flaggedCount, tagTotal, lastFlagged = 0, 0, nil
+        refreshAll()
+        updateStatus()
+        addBubble("sys", "Strikes and logs cleared.")
+    else
+        addBubble("sys", "Commands: /add <word> • /white <word> • /stats • /refresh • /reset")
+    end
+end
+
+local convo = {}
+local aiBusy = false
+
+local function sendChat(overrideText, shownText)
+    if aiBusy or not alive then
+        return
+    end
+    local text = overrideText or (aiInput.Text or ""):match("^%s*(.-)%s*$")
+    if not text or text == "" then
+        return
+    end
+    if not overrideText then
+        aiInput.Text = ""
+        if text:sub(1, 1) == "/" then
+            handleCommand(text)
+            return
+        end
+    end
+    addBubble("user", shownText or text)
+    table.insert(convo, { role = "user", content = text })
+
+    aiBusy = true
+    setBtn(sendBtn, "…")
+    local thinking = addBubble("ai", "thinking…")
+
+    task.spawn(function()
+        local messages = {
+            { role = "system", content = "You are a concise assistant inside a Roblox moderation tool that helps keep chats safe and kind. Keep answers short." },
+        }
+        for i = math.max(1, #convo - 9), #convo do
+            table.insert(messages, convo[i])
+        end
+        local reply, prov, err = callAI(messages, 300)
+        if reply then
+            table.insert(convo, { role = "assistant", content = reply })
+            aiLast = prov or aiLast
+            reply = reply .. "\n(" .. tostring(prov) .. ")"
+        else
+            reply = "Error: " .. tostring(err)
+        end
+        if alive then
+            if thinking and thinking.Parent then
+                thinking.Text = "AI  " .. reply
+            else
+                addBubble("ai", reply)
+            end
+            setBtn(sendBtn, "Send")
+            updateStatus()
+        end
+        aiBusy = false
+    end)
+end
+
+sendBtn.Activated:Connect(function()
+    sendChat()
+end)
+aiInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        sendChat()
+    end
+end)
+analyzeBtn.Activated:Connect(function()
+    if not lastFlagged then
+        addBubble("sys", "No flagged message yet.")
+        return
+    end
+    local m = lastFlagged
+    sendChat("Moderation review. Is this Roblox chat message a violation of Roblox Community Standards? Player: " .. m.name
+        .. ". Message: \"" .. m.msg:sub(1, 200) .. "\". Auto-detected: " .. table.concat(m.cats, ", ")
+        .. " (severity " .. m.sev .. "/5). Reply briefly: verdict, whether it could be a false positive, and best report category.",
+        "Analyze: " .. m.name .. ": " .. m.msg:sub(1, 60))
+end)
+
+-- ============================== TAB: SETUP ==============================
+local setScroll = makeScroll(pages["Setup"], UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, 0))
+local so = 0
+local function nextOrder()
+    so += 1
+    return so
+end
+
+sectionLabel(setScroll, "Protection", nextOrder())
+toggleRow(setScroll, "🛡 Self-Guard (block my abuse)", selfGuard, function(v)
+    selfGuard = v
+    toast("Self-Guard " .. (v and "ON" or "OFF"), NEON)
+end, nextOrder())
+toggleRow(setScroll, "📋 Auto-copy pack on alert", CFG.AUTO_COPY_EVIDENCE, function(v)
+    CFG.AUTO_COPY_EVIDENCE = v
+end, nextOrder())
+aiSegSetup = segRow(setScroll, "🤖 AI mode", { "Smart", "Strict", "Off" }, "Smart", setAiMode, nextOrder())
+segRow(setScroll, "🚨 Alert at strikes", { "2", "3", "5" }, tostring(CFG.STRIKE_ALERT), function(v)
+    CFG.STRIKE_ALERT = tonumber(v) or 3
+    toast("Alert threshold: " .. v, NEON)
+end, nextOrder())
+
+sectionLabel(setScroll, "AI providers (auto-rotation)", nextOrder())
+local provLabels = {}
+for _, name in ipairs({ "Groq", "Gemini", "OpenRouter", "Pollinations" }) do
+    local row = new("Frame", { Size = UDim2.new(1, -6, 0, 28), BackgroundColor3 = CARD, BorderSizePixel = 0, LayoutOrder = nextOrder() }, setScroll)
+    round(row, 8)
+    label(row, name, 12, TXT, Enum.Font.GothamMedium, { Position = UDim2.new(0, 10, 0, 0), Size = UDim2.new(0.5, 0, 1, 0), TextWrapped = false })
+    provLabels[name] = label(row, "", 11, MUTED, Enum.Font.Gotham, {
+        Position = UDim2.new(0.4, 0, 0, 0), Size = UDim2.new(0.6, -10, 1, 0), TextXAlignment = Enum.TextXAlignment.Right, TextWrapped = false,
+    })
+end
+label(setScroll, "Add free keys at the top of the script (Groq is the fastest). Keyless Pollinations always works as a fallback.", 10, MUTED,
+    Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 28), LayoutOrder = nextOrder() })
+
+sectionLabel(setScroll, "Internet lists", nextOrder())
+local listsLabel = label(setScroll, "", 11, TXT, Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 28), LayoutOrder = nextOrder() })
+button(setScroll, "🔄 Re-download lists", CARD, UDim2.new(1, -6, 0, 30), nil, function()
+    toast("Downloading lists…", BLUE)
+    task.spawn(function()
+        remoteSet, remotePhrases = {}, {}
+        pcall(loadRemote, true)
+        if alive then
+            toast("Lists: " .. remoteStats.words .. " words / " .. remoteStats.phrases .. " phrases", BLUE)
+        end
+    end)
+end, 11).LayoutOrder = nextOrder()
+
+sectionLabel(setScroll, "Data", nextOrder())
+button(setScroll, "📤 Copy learned words (JSON)", CARD, UDim2.new(1, -6, 0, 30), nil, function()
+    local ok = copyToClipboard(HttpService:JSONEncode({ learned = learned, custom = custom, whitelist = whitelist }))
+    toast(ok and "📤 Copied" or "⚠ No clipboard", NEON)
+end, 11).LayoutOrder = nextOrder()
+button(setScroll, "🧠 Clear learned words", CARD, UDim2.new(1, -6, 0, 30), nil, function()
+    for tok in pairs(learned) do
+        if not builtin[c2(tok)] then
+            exactSet[c2(tok)] = nil
+            exactSet[c1(tok)] = nil
+        end
+    end
+    learned = {}
+    markSave()
+    toast("🧠 Learned words cleared", AMBER)
+end, 11).LayoutOrder = nextOrder()
+button(setScroll, "🧹 Reset strikes & logs", RED, UDim2.new(1, -6, 0, 30), nil, function()
+    strikes, chatLog = {}, {}
+    flaggedCount, tagTotal, lastFlagged = 0, 0, nil
+    refreshAll()
+    updateStatus()
+    toast("🧹 Strikes and logs cleared", AMBER)
+end, 11).LayoutOrder = nextOrder()
+label(setScroll, "Reports are sent only when you tap and confirm. Report real violations only — Roblox decides the action.", 10, MUTED,
+    Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 30), LayoutOrder = nextOrder() })
+
+-- periodic status refresh (provider states, header dot, lists)
+local function refreshProviders()
+    local enabled = {
+        Groq = hasKey(GROQ_KEY), Gemini = hasKey(GEMINI_KEY), OpenRouter = hasKey(AI_API_KEY), Pollinations = USE_FREE_FALLBACK,
+    }
+    local now = os.clock()
+    local anyReady, anyCool = false, false
+    for name, lbl in pairs(provLabels) do
+        if not enabled[name] then
+            lbl.Text, lbl.TextColor3 = "○ off (no key)", MUTED
+        elseif rate[name].coolUntil > now then
+            anyCool = true
+            lbl.Text, lbl.TextColor3 = "● cooling " .. math.ceil(rate[name].coolUntil - now) .. "s", AMBER
+        else
+            anyReady = true
+            lbl.Text, lbl.TextColor3 = "● ready", GREEN
+        end
+    end
+    statusDot.BackgroundColor3 = anyReady and GREEN or (anyCool and AMBER or RED)
+    listsLabel.Text = "🌐 " .. remoteStats.words .. " words · " .. remoteStats.phrases .. " phrases · " .. remoteStats.status
+end
+
+task.spawn(function()
+    while alive do
+        pcall(refreshProviders)
+        task.wait(2)
+    end
+end)
+
+-- ============================== CLEANUP / START ==============================
+local function cleanup()
+    if not alive then
+        return
+    end
+    alive = false
+    for _, c in ipairs(conns) do
+        pcall(function()
+            c:Disconnect()
+        end)
+    end
+    table.clear(conns)
+    table.clear(queue)
+    if gui then
+        gui:Destroy()
+    end
+    env.PhantomOS_Cleanup = nil
+end
+
+env.PhantomOS_Cleanup = cleanup
+closeBtn.Activated:Connect(cleanup)
+
+updateStatus()
+selectTab("Live")
