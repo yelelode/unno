@@ -34,9 +34,12 @@ local CFG = {
     },
 }
 
+-- Ensure the game and player are loaded before starting
+if not game:IsLoaded() then game.Loaded:Wait() end
 local Players, UIS, TS, HS, TCS, SG = game:GetService("Players"), game:GetService("UserInputService"),
     game:GetService("TweenService"), game:GetService("HttpService"), game:GetService("TextChatService"),
     game:GetService("StarterGui")
+while not Players.LocalPlayer do task.wait() end
 local LP = Players.LocalPlayer
 
 local env = (getgenv and getgenv()) or _G
@@ -1948,28 +1951,6 @@ function V.addEntry(player, name, msg, sev, cats, blocked, doubt, incident, flag
         actions.Visible = cur > 0 and not blocked
     end
     render()
-    card.BackgroundTransparency = 1
-    U.tw(card, { BackgroundTransparency = 0 }, 0.2)
-
-    local h = {}
-    function h.setVerifying()
-        if cur > 0 then noteAI = "🟡 AI verifying…" render() end
-    end
-    function h.markTagged(tt)
-        if not S.alive or not card.Parent then return end
-        tagged, tagText, checking = true, tt, false
-        if cur == 0 then parts[#parts + 1] = "● " .. table.concat(curCats, ", ") end
-        if tagged then parts[#parts + 1] = taggedOnly and "🏷 Roblox hid the text" or "🏷 Tagged by Roblox" end
-        if flags.newAcct then parts[#parts + 1] = "🆕 new account (" .. tostring(flags.age) .. "d)" end
-        if flags.watched then parts[#parts + 1] = "⭐ watched" end
-        if trusted then parts[#parts + 1] = "👥 trusted (not scanned)" end
-        if checking then parts[#parts + 1] = "🟡 AI checking…" end
-        if noteAI ~= "" then parts[#parts + 1] = noteAI end
-        chips.Text = table.concat(parts, "  •  ")
-        chips.Visible = #parts > 0
-        actions.Visible = cur > 0 and not blocked
-    end
-render()
     card.BackgroundTransparency = 1
     U.tw(card, { BackgroundTransparency = 0 }, 0.2)
 
