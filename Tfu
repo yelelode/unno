@@ -6,7 +6,7 @@
 ]]
 
 local KEYS = {
-    groq = "PUT_KEY_HERE",       -- free: console.groq.com
+    groq = "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",       -- free: console.groq.com
     gemini = "PUT_KEY_HERE",     -- free: aistudio.google.com/apikey
     openrouter = "PUT_KEY_HERE", -- put your NEW key here (rotate the old one!)
 }
