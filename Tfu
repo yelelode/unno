@@ -1,9 +1,10 @@
 --[[
-    🔮 PHANTOM OS v9 — Pro Moderation Suite (Mobile)
+    🔮 PHANTOM OS v9.5 — Pro Moderation Suite (Mobile)
     Tabs: Live | Strikes | Players | Reports | Stats | Words | AI | Setup
+    • Reports are capped at 1000 characters (setting: 500 / 800 / 1000)
+    • Evidence-based report builder: spam facts + filter-avoidance techniques
+    • 76 generic report-reason templates (spam-heavy, no target) in Reports → Appeals
     • NO auto-copy: clipboard is only used when YOU tap a button
-    • Spam storm protection, duplicate merging, auto-quarantine, spam hider
-    • Modular layout (≈20 top-level locals) → safe under the 200-local limit
 ]]
 
 local KEYS = {
@@ -20,6 +21,7 @@ local CFG = {
     confirmStrong = false, strikeAlert = 3, ignoreFriends = false,
     workers = 2, queueMax = 8, ctxLines = 4, learnVotes = 2, tagVotes = 2,
     saveFile = "PhantomOS_data.json", reportCooldown = 12,
+    reportMax = 1000, directMax = 1000, -- max characters of a report text
     raidJoins = 4, raidWindow = 25, newAcct = 7,
     stormMsgs = 28, stormWindow = 5, autoQuar = true, quarSecs = 60,
     reportReason = {
@@ -326,18 +328,18 @@ function U.sheet(title, body, actions)
     if not m or not m.frame.Parent then
         m = {}
         m.frame = U.new("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.4, ZIndex = 60, Visible = false, Active = true }, V.main)
-        local box = U.new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(1, -20, 1, -60), BackgroundColor3 = T.PANEL, BorderSizePixel = 0, ZIndex = 61 }, m.frame)
+        local box = U.new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(1, -20, 1, -50), BackgroundColor3 = T.PANEL, BorderSizePixel = 0, ZIndex = 61 }, m.frame)
         U.round(box, 12)
         U.outline(box, T.NEON, 1, 0.3)
         m.title = U.label(box, "", 13, T.NEON, Enum.Font.GothamBold, { Position = UDim2.new(0, 10, 0, 8), Size = UDim2.new(1, -20, 0, 18), TextWrapped = false, ZIndex = 62 })
         local sf = U.new("ScrollingFrame", {
-            Position = UDim2.new(0, 8, 0, 32), Size = UDim2.new(1, -16, 1, -112), BackgroundColor3 = T.CARD, BorderSizePixel = 0,
+            Position = UDim2.new(0, 8, 0, 32), Size = UDim2.new(1, -16, 1, -146), BackgroundColor3 = T.CARD, BorderSizePixel = 0,
             ScrollBarThickness = 3, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 62,
         }, box)
         U.round(sf, 8)
         U.pad(sf, 6, 6, 6, 6)
         m.body = U.label(sf, "", 11, T.TXT, Enum.Font.Code, { Size = UDim2.new(1, -4, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, ZIndex = 63 })
-        m.actions = U.new("Frame", { Position = UDim2.new(0, 8, 1, -72), Size = UDim2.new(1, -16, 0, 64), BackgroundTransparency = 1, ZIndex = 62 }, box)
+        m.actions = U.new("Frame", { Position = UDim2.new(0, 8, 1, -106), Size = UDim2.new(1, -16, 0, 98), BackgroundTransparency = 1, ZIndex = 62 }, box)
         V.sheetUI = m
     end
     m.title.Text, m.body.Text = title, body
@@ -382,6 +384,7 @@ function N.load()
                     if st.hideSpam ~= nil then S.hideSpam = st.hideSpam end
                     if st.autoQuar ~= nil then CFG.autoQuar = st.autoQuar end
                     if tonumber(st.stormMsgs) then CFG.stormMsgs = tonumber(st.stormMsgs) end
+                    if tonumber(st.reportMax) then CFG.reportMax = math.clamp(tonumber(st.reportMax), 300, 1000) end
                 end
             end
         end
@@ -406,7 +409,7 @@ function N.save()
                     guard = S.guard, aiMode = S.aiMode, alert = CFG.strikeAlert, ignoreFriends = CFG.ignoreFriends,
                     theme = S.theme, scale = S.scale, shield = S.shield, shieldLevel = S.shieldLevel, autoSave = S.autoSave,
                     confirmStrong = CFG.confirmStrong, notifyMode = S.notifyMode, perf = S.perf, hideSpam = S.hideSpam,
-                    autoQuar = CFG.autoQuar, stormMsgs = CFG.stormMsgs,
+                    autoQuar = CFG.autoQuar, stormMsgs = CFG.stormMsgs, reportMax = CFG.reportMax,
                 },
             }))
         end)
@@ -489,6 +492,7 @@ D.HOMO = {
 D.ZERO = { [0x200B] = true, [0x200C] = true, [0x200D] = true, [0x200E] = true, [0x200F] = true, [0x2060] = true, [0xFEFF] = true, [0xAD] = true }
 D.LEET = { ["0"] = "o", ["1"] = "i", ["3"] = "e", ["4"] = "a", ["5"] = "s", ["@"] = "a", ["$"] = "s" }
 D.SYMS = "[%*%.%-_~'`%^%+|\\/\"%(%)%[%]{}<>,;:]"
+D.ABUSE = { profanity = true, hindi = true, hate = true, harass = true, threat = true, sexual = true, scam = true }
 
 function D.fold(s)
     if not s:find("[\128-\255]") then return s end
@@ -503,6 +507,13 @@ function D.fold(s)
         end
     end
     return table.concat(out)
+end
+function D.hasLookalike(s)
+    if not s:find("[\128-\255]") or not utf8.len(s) then return false end
+    for _, cp in utf8.codes(s) do
+        if D.HOMO[cp] or D.ZERO[cp] or (cp >= 0xFF01 and cp <= 0xFF5E) then return true end
+    end
+    return false
 end
 function D.c2(s) return (s:gsub("(%a)%1%1+", "%1%1")) end
 function D.c1(s) return (s:gsub("(%a)%1+", "%1")) end
@@ -611,7 +622,7 @@ local function anyIn(s, list)
     return nil
 end
 
--- returns sev, cats, hits, doubt, hint, ctoks, targeted
+-- returns sev, cats, hits, doubt, hint, ctoks, targeted, evasion(list), waveCount
 function D.analyze(player, msg, stateless)
     local norm = D.norm(msg)
     local glued = (norm:gsub(D.SYMS, ""))
@@ -619,9 +630,11 @@ function D.analyze(player, msg, stateless)
     if glued ~= norm then variants[2] = glued end
     local sev, catSet, cats, hits = 0, {}, {}, {}
     local doubt, hints, ctoks, seenTok, targeted = false, {}, {}, {}, false
+    local abuseWords, ambigTok, fuzzyTok, waveCount = {}, nil, nil, 0
     local function hit(cat, s, word)
         if not catSet[cat] then catSet[cat] = true cats[#cats + 1] = cat end
         hits[#hits + 1] = word
+        if D.ABUSE[cat] and word ~= "flood" and word ~= "wave" then abuseWords[#abuseWords + 1] = word end
         if s > sev then sev = s end
     end
     local function addDoubt(tok, h)
@@ -641,11 +654,15 @@ function D.analyze(player, msg, stateless)
             if e then
                 hit(e.cat, e.sev, tok)
                 if not stateless then S.wordCount[tok] = (S.wordCount[tok] or 0) + 1 end
-                if e.ambig then addDoubt(tok, "'" .. tok .. "' may be a Hindi abuse abbreviation/evasion spelling or harmless") end
+                if e.ambig then
+                    ambigTok = ambigTok or tok
+                    addDoubt(tok, "'" .. tok .. "' may be a Hindi abuse abbreviation/evasion spelling or harmless")
+                end
             elseif not S.whitelist[tok] then
                 if #tok >= 4 and (D.remote[tok] or D.remote[D.c1(tok)]) and not D.STOP[tok] then
                     addDoubt(tok, "'" .. tok .. "' is on public bad-word lists (may be harmless)")
                 elseif #tok >= 5 and D.skel[D.skeleton(tok)] then
+                    fuzzyTok = fuzzyTok or tok
                     hit("hindi", 3, tok)
                     addDoubt(tok, "'" .. tok .. "' sounds like Hindi abuse '" .. D.skel[D.skeleton(tok)] .. "'")
                 elseif #tok >= 3 and #tok <= 6 and not tok:find("[aeiouy]") and not D.COK[tok] then
@@ -702,6 +719,7 @@ function D.analyze(player, msg, stateless)
                 S.wave[norm] = w
             end
             if not w.players[player] then w.players[player] = true w.n += 1 end
+            waveCount = w.n
             if w.n >= 3 then hit("spam", 3, "wave") addDoubt(nil, "same text posted by " .. w.n .. " different players (spam wave)") end
             if S.waveN > 80 then
                 for k, v in pairs(S.wave) do if now - v.t > 30 then S.wave[k] = nil end end
@@ -711,7 +729,33 @@ function D.analyze(player, msg, stateless)
         local rec = S.strikes[U.key(player)]
         if rec and rec.count >= 3 and sev > 0 then sev = math.min(5, sev + 1) end
     end
-    return sev, cats, hits, doubt, table.concat(hints, "; "), ctoks, targeted
+
+    -- filter-avoidance techniques (only reported when abusive content was actually matched)
+    local ev = {}
+    if not stateless and #abuseWords > 0 then
+        local plain = D.c2(D.fold(msg):lower())
+        local compactP = (plain:gsub("[^%a]", ""))
+        local fl = {}
+        for _, w in ipairs(abuseWords) do
+            if not plain:find(w, 1, true) then
+                local wc = (w:gsub("[^%a]", ""))
+                if D.c1(plain):find(D.c1(w), 1, true) then fl.stretch = true
+                elseif #wc >= 3 and compactP:find(wc, 1, true) then fl.split = true
+                elseif #wc >= 3 and D.c1(compactP):find(D.c1(wc), 1, true) then fl.split, fl.stretch = true, true
+                elseif msg:find("[01345@%$]") then fl.leet = true
+                else fl.alter = true end
+            end
+        end
+        if D.hasLookalike(msg) then fl.uni = true end
+        if fuzzyTok then fl.alter = true end
+        if fl.split then ev[#ev + 1] = "letters split by spaces/symbols (e.g. f*ck, f u c k)" end
+        if fl.leet then ev[#ev + 1] = "number/symbol substitution (e.g. sh1t, @ss)" end
+        if fl.stretch then ev[#ev + 1] = "stretched letters (e.g. fuuuck)" end
+        if fl.uni then ev[#ev + 1] = "look-alike or hidden unicode characters" end
+        if fl.alter then ev[#ev + 1] = "deliberately altered spelling" end
+        if ambigTok then ev[#ev + 1] = "coded abbreviation ('" .. ambigTok .. "')" end
+    end
+    return sev, cats, hits, doubt, table.concat(hints, "; "), ctoks, targeted, ev, waveCount
 end
 function D.quick(msg) local s = D.analyze(nil, msg, true) return s end
 
@@ -735,7 +779,7 @@ function D.filteredWords(raw, tagged)
 end
 
 -- =====================================================================
--- R : reports / evidence
+-- R : reports / evidence (report text is always <= CFG.reportMax characters)
 -- =====================================================================
 R.REASONS = {
     profanity = "Roblox Community Standards – Civility and Respect / Terms of Use: Abusive and profane language in chat.",
@@ -749,15 +793,16 @@ R.REASONS = {
     offsite = "Roblox Community Standards – Off-Platform Communication / Terms of Use: Off-platform invite links in chat.",
     filtered = "Roblox Community Standards – Civility and Respect / Terms of Use: Message was blocked/tagged (####) by Roblox's own chat filter.",
 }
+-- { policy title, violation description, short rule sentence }
 R.POLICY = {
     profanity = { "Civility and Respect", "used profane and abusive language in public chat", "Abusive or profane language toward or around other players is not permitted." },
-    hindi = { "Civility and Respect", "used abusive Hindi/Hinglish language, including abbreviations or altered spellings meant to get around the chat filter", "Insults and abuse are not permitted in any language, and disguising them to avoid the filter is itself a violation." },
+    hindi = { "Civility and Respect", "used abusive Hindi/Hinglish language in public chat", "Insults and abuse are not permitted in any language, and disguising them to avoid the filter is itself a violation." },
     sexual = { "Sexual Content and Adult Material", "posted sexual or adult content in public chat", "Sexual or adult content is not permitted in chat." },
-    scam = { "Fraud, Scams and Deceptive Practices", "posted a scam, free-Robux, or exploit/script advertisement in chat", "Promoting scams or exploit scripts is deceptive and puts other players' accounts at risk." },
+    scam = { "Fraud, Scams and Deceptive Practices", "posted a scam, free-Robux or exploit/script advertisement in chat", "Promoting scams or exploit scripts is deceptive and puts other players' accounts at risk." },
     harass = { "Bullying and Harassment", "harassed another player and/or encouraged self-harm in chat", "Harassment, bullying and encouraging self-harm are not permitted." },
     threat = { "Threats and Violent Content", "made threats or doxxing/attack-related statements in chat", "Threats and attempts to expose or attack users are not permitted." },
     hate = { "Hate Speech and Discrimination", "used hateful or discriminatory language in chat", "Hate speech and discriminatory language are not permitted." },
-    spam = { "Spam and Disruptive Behavior", "spammed the chat (flooding, repeated or copy-paste messages)", "Flooding or repeating content disrupts other players." },
+    spam = { "Spam and Disruptive Behavior", "spammed the chat (flooding, repeated or copy-paste messages)", "Flooding or repeating content pushes out normal conversation and disrupts every player in the server." },
     offsite = { "Off-Platform Communication", "posted an off-platform invite link in chat", "Directing players to external platforms through chat is not permitted." },
     filtered = { "Civility and Respect", "wrote a message that Roblox's own chat filter tagged as inappropriate", "The message was blocked/tagged by Roblox's automated chat filter." },
 }
@@ -767,6 +812,16 @@ function R.reasonText(cats)
     return table.concat(p, " ")
 end
 function R.game() return "Game PlaceId: " .. tostring(game.PlaceId) .. " | JobId: " .. tostring(game.JobId) end
+-- cut a string to n bytes without splitting a UTF-8 character
+function R.cut(s, n)
+    if #s <= n then return s end
+    local c = n
+    while c > 0 do
+        local b = s:byte(c + 1)
+        if b and b >= 128 and b < 192 then c -= 1 else break end
+    end
+    return s:sub(1, c)
+end
 function R.logFor(key, name, uid)
     local log = S.chatLog[key] or {}
     local lines = { "CHAT LOG — " .. tostring(name) .. " (UserId " .. tostring(uid) .. ") | " .. R.game() }
@@ -779,85 +834,123 @@ function R.logFor(key, name, uid)
     end
     return table.concat(lines, "\n")
 end
-function R.short(i)
-    local p = R.POLICY[i.cat] or R.POLICY.profanity
-    local m = #i.msg > 90 and (i.msg:sub(1, 90) .. "...") or i.msg
-    local s = "Reporting " .. i.name .. " (UserId " .. tostring(i.userId) .. ") who " .. p[2] .. ". Message: \"" .. m .. "\" at " .. i.time .. ". "
-    if i.targeted then s = s .. "It was aimed at another player. " end
-    if i.count and i.count > 1 then s = s .. "This is flagged message #" .. i.count .. " from this user this session. " end
-    if i.tagged then s = s .. "Roblox's own filter also tagged it. " end
-    return s .. "Violates the Community Standards (" .. p[1] .. ")."
-end
+-- ≤190 chars (tiny fallback for very small comment boxes)
 function R.tiny(i)
-    local m = #i.msg > 80 and (i.msg:sub(1, 80) .. "...") or i.msg
+    local m = #i.msg > 70 and (R.cut(i.msg, 70) .. "…") or i.msg
     local s = "\"" .. m .. "\" at " .. i.time .. "."
+    if (i.dupN or 0) >= 3 then s = s .. " Repeated x" .. i.dupN .. "." end
+    if i.evasion and #i.evasion > 0 then s = s .. " Filter avoidance used." end
     if i.targeted then s = s .. " Aimed at a player." end
-    if i.count and i.count > 1 then s = s .. " Flagged x" .. i.count .. " this session." end
-    if i.tagged then s = s .. " Roblox filter tagged it." end
-    return s:sub(1, 190)
+    if i.count and i.count > 1 then s = s .. " Flagged x" .. i.count .. "." end
+    return R.cut(s, 190)
 end
-function R.full(i)
+-- The report text. Hard-capped at `max` characters (default CFG.reportMax = 1000).
+-- Only facts the script actually observed are included; lowest-priority lines are dropped first.
+function R.build(i, max)
+    max = math.min(max or CFG.reportMax, 1000)
     local p = R.POLICY[i.cat] or R.POLICY.profanity
-    local m = #i.msg > 300 and (i.msg:sub(1, 300) .. "...") or i.msg
-    local L = {
-        "Subject: Chat report — " .. i.name .. " (UserId " .. tostring(i.userId) .. ")", "", "Hello Roblox Trust & Safety,", "",
-        "I am reporting the user " .. i.name .. " (display name: " .. tostring(i.display) .. ", UserId: " .. tostring(i.userId)
-            .. ", account age: " .. tostring(i.age or 0) .. " days) for violating the Roblox Community Standards (" .. p[1] .. ").", "",
-        "What happened:",
-        "- At " .. i.time .. " in experience PlaceId " .. tostring(game.PlaceId) .. " (server JobId " .. tostring(game.JobId) .. "), the user " .. p[2] .. ".",
-        "- Exact message: \"" .. m .. "\"",
-        i.targeted and "- The message was directed at another player." or "- The message was posted in public chat, visible to other players in the server.",
-    }
-    if i.count and i.count > 1 then L[#L + 1] = "- Not an isolated incident: " .. i.count .. " flagged messages from this user were captured in this session." end
-    if i.tagged then L[#L + 1] = "- Roblox's automated chat filter also tagged at least one of this user's messages (" .. tostring(i.tags or 1) .. " tag(s))." end
-    if i.extra and i.extra ~= "" then L[#L + 1] = "- " .. i.extra end
-    L[#L + 1] = ""
-    L[#L + 1] = "Why this violates the rules: " .. p[3]
-    L[#L + 1] = ""
-    L[#L + 1] = "A timestamped chat log captured live is included below as evidence."
-    L[#L + 1] = "Please review this report and take action consistent with your policies. Thank you."
-    return table.concat(L, "\n")
+    local spamCat = (i.cat == "spam")
+    local jid = tostring(game.JobId)
+    if jid == "" then jid = "n/a" end
+    local REQ = "Request: please review the chat logs for this server and time and apply appropriate chat restrictions to this account. Evidence available on request."
+
+    local function make(msgLen)
+        local m = i.msg
+        if #m > msgLen then m = R.cut(m, msgLen) .. "…" end
+        local rep = ""
+        if (i.dupN or 0) == 2 then rep = " [sent twice]" end
+        local fixed = {
+            "CHAT REPORT — " .. i.name .. " (UserID " .. tostring(i.userId) .. ")",
+            "Policy: Roblox Community Standards – " .. p[1] .. ".",
+            "Violation: the user " .. p[2] .. ".",
+            "Message: \"" .. m .. "\"" .. rep,
+        }
+        local where = "Where/when: PlaceId " .. tostring(game.PlaceId) .. ", server " .. jid .. ", " .. i.time .. "."
+        local opt = {}
+        if i.evasion and #i.evasion > 0 then
+            opt[#opt + 1] = { "Filter avoidance: " .. table.concat(i.evasion, "; ") .. " — an apparent deliberate attempt to bypass the chat filter.", spamCat and 2 or 1 }
+        end
+        local sp = {}
+        if (i.dupN or 0) >= 3 then
+            sp[#sp + 1] = "identical message repeated ×" .. i.dupN .. ((i.dupSecs and i.dupSecs >= 1) and (" in " .. math.floor(i.dupSecs) .. "s") or "")
+        end
+        if (i.peak or 0) >= 6 then sp[#sp + 1] = "peak of " .. i.peak .. " messages in 10 seconds" end
+        if (i.wave or 0) >= 3 then sp[#sp + 1] = "same text posted by " .. i.wave .. " accounts at once (coordinated)" end
+        if #sp > 0 then opt[#opt + 1] = { "Spam pattern: " .. table.concat(sp, "; ") .. ".", spamCat and 1 or 3 } end
+        if i.targeted then opt[#opt + 1] = { "The message was directed at another player.", 4 } end
+        if i.tagged then opt[#opt + 1] = { "Roblox's own chat filter also tagged this user's message (" .. tostring(i.tags or 1) .. " tag).", 5 } end
+        if (i.count or 0) > 1 then opt[#opt + 1] = { "Repeat behaviour: " .. i.count .. " flagged messages from this account this session.", 6 } end
+        opt[#opt + 1] = { "Why: " .. p[3], 7 }
+        table.sort(opt, function(a, b) return a[2] < b[2] end)
+        return fixed, where, opt
+    end
+
+    local text, msgLen = "", 170
+    for _ = 1, 6 do
+        local fixed, where, opt = make(msgLen)
+        local keep = {}
+        for _, o in ipairs(opt) do keep[#keep + 1] = o end
+        local function join()
+            local lines = {}
+            for _, l in ipairs(fixed) do lines[#lines + 1] = l end
+            for _, o in ipairs(keep) do lines[#lines + 1] = o[1] end
+            lines[#lines + 1] = where
+            lines[#lines + 1] = REQ
+            return table.concat(lines, "\n")
+        end
+        text = join()
+        while #text > max and #keep > 0 do
+            table.remove(keep)
+            text = join()
+        end
+        if #text <= max then break end
+        msgLen = math.max(24, math.floor(msgLen / 2))
+    end
+    return R.cut(text, max)
 end
-function R.pack(i)
-    return table.concat({
-        "=== SHORT REPORT (paste in the report comment box) ===", R.short(i), "",
-        "=== FULL REPORT (support form / email) ===", R.full(i), "",
-        "=== EVIDENCE ===", "Severity: " .. tostring(i.sev) .. "/5 | Categories: " .. table.concat(i.cats, ", "),
-        "Rule: " .. R.reasonText(i.cats), R.game(), "", R.logFor(i.key, i.name, i.userId),
-    }, "\n")
+function R.spamFacts(key)
+    local ps = S.pstats[key] or {}
+    return { dupN = ps.dupMax, dupSecs = ps.dupSecs, peak = ps.peak, wave = ps.wave, msgs = ps.msgs }
 end
 function R.info(player, name, msg, sev, cats, o)
     o = o or {}
     local inst = typeof(player) == "Instance"
-    local rec = S.strikes[U.key(player)]
+    local key = U.key(player)
+    local rec = S.strikes[key]
+    local sf = R.spamFacts(key)
     return {
         name = name, display = inst and player.DisplayName or name, userId = inst and player.UserId or 0,
-        age = inst and player.AccountAge or 0, key = U.key(player), msg = msg, sev = sev, cats = cats, cat = cats[1] or "profanity",
+        age = inst and player.AccountAge or 0, key = key, msg = msg, sev = sev, cats = cats, cat = cats[1] or "profanity",
         time = o.time or os.date("%H:%M:%S"), tagged = o.tagged, tagText = o.tagText, targeted = o.targeted, extra = o.extra,
-        count = rec and rec.count or 1, tags = rec and rec.tags or 0,
+        evasion = o.evasion or {}, count = rec and rec.count or 1, tags = rec and rec.tags or 0,
+        dupN = sf.dupN, dupSecs = sf.dupSecs, peak = sf.peak, wave = sf.wave, msgs = sf.msgs,
     }
 end
 function R.infoRec(rec)
     local best
     for _, x in ipairs(rec.incidents) do if not best or x.sev >= best.sev then best = x end end
     best = best or { msg = "(see chat log)", sev = rec.maxSev, cat = "profanity", time = os.date("%H:%M:%S") }
+    local sf = R.spamFacts(rec.key)
     return {
         name = rec.name, display = rec.display, userId = rec.userId, age = rec.age, key = rec.key, msg = best.msg,
         sev = best.sev, cats = { best.cat }, cat = best.cat, time = best.time, tagged = rec.tags > 0,
-        targeted = best.targeted, count = rec.count, tags = rec.tags,
+        targeted = best.targeted, evasion = best.evasion or {}, count = rec.count, tags = rec.tags,
+        dupN = sf.dupN, dupSecs = sf.dupSecs, peak = sf.peak, wave = sf.wave, msgs = sf.msgs,
     }
 end
 function R.evidence(rec)
+    local sf = R.spamFacts(rec.key)
     local L = {
         "PHANTOM OS EVIDENCE REPORT", R.game(),
         "Reported user: " .. rec.name .. " (Display: " .. rec.display .. ", UserId: " .. tostring(rec.userId) .. ", Account age: " .. tostring(rec.age) .. " days)",
         "Total strikes: " .. rec.count .. " | Roblox-filter tags: " .. rec.tags .. " | Spam repeats: " .. (rec.spam or 0) .. " | Highest severity: " .. rec.maxSev .. "/5",
+        "Spam facts: max identical repeats " .. tostring(sf.dupN or 0) .. " | peak " .. tostring(sf.peak or 0) .. " msgs/10s | wave size " .. tostring(sf.wave or 0),
         "Incidents (latest 10):",
     }
     local seen, cl = {}, {}
     for i = math.max(1, #rec.incidents - 9), #rec.incidents do
         local x = rec.incidents[i]
-        L[#L + 1] = string.format("[%s] (%s, SEV %d) \"%s\"", x.time, x.cat, x.sev, x.msg)
+        L[#L + 1] = string.format("[%s] (%s, SEV %d) \"%s\"%s", x.time, x.cat, x.sev, x.msg, (x.evasion and #x.evasion > 0) and ("  [avoidance: " .. table.concat(x.evasion, "; ") .. "]") or "")
     end
     for _, x in ipairs(rec.incidents) do if not seen[x.cat] then seen[x.cat] = true cl[#cl + 1] = x.cat end end
     L[#L + 1] = "Applicable rules: " .. R.reasonText(cl)
@@ -865,7 +958,6 @@ function R.evidence(rec)
     L[#L + 1] = R.logFor(rec.key, rec.name, rec.userId)
     return table.concat(L, "\n")
 end
--- risk uses strike decay (recent strikes weigh more), spam volume, account age and past offences
 function R.risk(d)
     local now, w = os.time(), 0
     for _, x in ipairs(d.incidents) do
@@ -917,14 +1009,15 @@ function R.submit(info, player)
     if not reason then return "noreason" end
     if typeof(player) ~= "Instance" or not player.Parent then return "gone" end
     if player == LP then return "self" end
-    local ok = pcall(function() Players:ReportAbuse(player, reason, R.tiny(info)) end)
+    local ok = pcall(function() Players:ReportAbuse(player, reason, R.build(info, math.min(CFG.reportMax, CFG.directMax))) end)
+    if not ok then ok = pcall(function() Players:ReportAbuse(player, reason, R.tiny(info)) end) end
     return ok and "sent" or "failed"
 end
 R.MSG = {
-    noreason = "No matching Roblox reason for this category — pack copied, report manually.",
-    gone = "Player left the server — pack copied.",
+    noreason = "No matching Roblox reason for this category — report text copied, report manually.",
+    gone = "Player left the server — report text copied.",
     self = "You can't report yourself.",
-    failed = "Direct report blocked on this executor — pack copied. Paste it in Roblox's report menu.",
+    failed = "Direct report blocked on this executor — report text copied. Paste it in Roblox's report menu.",
 }
 function R.mark(player)
     local rec = typeof(player) == "Instance" and S.strikes[U.key(player)] or nil
@@ -960,8 +1053,8 @@ function R.bind(btn, getInfo, getPlayer, onDone)
             R.log(info, "sent")
             if onDone then onDone() end
         else
-            if status ~= "self" then U.copy(R.pack(info)) R.log(info, "pack copied") end
-            U.setBtn(btn, "📋 Pack copied", T.BLUE)
+            if status ~= "self" then U.copy(R.build(info)) R.log(info, "text copied") end
+            U.setBtn(btn, "📋 Text copied", T.BLUE)
             U.toast(R.MSG[status] or "Report failed.", T.AMBER)
             task.delay(2.5, function() if S.alive and btn.Parent and not done then U.setBtn(btn, "⚡ Report", T.RED) end end)
         end
@@ -1014,12 +1107,15 @@ function H.addTag(player)
     H.schedule()
     V.status()
 end
-function H.register(player, name, msg, cats, sev, blocked, tagged, targeted)
+function H.register(player, name, msg, cats, sev, blocked, tagged, targeted, evasion)
     local rec = H.record(player)
     rec.count += 1
     if tagged then rec.tags += 1 S.tags += 1 end
     if sev > rec.maxSev then rec.maxSev = sev end
-    local inc = { t = os.time(), time = os.date("%H:%M:%S"), msg = msg:sub(1, 200), cat = cats[1] or "harass", sev = sev, targeted = targeted or false }
+    local inc = {
+        t = os.time(), time = os.date("%H:%M:%S"), msg = msg:sub(1, 200), cat = cats[1] or "harass", sev = sev,
+        targeted = targeted or false, evasion = evasion or {},
+    }
     table.insert(rec.incidents, inc)
     if #rec.incidents > 20 then table.remove(rec.incidents, 1) end
     S.flagged += 1
@@ -1110,12 +1206,17 @@ function H.pstat(p)
     if not s then s = { msgs = 0, times = {} } S.pstats[k] = s end
     return s
 end
-function H.rate(p)
+function H.rate(p, w)
     local s = S.pstats[U.key(p)]
     if not s then return 0 end
     local now = os.clock()
     while #s.times > 0 and now - s.times[1] > 60 do table.remove(s.times, 1) end
-    return #s.times
+    if not w or w >= 60 then return #s.times end
+    local n = 0
+    for i = #s.times, 1, -1 do
+        if now - s.times[i] <= w then n += 1 else break end
+    end
+    return n
 end
 function H.event(text)
     table.insert(S.events, 1, { time = os.date("%H:%M:%S"), text = text })
@@ -1169,7 +1270,6 @@ function H.mood()
     if idx < 0.18 then return "🟡 Heated", T.AMBER, idx end
     return "🔴 Toxic", T.RED, idx
 end
--- spam detected → hide from my chat for 45s + optional quarantine (skip UI/AI for that player)
 function H.spamFlag(player, cats)
     if typeof(player) ~= "Instance" or player == LP then return end
     for _, c in ipairs(cats) do
@@ -1215,7 +1315,6 @@ function H.preset(name)
     N.save()
     U.toast("Preset applied: " .. name, T.NEON)
 end
--- Shield: hides abusive / spam messages in YOUR chat window only (new Roblox chat required)
 function H.installShield()
     if H.shieldSet then return true end
     if TCS.ChatVersion ~= Enum.ChatVersion.TextChatService then return false end
@@ -1532,8 +1631,11 @@ function H.commit(player, msg, blocked, tagText, taggedOnly)
     local ps = H.pstat(player)
     ps.msgs += 1
     ps.times[#ps.times + 1] = now
+    local b10 = H.rate(player, 10)
+    if b10 > (ps.peak or 0) then ps.peak = b10 end
     H.stormCheck(now)
     local tagged = (tagText ~= nil) or taggedOnly or false
+    local nk = D.norm(msg)
 
     -- quarantined spammer: count only (unless the message is actually abusive)
     local q = S.quar[pk]
@@ -1542,22 +1644,34 @@ function H.commit(player, msg, blocked, tagText, taggedOnly)
             S.quarCount += 1
             local rec = S.strikes[pk]
             if rec then rec.spam = (rec.spam or 0) + 1 end
+            local l2 = S.lastMsg[pk]
+            if l2 and l2.nk == nk then
+                l2.n += 1
+                l2.t = now
+                ps.dupMax = math.max(ps.dupMax or 0, l2.n)
+                ps.dupSecs = now - l2.first
+                if l2.entry then l2.entry.dups = l2.n end
+                l2.handle.bump(l2.n, 0, {}, false, nil)
+            end
             return
         end
     end
 
     -- identical repeat from the same player → merge into one card (×N)
-    local nk = D.norm(msg)
     local last = S.lastMsg[pk]
     if last and last.nk == nk and now - last.t < 30 and last.handle and not blocked and not tagged then
         last.n += 1
         last.t = now
         S.dupSuppressed += 1
-        local sev2, cats2, _, _, _, _, tg2 = D.analyze(player, msg)
+        local sev2, cats2, _, _, _, _, tg2, ev2, wv2 = D.analyze(player, msg)
         local rec = S.strikes[pk]
         if rec then rec.spam = (rec.spam or 0) + 1 end
+        ps.dupMax = math.max(ps.dupMax or 0, last.n)
+        ps.dupSecs = now - last.first
+        ps.dupText = msg:sub(1, 80)
+        if wv2 and wv2 >= 3 then ps.wave = math.max(ps.wave or 0, wv2) end
         if last.entry then last.entry.dups = last.n end
-        last.handle.bump(last.n, sev2, cats2, tg2)
+        last.handle.bump(last.n, sev2, cats2, tg2, ev2)
         H.spamFlag(player, cats2)
         return
     end
@@ -1565,8 +1679,9 @@ function H.commit(player, msg, blocked, tagText, taggedOnly)
     local age = inst and player.AccountAge or 999
     local watched = inst and S.watch[tostring(player.UserId)] == true
     local trusted = H.trusted(player)
-    local sev, cats, _, doubt, hint, ctoks, targeted = D.analyze(player, msg)
-    if trusted and not tagged then sev, cats, doubt = 0, {}, false end
+    local sev, cats, _, doubt, hint, ctoks, targeted, evasion, wv = D.analyze(player, msg)
+    if wv and wv >= 3 then ps.wave = math.max(ps.wave or 0, wv) end
+    if trusted and not tagged then sev, cats, doubt, evasion = 0, {}, false, {} end
     if tagged then
         if sev < 3 then sev = 3 end
         if #cats == 0 then cats = { "filtered" } end
@@ -1590,14 +1705,15 @@ function H.commit(player, msg, blocked, tagText, taggedOnly)
     end
 
     local inc
-    if sev > 0 then inc = H.register(player, name, msg, cats, sev, blocked, tagged, targeted) end
+    if sev > 0 then inc = H.register(player, name, msg, cats, sev, blocked, tagged, targeted, evasion) end
     local rp = inst and S.rep[tostring(player.UserId)]
     local handle = V.addEntry(player, name, msg, sev, cats, blocked, doubt, inc, {
         tagged = tagged, taggedOnly = taggedOnly, tagText = tagText, targeted = targeted, trusted = trusted,
         watched = watched, newAcct = age < CFG.newAcct, age = age, known = rp and (rp.n or 0) >= 3 and rp.n or nil,
+        evasion = evasion,
     }, ge)
     entry.handle = handle
-    if handle then S.lastMsg[pk] = { nk = nk, t = now, n = 1, handle = handle, entry = entry } end
+    if handle then S.lastMsg[pk] = { nk = nk, t = now, first = now, n = 1, handle = handle, entry = entry } end
     local ctx = H.snapshot()
     V.status()
     if tagText then H.learnTag(msg, tagText) end
@@ -1728,7 +1844,7 @@ function H.pulse(tick)
     for k, t in pairs(S.spamUntil) do if now > t then S.spamUntil[k] = nil end end
     for k, l in pairs(S.lastMsg) do if now - l.t > 60 then S.lastMsg[k] = nil end end
     local label = H.mood()
-    if V.subtitle then V.subtitle.Text = "Chat: " .. label .. " • v9" end
+    if V.subtitle then V.subtitle.Text = "Chat: " .. label .. " • v9.5" end
     if V.cur == "Stats" then V.refreshStats() end
     if V.cur == "Players" and tick % 2 == 0 then V.refreshPlayers() end
 end
@@ -1737,6 +1853,7 @@ end
 -- V : views
 -- =====================================================================
 V.tabs = { "Live", "Strikes", "Players", "Reports", "Stats", "Words", "AI", "Setup" }
+V.pages, V.tabBtns = {}, {}
 V.THEMES = {
     Neon = { NEON = Color3.fromRGB(0, 235, 145), NEOND = Color3.fromRGB(0, 110, 75) },
     Cyber = { NEON = Color3.fromRGB(60, 175, 255), NEOND = Color3.fromRGB(20, 90, 150) },
@@ -1798,7 +1915,7 @@ function V.build()
     U.new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(28, 33, 46), Color3.fromRGB(16, 18, 26)), Rotation = 90 }, header)
     U.new("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = T.NEON, BackgroundTransparency = 0.6, BorderSizePixel = 0 }, header)
     U.label(header, "🔮 PHANTOM OS", 15, T.NEON, Enum.Font.GothamBlack, { Position = UDim2.new(0, 12, 0, 4), Size = UDim2.new(1, -130, 0, 20), TextWrapped = false })
-    V.subtitle = U.label(header, "Chat: 🟢 Calm • v9", 9, T.MUTED, Enum.Font.Gotham, { Position = UDim2.new(0, 12, 0, 23), Size = UDim2.new(1, -130, 0, 12), TextWrapped = false })
+    V.subtitle = U.label(header, "Chat: 🟢 Calm • v9.5", 9, T.MUTED, Enum.Font.Gotham, { Position = UDim2.new(0, 12, 0, 23), Size = UDim2.new(1, -130, 0, 12), TextWrapped = false })
     V.statusDot = U.new("Frame", { Size = UDim2.new(0, 8, 0, 8), Position = UDim2.new(1, -114, 0, 16), BackgroundColor3 = T.GREEN, BorderSizePixel = 0 }, header)
     U.round(V.statusDot, 4)
     U.button(header, "◉", T.CARD, UDim2.new(0, 26, 0, 24), UDim2.new(1, -92, 0, 8), function() V.setOrb(true) end, 12)
@@ -1881,6 +1998,29 @@ function V.build()
     U.draggable(V.orb, V.orb, function() V.setOrb(false) end)
 end
 
+-- ---------- Report preview (shows the exact text + length counter) ----------
+function V.preview(info, player)
+    local text = R.build(info)
+    local rec = S.strikes[info.key]
+    U.sheet("📝 Report preview", text .. "\n\n— " .. #text .. " / " .. CFG.reportMax .. " characters —", {
+        { text = "📝 Copy", color = T.NEOND, fn = function()
+            U.toast(U.copy(text) and ("📝 Copied " .. #text .. "/" .. CFG.reportMax) or "⚠ No clipboard", T.NEON)
+        end },
+        { text = "🔤 Short", fn = function()
+            local t = R.tiny(info)
+            U.toast(U.copy(t) and ("🔤 Copied " .. #t .. " chars") or "⚠ No clipboard", T.NEON)
+        end },
+        { text = "📋 Evidence", fn = function()
+            if rec then U.toast(U.copy(R.evidence(rec)) and "📋 Evidence copied" or "⚠ No clipboard", T.NEON)
+            else U.toast("No evidence record yet", T.AMBER) end
+        end },
+        { text = "📜 Log", fn = function() U.toast(U.copy(R.logFor(info.key, info.name, info.userId)) and "📜 Log copied" or "⚠ No clipboard", T.NEON) end },
+        { text = "⚡ Report", color = T.RED, setup = function(b)
+            R.bind(b, function() return info end, function() return player end, function() R.mark(player) end)
+        end },
+    })
+end
+
 -- ---------- Offender cards ----------
 function V.offenderCard(parent, d, order, specs)
     local alert = d.count >= CFG.strikeAlert
@@ -1927,7 +2067,7 @@ function V.inspect(p)
         name .. (inst and (" (@" .. p.DisplayName .. ")") or ""),
         "UserId: " .. tostring(uid) .. " | Account age: " .. tostring(inst and p.AccountAge or "?") .. " days" .. ((inst and p.AccountAge < CFG.newAcct) and "  🆕 NEW" or ""),
         "In server: " .. tostring(inst and p.Parent ~= nil) .. " | Friend: " .. tostring(S.friends[uid] == true),
-        "Messages: " .. (ps and ps.msgs or 0) .. " (" .. (inst and H.rate(p) or 0) .. " in last 60s)",
+        "Messages: " .. (ps and ps.msgs or 0) .. " (" .. (inst and H.rate(p) or 0) .. " in last 60s) | peak " .. (ps and ps.peak or 0) .. "/10s | max repeats " .. (ps and ps.dupMax or 0),
         "Watchlist: " .. tostring(S.watch[tostring(uid)] == true) .. " | Ignored: " .. tostring(S.ignored[tostring(uid)] == true)
             .. " | Quarantined: " .. tostring(q ~= nil and os.clock() < q),
         "All-time strikes (all servers): " .. (rp and rp.n or 0),
@@ -1946,10 +2086,11 @@ function V.inspect(p)
 
     local acts = {}
     if rec then
-        acts[#acts + 1] = { text = "📋 Evidence", fn = function() U.toast(U.copy(R.evidence(rec)) and "📋 Evidence copied" or "⚠ No clipboard", T.NEON) end }
         acts[#acts + 1] = { text = "⚡ Report", color = T.RED, setup = function(b)
             R.bind(b, function() return R.infoRec(rec) end, function() return inst and p or nil end, function() R.mark(p) end)
         end }
+        acts[#acts + 1] = { text = "📝 Preview", color = T.NEOND, fn = function() V.preview(R.infoRec(rec), inst and p or nil) end }
+        acts[#acts + 1] = { text = "📋 Evidence", fn = function() U.toast(U.copy(R.evidence(rec)) and "📋 Evidence copied" or "⚠ No clipboard", T.NEON) end }
     end
     acts[#acts + 1] = { text = "📜 Log", fn = function() U.toast(U.copy(R.logFor(U.key(p), name, uid)) and "📜 Log copied" or "⚠ No clipboard", T.NEON) end }
     acts[#acts + 1] = { text = "🚫 Block", fn = function()
@@ -2068,6 +2209,7 @@ function V.addEntry(player, name, msg, sev, cats, blocked, doubt, incident, flag
     local cur, curCats = sev, cats
     local tagged, taggedOnly, tagText = flags.tagged or false, flags.taggedOnly or false, flags.tagText
     local targeted, trusted = flags.targeted or false, flags.trusted or false
+    local evasion = flags.evasion or {}
     local stamp, stampFull = os.date("%H:%M"), os.date("%H:%M:%S")
     local extra, noteAI = "", ""
     local checking = (sev == 0 and doubt) and true or false
@@ -2099,15 +2241,16 @@ function V.addEntry(player, name, msg, sev, cats, blocked, doubt, incident, flag
     local actions = U.new("Frame", { Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1, LayoutOrder = 4, Visible = false }, card)
 
     local function getInfo()
-        return R.info(player, name, msg, cur, curCats, { time = stampFull, tagged = tagged, tagText = tagText, targeted = targeted, extra = extra })
+        return R.info(player, name, msg, cur, curCats, { time = stampFull, tagged = tagged, tagText = tagText, targeted = targeted, extra = extra, evasion = evasion })
     end
     local repBtn = U.button(actions, "⚡ Report", T.RED, UDim2.new(0.34, -3, 1, 0), UDim2.new(0, 0, 0, 0), nil, 10)
     R.bind(repBtn, getInfo, function() return player end, function() R.mark(player) end)
-    U.button(actions, "📦 Pack", T.PANEL, UDim2.new(0.22, -3, 1, 0), UDim2.new(0.34, 2, 0, 0), function()
-        U.toast(U.copy(R.pack(getInfo())) and "📦 Report pack copied" or "⚠ No clipboard", T.NEON)
+    U.button(actions, "📝 Copy", T.PANEL, UDim2.new(0.22, -3, 1, 0), UDim2.new(0.34, 2, 0, 0), function()
+        local t = R.build(getInfo())
+        U.toast(U.copy(t) and ("📝 Report copied (" .. #t .. "/" .. CFG.reportMax .. ")") or "⚠ No clipboard", T.NEON)
     end, 10)
     U.button(actions, "👁 Ctx", T.PANEL, UDim2.new(0.22, -3, 1, 0), UDim2.new(0.56, 3, 0, 0), function() H.showContext(ge) end, 10)
-    U.button(actions, "⋯", T.PANEL, UDim2.new(0.22, -3, 1, 0), UDim2.new(0.78, 4, 0, 0), function() V.inspect(player) end, 12)
+    U.button(actions, "⋯", T.PANEL, UDim2.new(0.22, -3, 1, 0), UDim2.new(0.78, 4, 0, 0), function() V.preview(getInfo(), player) end, 12)
 
     local count = 1
     local function render()
@@ -2123,6 +2266,7 @@ function V.addEntry(player, name, msg, sev, cats, blocked, doubt, incident, flag
         msgL.TextColor3 = cur >= 4 and T.REDT or (cur > 0 and T.AMBT or T.TXT)
         local parts = {}
         if cur > 0 then parts[#parts + 1] = "● " .. table.concat(curCats, ", ") end
+        if #evasion > 0 then parts[#parts + 1] = "🕵 avoidance: " .. table.concat(evasion, ", ") end
         if count > 1 then parts[#parts + 1] = "🔁 repeated " .. count .. "×" end
         if tagged then parts[#parts + 1] = taggedOnly and "🏷 Roblox hid the text" or "🏷 Tagged by Roblox" end
         if flags.known then parts[#parts + 1] = "🔁 known offender (" .. flags.known .. " past)" end
@@ -2145,14 +2289,14 @@ function V.addEntry(player, name, msg, sev, cats, blocked, doubt, incident, flag
     function h.setVerifying()
         if cur > 0 then noteAI = "🟡 AI verifying…" render() end
     end
-    -- same message repeated by the same player: merge into this card
-    function h.bump(n, s2, c2, tg)
+    function h.bump(n, s2, c2, tg, ev2)
         if not card.Parent then return end
         count, stamp = n, os.date("%H:%M")
         if tg then targeted = true end
+        if ev2 and #ev2 > #evasion then evasion = ev2 end
         if s2 > cur and #c2 > 0 then
             cur, curCats = s2, c2
-            if player and not blocked and not incident then incident = H.register(player, name, msg, curCats, cur, blocked, false, targeted) end
+            if player and not blocked and not incident then incident = H.register(player, name, msg, curCats, cur, blocked, false, targeted, evasion) end
             if ge then ge.sev = cur end
             card.Visible = H.passes(cur, curCats, nameL, textL)
         end
@@ -2163,7 +2307,7 @@ function V.addEntry(player, name, msg, sev, cats, blocked, doubt, incident, flag
         tagged, tagText, checking = true, tt, false
         if cur == 0 then
             cur, curCats = 3, { "filtered" }
-            if player then incident = H.register(player, name, msg, curCats, cur, blocked, true, targeted) end
+            if player then incident = H.register(player, name, msg, curCats, cur, blocked, true, targeted, evasion) end
         else
             if cur < 3 then
                 cur = 3
@@ -2186,7 +2330,7 @@ function V.addEntry(player, name, msg, sev, cats, blocked, doubt, incident, flag
         if res.violation then
             if cur == 0 then
                 cur, curCats = res.severity, { res.category }
-                if player and not blocked then incident = H.register(player, name, msg, curCats, cur, blocked, false, targeted) end
+                if player and not blocked then incident = H.register(player, name, msg, curCats, cur, blocked, false, targeted, evasion) end
                 if ge then ge.sev = cur end
             end
             extra = "AI review confirmed: " .. res.reason
@@ -2275,55 +2419,84 @@ function V.refreshEvents()
 end
 
 -- ---------- Reports tab ----------
+-- Generic report-reason templates: no target, no placeholders, each ≤ 1000 chars. Spam-heavy.
+-- { name, group, policy, what, observed pattern, avoidance technique, impact }
+V.TPL = {
+    { "Chat Flooding", "Spam", "Spam and Disruptive Behavior", "flooding the chat with rapid-fire messages", "Messages arrive several times per second and push every other conversation out of view.", "slightly changed text between messages to dodge duplicate-message detection", "Other players cannot read or use the chat" },
+    { "Copy-Paste Spam", "Spam", "Spam and Disruptive Behavior", "pasting the same message again and again", "The identical text is repeated many times in a row.", "invisible characters or tiny edits so each copy looks different", "Normal conversation is drowned out" },
+    { "Coordinated Spam Wave", "Spam", "Spam and Disruptive Behavior", "taking part in a coordinated wave in which several accounts post the same text at the same time", "Multiple accounts post identical text within seconds of each other.", "many alternate accounts to spread the same message", "The whole server's chat is taken over" },
+    { "Repeated Advertising", "Spam", "Unsolicited Advertising / Spam", "repeatedly advertising a game, group or product in public chat", "The same promotional message is posted over and over.", "rephrased wording and odd spacing to avoid detection", "Chat is used as an unwanted advertising board" },
+    { "Script / Exploit Ads", "Spam", "Fraud, Scams and Deceptive Practices", "advertising exploit scripts and downloads in chat", "Messages promote 'free scripts', loaders or download links.", "spaced-out or altered spellings of words such as 'script' or 'loadstring'", "Such links put other players' accounts at risk" },
+    { "Free Robux Scam Spam", "Spam", "Fraud, Scams and Deceptive Practices", "spamming 'free Robux' and giveaway scams", "The same giveaway claim is repeated to many players.", "altered spellings such as fr33 r0bux", "Players can lose their accounts or items to this kind of scam" },
+    { "Invite-Link Spam", "Spam", "Off-Platform Communication", "spamming off-platform invite links", "The same invite link is posted repeatedly in public chat.", "broken-up links such as 'discord . gg'", "Players are pushed to unmoderated outside platforms" },
+    { "Symbol / Emoji Flood", "Spam", "Spam and Disruptive Behavior", "posting long strings of symbols, emojis or random characters", "Very long messages made of symbols fill the chat window.", "symbol padding instead of real words", "Chat becomes unreadable for everyone" },
+    { "Bot / Auto-Chatter", "Spam", "Spam and Disruptive Behavior", "using an automated script to post messages at inhuman speed", "Messages appear at a rate no person could type.", "randomised delays and slightly varied text", "Automated spam degrades the experience for all players" },
+    { "Stretched-Letter Spam", "Spam", "Spam and Disruptive Behavior", "posting extremely long stretched words (for example aaaaaaaa)", "Repeated-letter strings are posted continuously.", "repeated letters instead of normal words", "The chat becomes unreadable" },
+    { "Spam Mixed With Abuse", "Spam", "Spam and Disruptive Behavior / Civility and Respect", "mixing spam with insults aimed at other players", "Insulting text is repeated rapidly so that it cannot be avoided.", "repetition combined with altered spellings", "Players are harassed and cannot use chat" },
+    { "Profanity", "Abuse", "Civility and Respect", "using profane and abusive language in public chat", "Abusive language is repeated in public chat.", "number and symbol substitutions (for example @ for a, 0 for o)", "It creates a hostile environment for other players" },
+    { "Hindi / Hinglish Abuse", "Abuse", "Civility and Respect", "using abusive Hindi/Hinglish language", "Insults in romanised Hindi are posted repeatedly.", "romanised spellings and shortened forms that the filter does not catch", "Abuse in any language is harmful to other players" },
+    { "Coded Abbreviation Insults", "Abuse", "Civility and Respect", "using coded letter abbreviations that stand for insults", "Short letter codes are used as direct insults toward other players.", "abbreviations (letter groups) that a word filter does not recognise", "The insult is still clear to the reader, so the harm is the same" },
+    { "Harassment", "Abuse", "Bullying and Harassment", "targeting another player with repeated insults", "The same player is insulted again and again.", "altered spellings to keep the insults from being filtered", "It makes the experience unsafe for the targeted player" },
+    { "Hate Speech", "Abuse", "Hate Speech and Discrimination", "using hateful or discriminatory language", "Discriminatory terms are posted in public chat.", "symbol or letter substitutions inside the words", "Hate speech harms the whole community" },
+    { "Threats", "Abuse", "Threats and Violent Content", "making threats toward other players", "Threatening statements are posted in chat.", "coded wording to avoid the filter", "Threats make players feel unsafe" },
+    { "Sexual Content", "Abuse", "Sexual Content and Adult Material", "posting sexual or adult content in chat", "Adult content is posted in public chat.", "altered spellings and symbols", "This content is not appropriate for the platform" },
+    { "Encouraging Self-Harm", "Abuse", "Bullying and Harassment", "telling other players to harm themselves", "Messages encouraging self-harm are posted in chat.", "coded phrases and abbreviations", "This can seriously hurt vulnerable players" },
+}
+V.STYLES = {
+    { "Concise", function(c)
+        return "Report — " .. c[3] .. ": a user in this experience is " .. c[4] .. ". " .. c[5] .. " " .. c[7] .. ". Please review the chat logs for this server and apply appropriate chat restrictions to the account(s) involved. Thank you."
+    end },
+    { "Formal", function(c)
+        return "Subject: " .. c[1] .. " — " .. c[3] .. "\n\nHello Roblox Trust & Safety,\n\nI am reporting a user in this experience who is " .. c[4]
+            .. ". This conduct falls under the Roblox Community Standards (" .. c[3] .. "). " .. c[5] .. " The behaviour is ongoing and affects the experience of other players. "
+            .. c[7] .. ".\n\nI kindly ask that the chat logs for this server be reviewed and that suitable chat restrictions be applied. Evidence is available on request.\n\nThank you for your time."
+    end },
+    { "Pattern", function(c)
+        return "REPORT SUMMARY\nCategory: " .. c[1] .. " (" .. c[3] .. ")\nObserved pattern: " .. c[5] .. "\nImpact: " .. c[7]
+            .. ".\nFrequency: repeated within a short period — not a one-off.\nRequest: review the chat logs for this server and time, and apply chat restrictions to the account(s) involved."
+    end },
+    { "Avoidance", function(c)
+        return "A user is " .. c[4] .. ". To get around the chat filter, the account uses " .. c[6]
+            .. ", which indicates the behaviour is deliberate rather than accidental. " .. c[5] .. " This is covered by the Roblox Community Standards (" .. c[3]
+            .. "), including attempts to bypass the filter. " .. c[7] .. ". Please review the chat logs and apply appropriate chat restrictions."
+    end },
+}
+
 function V.buildReports()
     local page = V.pages.Reports
     V.builderScroll = U.scroll(page, UDim2.new(0, 0, 0, 32), UDim2.new(1, 0, 1, -32))
     V.historyScroll = U.scroll(page, UDim2.new(0, 0, 0, 32), UDim2.new(1, 0, 1, -32))
-    V.appealsScroll = U.scroll(page, UDim2.new(0, 0, 0, 32), UDim2.new(1, 0, 1, -32))
-    V.historyScroll.Visible, V.appealsScroll.Visible = false, false
+    V.appealsHolder = U.new("Frame", { Position = UDim2.new(0, 0, 0, 32), Size = UDim2.new(1, 0, 1, -32), BackgroundTransparency = 1, Visible = false }, page)
+    V.historyScroll.Visible = false
     U.segmented(page, { "Builder", "History", "Appeals" }, "Builder", function(v)
         V.builderScroll.Visible = (v == "Builder")
         V.historyScroll.Visible = (v == "History")
-        V.appealsScroll.Visible = (v == "Appeals")
+        V.appealsHolder.Visible = (v == "Appeals")
     end, UDim2.new(), UDim2.new(1, -6, 0, 26))
     V.builderRows, V.historyRows = {}, {}
 
-    local cats = {
-        { "Exploit Spam", "Community Standards (Spam and Disruptive Behavior) and the Terms of Use", "the repeated or automated messages attributed to my account" },
-        { "Hate Speech", "Community Standards (Hate Speech and Discrimination)", "the chat content classified as discriminatory" },
-        { "NSFW Content", "Community Standards (Sexual Content and Adult Material)", "the content classified as inappropriate for the platform" },
-        { "Scamming", "Community Standards (Fraud, Scams and Deceptive Practices)", "the messages classified as an attempt to deceive other users" },
-        { "Harassment", "Community Standards (Bullying and Harassment)", "the interactions classified as harassing toward another user" },
-        { "Threats", "Community Standards (Threats and Violent Content)", "the statement classified as a threat" },
-        { "Off-Platform Links", "Community Standards (Off-Platform Communication and Links)", "the external link that was shared" },
-        { "Personal Information", "Community Standards (Privacy and Personal Information)", "the information classified as personally identifiable" },
-        { "Filter Bypass", "Community Standards (Chat Filter Circumvention)", "the text classified as an attempt to evade the chat filter" },
-        { "Unsolicited Ads", "Community Standards (Unsolicited Advertising)", "the promotional messages attributed to my account" },
-        { "Impersonation", "Community Standards (Impersonation and Misrepresentation)", "the name or behavior classified as impersonating another party" },
-        { "Inappropriate Content", "Community Standards (User-Generated Content)", "the user-generated content that was removed or flagged" },
-    }
-    local variants = {
-        { "Context Review", function(c) return "I am writing to formally appeal the moderation action on my account for " .. c[1] .. ". I respectfully submit that the action rests on a misreading of context. In reference to " .. c[3] .. ", my intent was not to violate the " .. c[2] .. ". I ask that a human reviewer examine the complete context rather than an isolated excerpt, and reverse the action if no violation is found." end },
-        { "Acknowledgment", function(c) return "I am appealing the " .. c[1] .. " action on my account. I have reviewed the " .. c[2] .. " and I understand why " .. c[3] .. " was reviewed. I take responsibility, I have taken steps to ensure it does not recur, and I commit to full compliance. I respectfully request that the penalty be lifted or reduced." end },
-        { "Proportionality", function(c) return "I respectfully appeal the sanction imposed for " .. c[1] .. ". Without disputing that moderators acted in good faith, I submit that the penalty is disproportionate when weighed against " .. c[3] .. ", my history on the platform, and the " .. c[2] .. ". I request that a warning or shorter restriction be applied instead." end },
-        { "Evidence Request", function(c) return "This is a formal request for review of the " .. c[1] .. " action against my account. To prepare a complete response, I request the specific content, timestamps and policy provision relied upon regarding " .. c[3] .. " under the " .. c[2] .. ". I ask that the action be paused pending review." end },
-        { "Account Security", function(c) return "[Use only if genuinely true.] I am appealing the " .. c[1] .. " action. I believe my account may have been accessed without authorization in connection with " .. c[3] .. ". I have since changed my password, enabled two-step verification and removed unknown sessions. Please review under the " .. c[2] .. "." end },
-    }
+    -- Appeals = generic, target-free report-reason templates (each ≤ CFG.reportMax chars)
+    local rows = {}
+    local function showGroup(g)
+        for _, r in ipairs(rows) do r.btn.Visible = (g == "All" or r.group == g) end
+    end
+    U.segmented(V.appealsHolder, { "All", "Spam", "Abuse" }, "All", showGroup, UDim2.new(), UDim2.new(1, -6, 0, 24))
+    V.appealsScroll = U.scroll(V.appealsHolder, UDim2.new(0, 0, 0, 28), UDim2.new(1, 0, 1, -28))
     local idx = 0
-    for _, c in ipairs(cats) do
-        for _, v in ipairs(variants) do
+    for _, c in ipairs(V.TPL) do
+        for _, st in ipairs(V.STYLES) do
             idx += 1
             local n = idx
-            local text = "Subject: Formal Appeal – " .. c[1] .. " Moderation Action\nAccount: [YOUR USERNAME] | User ID: [YOUR USER ID] | Reference: [TICKET / ACTION ID]\nTo: Roblox Trust & Safety – Moderation Appeals Team\n\nDear Review Team,\n\n"
-                .. v[2](c) .. "\n\nI respectfully request written confirmation of the outcome and reasoning. Thank you for your time.\n\nRespectfully submitted,\n[YOUR USERNAME]"
-            local b = U.button(V.appealsScroll, string.format("#%02d  %s\n%s · tap to copy", n, c[1], v[1]), T.CARD, UDim2.new(1, -6, 0, 42), nil, nil, 11)
+            local text = R.cut(st[2](c), CFG.reportMax)
+            local b = U.button(V.appealsScroll, string.format("#%02d  %s\n%s · %d chars · tap to copy", n, c[1], st[1], #text), T.CARD, UDim2.new(1, -6, 0, 42), nil, nil, 11)
             b.LayoutOrder, b.TextWrapped, b.TextXAlignment, b.Font = n, true, Enum.TextXAlignment.Left, Enum.Font.Gotham
             U.pad(b, 10, 0, 6, 0)
             b.Activated:Connect(function()
                 local ok = U.copy(text)
                 U.flash(b, ok, T.CARD)
-                U.toast(ok and ("⚖ Appeal #" .. n .. " copied") or "⚠ No clipboard", T.NEON)
+                U.toast(ok and ("📝 #" .. n .. " copied (" .. #text .. "/" .. CFG.reportMax .. ")") or "⚠ No clipboard", T.NEON)
             end)
+            rows[#rows + 1] = { btn = b, group = c[2] }
         end
     end
 end
@@ -2331,7 +2504,7 @@ function V.refreshReports()
     if not V.builderRows or not V.builderScroll then return end
     for _, r in ipairs(V.builderRows) do r:Destroy() end
     table.clear(V.builderRows)
-    V.builderRows[1] = U.label(V.builderScroll, "⚡ Report = one tap + confirm. Nothing is ever copied automatically. Report only what really happened — Roblox decides the action.", 10, T.BLUE, Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 40), LayoutOrder = 0 })
+    V.builderRows[1] = U.label(V.builderScroll, "⚡ Report = one tap + confirm. 📝 Copy = report text (max " .. CFG.reportMax .. " chars) with the exact facts, spam stats and filter-avoidance found. Nothing is ever copied automatically.", 10, T.BLUE, Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 52), LayoutOrder = 0 })
     local list = H.sorted()
     if #list == 0 then V.builderRows[2] = U.empty(V.builderScroll, "📝", "No flagged users yet.", 1) return end
     for i = 1, math.min(#list, 15) do
@@ -2340,9 +2513,12 @@ function V.refreshReports()
             { text = "⚡ Report", color = T.RED, setup = function(b)
                 R.bind(b, function() return R.infoRec(d) end, function() return d.player end, function() R.mark(d.player) end)
             end },
-            { text = "📝 Short", fn = function() U.toast(U.copy(R.short(R.infoRec(d))) and "📝 Short report copied" or "⚠ No clipboard", T.NEON) end },
-            { text = "📄 Full", fn = function() U.toast(U.copy(R.full(R.infoRec(d))) and "📄 Full report copied" or "⚠ No clipboard", T.NEON) end },
-            { text = "📦 Pack", fn = function() U.toast(U.copy(R.pack(R.infoRec(d))) and "📦 Report pack copied" or "⚠ No clipboard", T.NEON) end },
+            { text = "📝 Copy", fn = function()
+                local t = R.build(R.infoRec(d))
+                U.toast(U.copy(t) and ("📝 Report copied (" .. #t .. "/" .. CFG.reportMax .. ")") or "⚠ No clipboard", T.NEON)
+            end },
+            { text = "🔍 Preview", fn = function() V.preview(R.infoRec(d), d.player) end },
+            { text = "📋 Evid", fn = function() U.toast(U.copy(R.evidence(d)) and "📋 Evidence copied" or "⚠ No clipboard", T.NEON) end },
         })
     end
 end
@@ -2658,6 +2834,13 @@ function V.buildSetup()
     local o = 0
     local function nx() o += 1 return o end
 
+    U.section(sf, "Reports", nx())
+    U.segRow(sf, "📏 Report length", { "500", "800", "1000" }, tostring(CFG.reportMax <= 500 and 500 or (CFG.reportMax <= 800 and 800 or 1000)), function(v)
+        CFG.reportMax = tonumber(v) or 1000
+        N.save()
+        U.toast("📏 Reports capped at " .. CFG.reportMax .. " chars (appeal templates refresh on UI rebuild)", T.NEON)
+    end, nx())
+
     U.section(sf, "Appearance", nx())
     U.segRow(sf, "🎨 Theme", { "Neon", "Cyber", "Violet", "Crimson" }, S.theme, function(v)
         if v == S.theme then return end
@@ -2741,7 +2924,7 @@ function V.buildSetup()
     U.button(sf, "🔁 Clear offender memory", T.CARD, UDim2.new(1, -6, 0, 30), nil, function() S.rep = {} N.save() U.toast("🔁 Offender memory cleared", T.AMBER) end, 11).LayoutOrder = nx()
     U.button(sf, "🔊 Clear ignore + watch lists", T.CARD, UDim2.new(1, -6, 0, 30), nil, function() S.ignored, S.watch = {}, {} N.save() H.schedule() U.toast("🔊 Lists cleared", T.AMBER) end, 11).LayoutOrder = nx()
     U.button(sf, "🧹 Reset strikes & logs", T.RED, UDim2.new(1, -6, 0, 30), nil, function()
-        S.strikes, S.chatLog, S.lastMsg = {}, {}, {}
+        S.strikes, S.chatLog, S.lastMsg, S.pstats = {}, {}, {}, {}
         S.flagged, S.tags, S.lastFlagged = 0, 0, nil
         H.refreshAll()
         V.status()
@@ -2838,5 +3021,5 @@ task.spawn(function()
     end
 end)
 task.delay(1.5, function()
-    if S.alive then U.toast("🔮 v9 ready · no auto-copy · ◉ = orb · RightCtrl = show/hide", T.NEON) end
+    if S.alive then U.toast("🔮 v9.5 ready · reports ≤" .. CFG.reportMax .. " chars · no auto-copy", T.NEON) end
 end)
