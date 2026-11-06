@@ -7,58 +7,59 @@
     Reports ≤ 1000 chars • spam storm control • NO auto-copy (clipboard only on your tap)
 ]]
 
-local KEYS = {
-    groq = "PUT_KEY_HERE",       -- free: console.groq.com
-    gemini = "PUT_KEY_HERE",     -- free: aistudio.google.com/apikey
-    openrouter = "PUT_KEY_HERE", -- put your NEW key here (rotate the old one!)
-}
-
-local CFG = {
-    groq = { url = "https://api.groq.com/openai/v1/chat/completions", model = "llama-3.1-8b-instant" },
-    gemini = { url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model = "gemini-2.5-flash" },
-    openrouter = { url = "https://openrouter.ai/api/v1/chat/completions", model = "meta-llama/llama-3.1-8b-instruct:free" },
-    pollinations = { enabled = true, url = "https://text.pollinations.ai/openai", model = "openai" },
-    confirmStrong = false, strikeAlert = 3, ignoreFriends = false,
-    workers = 2, queueMax = 8, ctxLines = 4, learnVotes = 2, tagVotes = 2,
-    saveFile = "PhantomOS_data.json", reportCooldown = 12, reportMax = 1000, directMax = 1000,
-    raidJoins = 4, raidWindow = 25, newAcct = 7,
-    stormMsgs = 28, stormWindow = 5, autoQuar = true, quarSecs = 60, autoHideLen = 600,
-    reportReason = {
-        profanity = "Swearing", hindi = "Swearing", filtered = "Swearing",
-        harass = "Bullying", hate = "Bullying", threat = "Bullying",
-        scam = "Scamming", offsite = "Offsite Links",
+-- ===== GLOBAL STATE & CONFIG (Optimized for 200-local limit) =====
+local C = {
+    KEYS = {
+        groq = "PUT_KEY_HERE",
+        gemini = "PUT_KEY_HERE",
+        openrouter = "PUT_KEY_HERE",
     },
-    remote = {
-        enabled = true, hours = 24, cache = "PhantomOS_remote.json",
-        words = {
-            "https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en",
-            "https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/hi",
+    CFG = {
+        groq = { url = "https://api.groq.com/openai/v1/chat/completions", model = "llama-3.1-8b-instant" },
+        gemini = { url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model = "gemini-2.5-flash" },
+        openrouter = { url = "https://openrouter.ai/api/v1/chat/completions", model = "meta-llama/llama-3.1-8b-instruct:free" },
+        pollinations = { enabled = true, url = "https://text.pollinations.ai/openai", model = "openai" },
+        confirmStrong = false, strikeAlert = 3, ignoreFriends = false,
+        workers = 2, queueMax = 8, ctxLines = 4, learnVotes = 2, tagVotes = 2,
+        saveFile = "PhantomOS_data.json", reportCooldown = 12, reportMax = 1000, directMax = 1000,
+        raidJoins = 4, raidWindow = 25, newAcct = 7,
+        stormMsgs = 28, stormWindow = 5, autoQuar = true, quarSecs = 60, autoHideLen = 600,
+        reportReason = {
+            profanity = "Swearing", hindi = "Swearing", filtered = "Swearing",
+            harass = "Bullying", hate = "Bullying", threat = "Bullying",
+            scam = "Scamming", offsite = "Offsite Links",
         },
-        phrases = {},
+        remote = {
+            enabled = true, hours = 24, cache = "PhantomOS_remote.json",
+            words = {
+                "https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en",
+                "https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/hi",
+            },
+            phrases = {},
+        },
     },
+    T = {
+        BG = Color3.fromRGB(9, 12, 24), PANEL = Color3.fromRGB(20, 28, 52), CARD = Color3.fromRGB(32, 42, 74),
+        LINE = Color3.fromRGB(62, 74, 108), TXT = Color3.fromRGB(240, 243, 252), MUTED = Color3.fromRGB(150, 160, 190),
+        NEON = Color3.fromRGB(0, 235, 145), NEOND = Color3.fromRGB(0, 122, 84), RED = Color3.fromRGB(236, 70, 88),
+        AMBER = Color3.fromRGB(246, 172, 56), BLUE = Color3.fromRGB(84, 170, 255), GREEN = Color3.fromRGB(50, 204, 116),
+        VIOLET = Color3.fromRGB(170, 120, 255), PINK = Color3.fromRGB(255, 125, 190),
+        REDT = Color3.fromRGB(255, 138, 138), AMBT = Color3.fromRGB(255, 212, 128), WHITE = Color3.fromRGB(255, 255, 255),
+        GW = 0.14, GC = 0.34, GP = 0.42,
+        GLASS = { Solid = { 0, 0, 0 }, Glass = { 0.14, 0.34, 0.42 }, Ultra = { 0.3, 0.5, 0.58 } },
+    }
 }
 
+-- Ensure loading before binding anything
+if not game:IsLoaded() then game.Loaded:Wait() end
 local Players, UIS, TS, HS, TCS, SG = game:GetService("Players"), game:GetService("UserInputService"),
     game:GetService("TweenService"), game:GetService("HttpService"), game:GetService("TextChatService"),
     game:GetService("StarterGui")
+while not Players.LocalPlayer do task.wait() end
 local LP = Players.LocalPlayer
 
 local env = (getgenv and getgenv()) or _G
-if env.PhantomOS_Cleanup then
-    pcall(env.PhantomOS_Cleanup)
-end
-
--- Design tokens: surfaces / text / semantic colours
-local T = {
-    BG = Color3.fromRGB(9, 12, 24), PANEL = Color3.fromRGB(20, 28, 52), CARD = Color3.fromRGB(32, 42, 74),
-    LINE = Color3.fromRGB(62, 74, 108), TXT = Color3.fromRGB(240, 243, 252), MUTED = Color3.fromRGB(150, 160, 190),
-    NEON = Color3.fromRGB(0, 235, 145), NEOND = Color3.fromRGB(0, 122, 84), RED = Color3.fromRGB(236, 70, 88),
-    AMBER = Color3.fromRGB(246, 172, 56), BLUE = Color3.fromRGB(84, 170, 255), GREEN = Color3.fromRGB(50, 204, 116),
-    VIOLET = Color3.fromRGB(170, 120, 255), PINK = Color3.fromRGB(255, 125, 190),
-    REDT = Color3.fromRGB(255, 138, 138), AMBT = Color3.fromRGB(255, 212, 128), WHITE = Color3.fromRGB(255, 255, 255),
-    GW = 0.14, GC = 0.34, GP = 0.42,
-    GLASS = { Solid = { 0, 0, 0 }, Glass = { 0.14, 0.34, 0.42 }, Ultra = { 0.3, 0.5, 0.58 } },
-}
+if env.PhantomOS_Cleanup then pcall(env.PhantomOS_Cleanup) end
 
 local S = {
     alive = true, conns = {}, uiConns = {}, guard = true, shield = false, shieldLevel = 3, hideSpam = true,
@@ -87,8 +88,8 @@ V.anims, V.pages, V.tabBtns, V.newCount, V.follow = {}, {}, {}, 0, { atBottom = 
 -- U : UI toolkit (glass + motion system)
 -- =====================================================================
 function U.applyGlass(name)
-    local g = T.GLASS[name] or T.GLASS.Glass
-    T.GW, T.GC, T.GP = g[1], g[2], g[3]
+    local g = C.T.GLASS[name] or C.T.GLASS.Glass
+    C.T.GW, C.T.GC, C.T.GP = g[1], g[2], g[3]
     S.glass = name
 end
 function U.track(sig, fn)
@@ -105,8 +106,8 @@ function U.new(class, props, parent)
     local i = Instance.new(class)
     local c = props.BackgroundColor3
     if c and props.BackgroundTransparency == nil then
-        if c == T.CARD then i.BackgroundTransparency = T.GC
-        elseif c == T.PANEL then i.BackgroundTransparency = T.GP end
+        if c == C.T.CARD then i.BackgroundTransparency = C.T.GC
+        elseif c == C.T.PANEL then i.BackgroundTransparency = C.T.GP end
     end
     for k, v in pairs(props) do i[k] = v end
     if parent then i.Parent = parent end
@@ -117,8 +118,8 @@ function U.round(i, r)
     local cls = i.ClassName
     if cls == "Frame" or cls == "TextButton" or cls == "TextLabel" or cls == "TextBox" or cls == "CanvasGroup" then
         local bc = i.BackgroundColor3
-        if (bc == T.CARD or bc == T.PANEL) and not i:FindFirstChildOfClass("UIStroke") then
-            U.new("UIStroke", { Color = T.WHITE, Thickness = 1, Transparency = 0.88, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, i)
+        if (bc == C.T.CARD or bc == C.T.PANEL) and not i:FindFirstChildOfClass("UIStroke") then
+            U.new("UIStroke", { Color = C.T.WHITE, Thickness = 1, Transparency = 0.88, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, i)
         end
     end
     return c
@@ -126,15 +127,14 @@ end
 function U.outline(i, c, t, tr)
     local s = i:FindFirstChildOfClass("UIStroke")
     if s then
-        s.Color, s.Thickness, s.Transparency = c or T.LINE, t or 1, tr or 0
+        s.Color, s.Thickness, s.Transparency = c or C.T.LINE, t or 1, tr or 0
         return s
     end
-    return U.new("UIStroke", { Color = c or T.LINE, Thickness = t or 1, Transparency = tr or 0, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, i)
+    return U.new("UIStroke", { Color = c or C.T.LINE, Thickness = t or 1, Transparency = tr or 0, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, i)
 end
 function U.pad(i, l, t, r, b)
     return U.new("UIPadding", { PaddingLeft = UDim.new(0, l or 0), PaddingTop = UDim.new(0, t or 0), PaddingRight = UDim.new(0, r or 0), PaddingBottom = UDim.new(0, b or 0) }, i)
 end
--- one easing language: Quint-out for movement, Back for "arrive", Quad for fades
 function U.tw(i, p, t, st, dir)
     if S.perfNow then
         pcall(function() for k, v in pairs(p) do i[k] = v end end)
@@ -147,7 +147,7 @@ end
 function U.anim(fn) V.anims[#V.anims + 1] = fn end
 function U.label(parent, text, size, color, font, props)
     local l = U.new("TextLabel", {
-        BackgroundTransparency = 1, Text = text, TextSize = size or 12, TextColor3 = color or T.TXT,
+        BackgroundTransparency = 1, Text = text, TextSize = size or 12, TextColor3 = color or C.T.TXT,
         Font = font or Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true, RichText = false,
     }, parent)
     if props then for k, v in pairs(props) do l[k] = v end end
@@ -165,7 +165,7 @@ function U.ripple(btn, input)
     local d = math.max(as.X, as.Y) * 1.7 / math.max(S.scale, 0.1)
     local r = U.new("Frame", {
         AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(rx, 0, ry, 0), Size = UDim2.new(0, 0, 0, 0),
-        BackgroundColor3 = T.WHITE, BackgroundTransparency = 0.82, BorderSizePixel = 0, ZIndex = btn.ZIndex + 1,
+        BackgroundColor3 = C.T.WHITE, BackgroundTransparency = 0.82, BorderSizePixel = 0, ZIndex = btn.ZIndex + 1,
     }, btn)
     U.new("UICorner", { CornerRadius = UDim.new(1, 0) }, r)
     U.tw(r, { Size = UDim2.new(0, d, 0, d), BackgroundTransparency = 1 }, 0.5)
@@ -180,11 +180,11 @@ function U.fx(btn)
     btn.InputBegan:Connect(function(i)
         local ty = i.UserInputType
         if ty == Enum.UserInputType.Touch or ty == Enum.UserInputType.MouseButton1 then
-            U.tw(btn, { BackgroundColor3 = base():Lerp(T.WHITE, 0.2) }, 0.07, Enum.EasingStyle.Quad)
+            U.tw(btn, { BackgroundColor3 = base():Lerp(C.T.WHITE, 0.2) }, 0.07, Enum.EasingStyle.Quad)
             U.tw(sc, { Scale = 0.96 }, 0.08, Enum.EasingStyle.Quad)
             U.ripple(btn, i)
         elseif ty == Enum.UserInputType.MouseMovement then
-            U.tw(btn, { BackgroundColor3 = base():Lerp(T.WHITE, 0.09) }, 0.12)
+            U.tw(btn, { BackgroundColor3 = base():Lerp(C.T.WHITE, 0.09) }, 0.12)
         end
     end)
     btn.InputEnded:Connect(function()
@@ -201,7 +201,7 @@ function U.setBtn(btn, text, color)
 end
 function U.button(parent, text, color, size, pos, onClick, ts)
     local b = U.new("TextButton", {
-        Text = text, BackgroundColor3 = color, TextColor3 = T.TXT, Font = Enum.Font.GothamBold,
+        Text = text, BackgroundColor3 = color, TextColor3 = C.T.TXT, Font = Enum.Font.GothamBold,
         TextSize = ts or 11, Size = size, Position = pos or UDim2.new(), BorderSizePixel = 0,
     }, parent)
     U.round(b, 9)
@@ -209,7 +209,6 @@ function U.button(parent, text, color, size, pos, onClick, ts)
     if onClick then b.Activated:Connect(onClick) end
     return b
 end
--- staggered entrance fade for list items
 function U.pop(inst, delay)
     if S.perfNow or not inst or not inst.Parent then return end
     if inst:IsA("CanvasGroup") then
@@ -234,14 +233,13 @@ end
 function U.scroll(parent, pos, size)
     local sf = U.new("ScrollingFrame", {
         Position = pos, Size = size, BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3,
-        ScrollBarImageColor3 = T.NEON, ScrollBarImageTransparency = 0.3, CanvasSize = UDim2.new(),
+        ScrollBarImageColor3 = C.T.NEON, ScrollBarImageTransparency = 0.3, CanvasSize = UDim2.new(),
         AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollingDirection = Enum.ScrollingDirection.Y,
     }, parent)
     U.new("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, sf)
     U.pad(sf, 0, 0, 5, 4)
     return sf
 end
--- smart follow: sticks to the bottom only if you are at the bottom
 function U.follow(sf, st, noLock)
     st.atBottom, st.guard = true, 0
     local function check()
@@ -298,12 +296,12 @@ function U.num(lbl, target, fmt)
     if up then
         local base = lbl:GetAttribute("col") or lbl.TextColor3
         lbl:SetAttribute("col", base)
-        lbl.TextColor3 = T.WHITE
+        lbl.TextColor3 = C.T.WHITE
         U.tw(lbl, { TextColor3 = base }, 0.7)
     end
 end
 function U.shimmer(parent, period, phase, strength)
-    local f = U.new("Frame", { Size = UDim2.new(0.28, 0, 1.6, 0), Position = UDim2.new(-0.4, 0, -0.3, 0), BackgroundColor3 = T.WHITE, BackgroundTransparency = 0, BorderSizePixel = 0, Rotation = 18, ZIndex = 5 }, parent)
+    local f = U.new("Frame", { Size = UDim2.new(0.28, 0, 1.6, 0), Position = UDim2.new(-0.4, 0, -0.3, 0), BackgroundColor3 = C.T.WHITE, BackgroundTransparency = 0, BorderSizePixel = 0, Rotation = 18, ZIndex = 5 }, parent)
     U.new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, strength or 0.9), NumberSequenceKeypoint.new(1, 1) }) }, f)
     U.anim(function(t)
         if not f.Parent then return true end
@@ -348,18 +346,17 @@ function U.draggable(handle, target, onTap)
         end
     end)
 end
--- segmented control with a sliding pill
 function U.segmented(parent, options, initial, onChange, pos, size)
-    local f = U.new("Frame", { Position = pos, Size = size, BackgroundColor3 = T.PANEL, BorderSizePixel = 0 }, parent)
+    local f = U.new("Frame", { Position = pos, Size = size, BackgroundColor3 = C.T.PANEL, BorderSizePixel = 0 }, parent)
     U.round(f, 9)
     local n = #options
-    local pill = U.new("Frame", { Size = UDim2.new(1 / n, -4, 1, -4), Position = UDim2.new(0, 2, 0, 2), BackgroundColor3 = T.NEOND, BorderSizePixel = 0 }, f)
+    local pill = U.new("Frame", { Size = UDim2.new(1 / n, -4, 1, -4), Position = UDim2.new(0, 2, 0, 2), BackgroundColor3 = C.T.NEOND, BorderSizePixel = 0 }, f)
     U.round(pill, 7)
     U.new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 0.3) }), Rotation = 90 }, pill)
     local btns, obj = {}, {}
     local function paint(v, anim)
         for i, o in ipairs(options) do
-            U.tw(btns[o], { TextColor3 = (o == v) and T.WHITE or T.MUTED }, 0.2)
+            U.tw(btns[o], { TextColor3 = (o == v) and C.T.WHITE or C.T.MUTED }, 0.2)
             if o == v then
                 local p = UDim2.new((i - 1) / n, 2, 0, 2)
                 if anim then U.tw(pill, { Position = p }, 0.42, Enum.EasingStyle.Quint) else pill.Position = p end
@@ -369,7 +366,7 @@ function U.segmented(parent, options, initial, onChange, pos, size)
     for i, o in ipairs(options) do
         local b = U.new("TextButton", {
             Position = UDim2.new((i - 1) / n, 0, 0, 0), Size = UDim2.new(1 / n, 0, 1, 0), BackgroundTransparency = 1,
-            Text = o, TextSize = 10, Font = Enum.Font.GothamBold, TextColor3 = T.MUTED, AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 2,
+            Text = o, TextSize = 10, Font = Enum.Font.GothamBold, TextColor3 = C.T.MUTED, AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 2,
         }, f)
         btns[o] = b
         b.Activated:Connect(function()
@@ -383,15 +380,15 @@ function U.segmented(parent, options, initial, onChange, pos, size)
     return obj
 end
 function U.toggle(parent, text, initial, onChange, order)
-    local row = U.new("Frame", { Size = UDim2.new(1, -6, 0, 36), BackgroundColor3 = T.CARD, BorderSizePixel = 0, LayoutOrder = order or 0 }, parent)
+    local row = U.new("Frame", { Size = UDim2.new(1, -6, 0, 36), BackgroundColor3 = C.T.CARD, BorderSizePixel = 0, LayoutOrder = order or 0 }, parent)
     U.round(row, 10)
-    U.label(row, text, 12, T.TXT, Enum.Font.GothamMedium, { Position = UDim2.new(0, 12, 0, 0), Size = UDim2.new(1, -72, 1, 0), TextWrapped = false })
+    U.label(row, text, 12, C.T.TXT, Enum.Font.GothamMedium, { Position = UDim2.new(0, 12, 0, 0), Size = UDim2.new(1, -72, 1, 0), TextWrapped = false })
     local sw = U.new("TextButton", {
         Text = "", Size = UDim2.new(0, 42, 0, 22), Position = UDim2.new(1, -54, 0.5, -11),
-        BackgroundColor3 = T.LINE, AutoButtonColor = false, BorderSizePixel = 0,
+        BackgroundColor3 = C.T.LINE, AutoButtonColor = false, BorderSizePixel = 0,
     }, row)
     U.round(sw, 11)
-    local knob = U.new("Frame", { Size = UDim2.new(0, 18, 0, 18), Position = UDim2.new(0, 2, 0.5, -9), BackgroundColor3 = T.WHITE, BorderSizePixel = 0 }, sw)
+    local knob = U.new("Frame", { Size = UDim2.new(0, 18, 0, 18), Position = UDim2.new(0, 2, 0.5, -9), BackgroundColor3 = C.T.WHITE, BorderSizePixel = 0 }, sw)
     U.round(knob, 9)
     local state = initial
     local function paint(anim)
@@ -404,7 +401,7 @@ function U.toggle(parent, text, initial, onChange, order)
         else
             knob.Position = pos
         end
-        U.tw(sw, { BackgroundColor3 = state and T.NEOND or T.LINE }, 0.25)
+        U.tw(sw, { BackgroundColor3 = state and C.T.NEOND or C.T.LINE }, 0.25)
     end
     paint(false)
     sw.Activated:Connect(function()
@@ -415,15 +412,15 @@ function U.toggle(parent, text, initial, onChange, order)
     return { set = function(v) state = v paint(true) end }
 end
 function U.segRow(parent, text, options, initial, onChange, order)
-    local row = U.new("Frame", { Size = UDim2.new(1, -6, 0, 38), BackgroundColor3 = T.CARD, BorderSizePixel = 0, LayoutOrder = order or 0 }, parent)
+    local row = U.new("Frame", { Size = UDim2.new(1, -6, 0, 38), BackgroundColor3 = C.T.CARD, BorderSizePixel = 0, LayoutOrder = order or 0 }, parent)
     U.round(row, 10)
-    U.label(row, text, 12, T.TXT, Enum.Font.GothamMedium, { Position = UDim2.new(0, 12, 0, 0), Size = UDim2.new(0.34, 0, 1, 0), TextWrapped = false })
+    U.label(row, text, 12, C.T.TXT, Enum.Font.GothamMedium, { Position = UDim2.new(0, 12, 0, 0), Size = UDim2.new(0.34, 0, 1, 0), TextWrapped = false })
     return U.segmented(row, options, initial, onChange, UDim2.new(0.34, 0, 0.5, -13), UDim2.new(0.66, -8, 0, 26))
 end
 function U.swatchRow(parent, text, names, current, onPick, order)
-    local row = U.new("Frame", { Size = UDim2.new(1, -6, 0, 42), BackgroundColor3 = T.CARD, BorderSizePixel = 0, LayoutOrder = order or 0 }, parent)
+    local row = U.new("Frame", { Size = UDim2.new(1, -6, 0, 42), BackgroundColor3 = C.T.CARD, BorderSizePixel = 0, LayoutOrder = order or 0 }, parent)
     U.round(row, 10)
-    U.label(row, text, 12, T.TXT, Enum.Font.GothamMedium, { Position = UDim2.new(0, 12, 0, 0), Size = UDim2.new(0.3, 0, 1, 0), TextWrapped = false })
+    U.label(row, text, 12, C.T.TXT, Enum.Font.GothamMedium, { Position = UDim2.new(0, 12, 0, 0), Size = UDim2.new(0.3, 0, 1, 0), TextWrapped = false })
     local dots = {}
     for i, nm in ipairs(names) do
         local x = (i - 1) * 28
@@ -432,7 +429,7 @@ function U.swatchRow(parent, text, names, current, onPick, order)
             BackgroundColor3 = V.THEMES[nm].NEON, AutoButtonColor = false, BorderSizePixel = 0,
         }, row)
         U.new("UICorner", { CornerRadius = UDim.new(1, 0) }, d)
-        local st = U.new("UIStroke", { Color = T.WHITE, Thickness = 2, Transparency = (nm == current) and 0 or 1 }, d)
+        local st = U.new("UIStroke", { Color = C.T.WHITE, Thickness = 2, Transparency = (nm == current) and 0 or 1 }, d)
         dots[nm] = st
         d.Activated:Connect(function()
             for k, v in pairs(dots) do U.tw(v, { Transparency = (k == nm) and 0 or 1 }, 0.25) end
@@ -447,12 +444,12 @@ function U.swatchRow(parent, text, names, current, onPick, order)
 end
 function U.section(parent, text, order)
     local f = U.new("Frame", { Size = UDim2.new(1, -6, 0, 20), BackgroundTransparency = 1, LayoutOrder = order or 0 }, parent)
-    U.new("Frame", { Size = UDim2.new(0, 3, 0, 10), Position = UDim2.new(0, 2, 0.5, -5), BackgroundColor3 = T.NEON, BorderSizePixel = 0 }, f)
-    U.label(f, string.upper(text), 10, T.MUTED, Enum.Font.GothamBold, { Position = UDim2.new(0, 12, 0, 0), Size = UDim2.new(1, -12, 1, 0), TextWrapped = false })
+    U.new("Frame", { Size = UDim2.new(0, 3, 0, 10), Position = UDim2.new(0, 2, 0.5, -5), BackgroundColor3 = C.T.NEON, BorderSizePixel = 0 }, f)
+    U.label(f, string.upper(text), 10, C.T.MUTED, Enum.Font.GothamBold, { Position = UDim2.new(0, 12, 0, 0), Size = UDim2.new(1, -12, 1, 0), TextWrapped = false })
     return f
 end
 function U.empty(parent, icon, text, order)
-    local l = U.label(parent, icon .. "\n" .. text, 12, T.MUTED, Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 78), TextXAlignment = Enum.TextXAlignment.Center, LayoutOrder = order or 1 })
+    local l = U.label(parent, icon .. "\n" .. text, 12, C.T.MUTED, Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 78), TextXAlignment = Enum.TextXAlignment.Center, LayoutOrder = order or 1 })
     if not S.perfNow then
         l.TextTransparency = 1
         U.tw(l, { TextTransparency = 0 }, 0.7)
@@ -461,7 +458,7 @@ function U.empty(parent, icon, text, order)
 end
 function U.avatar(parent, userId, size, pos)
     local img = U.new("ImageLabel", {
-        Size = UDim2.new(0, size, 0, size), Position = pos, BackgroundColor3 = T.LINE, BorderSizePixel = 0, ImageTransparency = S.perfNow and 0 or 1,
+        Size = UDim2.new(0, size, 0, size), Position = pos, BackgroundColor3 = C.T.LINE, BorderSizePixel = 0, ImageTransparency = S.perfNow and 0 or 1,
         Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(userId) .. "&w=60&h=60",
     }, parent)
     U.round(img, size)
@@ -470,15 +467,15 @@ function U.avatar(parent, userId, size, pos)
 end
 function U.textbox(parent, placeholder, pos, size)
     local b = U.new("TextBox", {
-        Position = pos, Size = size, BackgroundColor3 = T.CARD, Text = "", PlaceholderText = placeholder, PlaceholderColor3 = T.MUTED,
-        TextColor3 = T.TXT, Font = Enum.Font.Gotham, TextSize = 11, ClearTextOnFocus = false,
+        Position = pos, Size = size, BackgroundColor3 = C.T.CARD, Text = "", PlaceholderText = placeholder, PlaceholderColor3 = C.T.MUTED,
+        TextColor3 = C.T.TXT, Font = Enum.Font.Gotham, TextSize = 11, ClearTextOnFocus = false,
         TextXAlignment = Enum.TextXAlignment.Left, BorderSizePixel = 0,
     }, parent)
     U.round(b, 9)
     U.pad(b, 10, 0, 8, 0)
     local st = b:FindFirstChildOfClass("UIStroke")
-    b.Focused:Connect(function() if st then U.tw(st, { Color = T.NEON, Transparency = 0.15, Thickness = 1.5 }, 0.25) end end)
-    b.FocusLost:Connect(function() if st then U.tw(st, { Color = T.WHITE, Transparency = 0.88, Thickness = 1 }, 0.35) end end)
+    b.Focused:Connect(function() if st then U.tw(st, { Color = C.T.NEON, Transparency = 0.15, Thickness = 1.5 }, 0.25) end end)
+    b.FocusLost:Connect(function() if st then U.tw(st, { Color = C.T.WHITE, Transparency = 0.88, Thickness = 1 }, 0.35) end end)
     return b
 end
 function U.count(t) local n = 0 for _ in pairs(t) do n += 1 end return n end
@@ -489,7 +486,6 @@ function U.dn(name)
     if not S.streamer or type(name) ~= "string" or #name < 3 then return name end
     return name:sub(1, 1) .. "•••" .. name:sub(-1)
 end
--- Clipboard: ONLY ever called from a button the user tapped
 function U.copy(text)
     local fn = setclipboard or toclipboard or (syn and syn.write_clipboard) or (Clipboard and Clipboard.set)
     if not fn then return false end
@@ -514,7 +510,6 @@ function U.note(text)
     if #S.notes > 40 then table.remove(S.notes) end
     if V.bellUpdate then V.bellUpdate() end
 end
--- toast = UI feedback. rises + fades in, drifts up + fades out
 function U.toast(text, color)
     if not S.alive or not V.toastLayer or not V.toastLayer.Parent then return end
     local now = os.clock()
@@ -523,13 +518,13 @@ function U.toast(text, color)
     S.toastN += 1
     local wrap = U.new("Frame", { Size = UDim2.new(1, 0, 0, 34), BackgroundTransparency = 1, LayoutOrder = S.toastN }, V.toastLayer)
     local t = U.new("CanvasGroup", {
-        Size = UDim2.new(1, 0, 1, -3), Position = UDim2.new(0, 0, 0, 16), BackgroundColor3 = T.BG,
+        Size = UDim2.new(1, 0, 1, -3), Position = UDim2.new(0, 0, 0, 16), BackgroundColor3 = C.T.BG,
         BackgroundTransparency = 0.04, BorderSizePixel = 0, GroupTransparency = 1,
     }, wrap)
     U.round(t, 11)
-    U.new("UIStroke", { Color = color or T.NEON, Thickness = 1, Transparency = 0.25, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, t)
-    U.new("Frame", { Size = UDim2.new(0, 3, 1, -12), Position = UDim2.new(0, 7, 0, 6), BackgroundColor3 = color or T.NEON, BorderSizePixel = 0 }, t)
-    U.label(t, text, 11, T.TXT, Enum.Font.GothamMedium, { Size = UDim2.new(1, -26, 1, 0), Position = UDim2.new(0, 18, 0, 0), TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+    U.new("UIStroke", { Color = color or C.T.NEON, Thickness = 1, Transparency = 0.25, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, t)
+    U.new("Frame", { Size = UDim2.new(0, 3, 1, -12), Position = UDim2.new(0, 7, 0, 6), BackgroundColor3 = color or C.T.NEON, BorderSizePixel = 0 }, t)
+    U.label(t, text, 11, C.T.TXT, Enum.Font.GothamMedium, { Size = UDim2.new(1, -26, 1, 0), Position = UDim2.new(0, 18, 0, 0), TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
     U.tw(t, { Position = UDim2.new(), GroupTransparency = 0 }, 0.5)
     local kids = {}
     for _, k in ipairs(V.toastLayer:GetChildren()) do if k:IsA("Frame") then kids[#kids + 1] = k end end
@@ -544,11 +539,10 @@ function U.toast(text, color)
         end
     end)
 end
--- alert = automatic event: logged in the notification center, honours Do-Not-Disturb
 function U.alert(text, color, strong)
     U.note(text)
     if S.dnd then return end
-    U.toast(text, color or T.AMBER)
+    U.toast(text, color or C.T.AMBER)
     if strong then
         U.ping("severe")
         if S.notifyMode ~= "OFF" then
@@ -563,7 +557,7 @@ function U.alert(text, color, strong)
     end
 end
 function U.flash(btn, ok, original)
-    U.setBtn(btn, nil, ok and T.GREEN or T.RED)
+    U.setBtn(btn, nil, ok and C.T.GREEN or C.T.RED)
     task.delay(0.7, function() if S.alive and btn.Parent then U.setBtn(btn, nil, original) end end)
 end
 function U.sheet(title, body, actions)
@@ -573,20 +567,20 @@ function U.sheet(title, body, actions)
         m.frame = U.new("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, ZIndex = 60, Visible = false, Active = true }, V.main)
         m.box = U.new("CanvasGroup", {
             AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(1, -20, 1, -74),
-            BackgroundColor3 = T.BG, BackgroundTransparency = 0.03, BorderSizePixel = 0, ZIndex = 61, GroupTransparency = 1,
+            BackgroundColor3 = C.T.BG, BackgroundTransparency = 0.03, BorderSizePixel = 0, ZIndex = 61, GroupTransparency = 1,
         }, m.frame)
         U.round(m.box, 16)
-        U.outline(m.box, T.NEON, 1.2, 0.35)
+        U.outline(m.box, C.T.NEON, 1.2, 0.35)
         m.scale = U.new("UIScale", { Scale = 1 }, m.box)
-        m.title = U.label(m.box, "", 13, T.NEON, Enum.Font.GothamBold, { Position = UDim2.new(0, 14, 0, 10), Size = UDim2.new(1, -28, 0, 18), TextWrapped = false })
-        U.new("Frame", { Position = UDim2.new(0, 14, 0, 31), Size = UDim2.new(1, -28, 0, 1), BackgroundColor3 = T.NEON, BackgroundTransparency = 0.72, BorderSizePixel = 0 }, m.box)
+        m.title = U.label(m.box, "", 13, C.T.NEON, Enum.Font.GothamBold, { Position = UDim2.new(0, 14, 0, 10), Size = UDim2.new(1, -28, 0, 18), TextWrapped = false })
+        U.new("Frame", { Position = UDim2.new(0, 14, 0, 31), Size = UDim2.new(1, -28, 0, 1), BackgroundColor3 = C.T.NEON, BackgroundTransparency = 0.72, BorderSizePixel = 0 }, m.box)
         m.sf = U.new("ScrollingFrame", {
-            Position = UDim2.new(0, 8, 0, 38), Size = UDim2.new(1, -16, 1, -152), BackgroundColor3 = T.CARD, BorderSizePixel = 0,
+            Position = UDim2.new(0, 8, 0, 38), Size = UDim2.new(1, -16, 1, -152), BackgroundColor3 = C.T.CARD, BorderSizePixel = 0,
             ScrollBarThickness = 3, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
         }, m.box)
         U.round(m.sf, 11)
         U.pad(m.sf, 8, 6, 8, 6)
-        m.body = U.label(m.sf, "", 11, T.TXT, Enum.Font.Code, { Size = UDim2.new(1, -4, 0, 0), AutomaticSize = Enum.AutomaticSize.Y })
+        m.body = U.label(m.sf, "", 11, C.T.TXT, Enum.Font.Code, { Size = UDim2.new(1, -4, 0, 0), AutomaticSize = Enum.AutomaticSize.Y })
         m.actions = U.new("Frame", { Position = UDim2.new(0, 8, 1, -108), Size = UDim2.new(1, -16, 0, 100), BackgroundTransparency = 1 }, m.box)
         function m.hide()
             m.tok += 1
@@ -603,14 +597,14 @@ function U.sheet(title, body, actions)
     m.sf.CanvasPosition = Vector2.new()
     for _, c in ipairs(m.actions:GetChildren()) do c:Destroy() end
     local list = {}
-    for _, a in ipairs(actions or { { text = "📋 Copy", color = T.NEOND, fn = function() U.toast(U.copy(body) and "📋 Copied" or "⚠ No clipboard", T.NEON) end } }) do
+    for _, a in ipairs(actions or { { text = "📋 Copy", color = C.T.NEOND, fn = function() U.toast(U.copy(body) and "📋 Copied" or "⚠ No clipboard", C.T.NEON) end } }) do
         if #list < 11 then list[#list + 1] = a end
     end
     list[#list + 1] = { text = "Close", fn = function() m.hide() end }
     for i, a in ipairs(list) do
         local col, row = (i - 1) % 4, math.floor((i - 1) / 4)
         local b
-        b = U.button(m.actions, a.text, a.color or T.CARD, UDim2.new(0.25, -4, 0, 28), UDim2.new(col * 0.25, 2, 0, row * 34), function() a.fn(b) end, 10)
+        b = U.button(m.actions, a.text, a.color or C.T.CARD, UDim2.new(0.25, -4, 0, 28), UDim2.new(col * 0.25, 2, 0, row * 34), function() a.fn(b) end, 10)
         if a.setup then a.setup(b) end
     end
     m.frame.Visible = true
@@ -630,8 +624,8 @@ end
 N.KEYS = { "learned", "whitelist", "custom", "cphrases", "ignored", "watch", "rep", "hidden", "alertWords", "pins" }
 function N.load()
     pcall(function()
-        if isfile and readfile and isfile(CFG.saveFile) then
-            local d = HS:JSONDecode(readfile(CFG.saveFile))
+        if isfile and readfile and isfile(C.CFG.saveFile) then
+            local d = HS:JSONDecode(readfile(C.CFG.saveFile))
             if type(d) == "table" then
                 for _, k in ipairs(N.KEYS) do
                     if type(d[k]) == "table" then S[k] = d[k] end
@@ -641,21 +635,21 @@ function N.load()
                     local function set(k, f) if st[k] ~= nil then f(st[k]) end end
                     set("guard", function(v) S.guard = v end)
                     set("aiMode", function(v) S.aiMode = v end)
-                    set("alert", function(v) CFG.strikeAlert = tonumber(v) or 3 end)
-                    set("ignoreFriends", function(v) CFG.ignoreFriends = v end)
-                    set("glass", function(v) if T.GLASS[v] then U.applyGlass(v) end end)
+                    set("alert", function(v) C.CFG.strikeAlert = tonumber(v) or 3 end)
+                    set("ignoreFriends", function(v) C.CFG.ignoreFriends = v end)
+                    set("glass", function(v) if C.T.GLASS[v] then U.applyGlass(v) end end)
                     set("theme", function(v) if V.THEMES[v] then V.applyTheme(v) end end)
                     set("scale", function(v) S.scale = tonumber(v) or 1 end)
                     set("shield", function(v) S.shield = v end)
                     set("shieldLevel", function(v) S.shieldLevel = tonumber(v) or 3 end)
                     set("autoSave", function(v) S.autoSave = v end)
-                    set("confirmStrong", function(v) CFG.confirmStrong = v end)
+                    set("confirmStrong", function(v) C.CFG.confirmStrong = v end)
                     set("notifyMode", function(v) S.notifyMode = v end)
                     set("perf", function(v) S.perf = v end)
                     set("hideSpam", function(v) S.hideSpam = v end)
-                    set("autoQuar", function(v) CFG.autoQuar = v end)
-                    set("stormMsgs", function(v) CFG.stormMsgs = tonumber(v) or 28 end)
-                    set("reportMax", function(v) CFG.reportMax = math.clamp(tonumber(v) or 1000, 300, 1000) end)
+                    set("autoQuar", function(v) C.CFG.autoQuar = v end)
+                    set("stormMsgs", function(v) C.CFG.stormMsgs = tonumber(v) or 28 end)
+                    set("reportMax", function(v) C.CFG.reportMax = math.clamp(tonumber(v) or 1000, 300, 1000) end)
                     set("heroOpen", function(v) S.heroOpen = v end)
                     set("sound", function(v) S.sound = v end)
                     set("autoCalm", function(v) S.autoCalm = v end)
@@ -685,14 +679,14 @@ function N.save()
             local out = {}
             for _, k in ipairs(N.KEYS) do out[k] = S[k] end
             out.settings = {
-                guard = S.guard, aiMode = S.aiMode, alert = CFG.strikeAlert, ignoreFriends = CFG.ignoreFriends,
+                guard = S.guard, aiMode = S.aiMode, alert = C.CFG.strikeAlert, ignoreFriends = C.CFG.ignoreFriends,
                 theme = S.theme, glass = S.glass, scale = S.scale, shield = S.shield, shieldLevel = S.shieldLevel,
-                autoSave = S.autoSave, confirmStrong = CFG.confirmStrong, notifyMode = S.notifyMode, perf = S.perf,
-                hideSpam = S.hideSpam, autoQuar = CFG.autoQuar, stormMsgs = CFG.stormMsgs, reportMax = CFG.reportMax,
+                autoSave = S.autoSave, confirmStrong = C.CFG.confirmStrong, notifyMode = S.notifyMode, perf = S.perf,
+                hideSpam = S.hideSpam, autoQuar = C.CFG.autoQuar, stormMsgs = C.CFG.stormMsgs, reportMax = C.CFG.reportMax,
                 heroOpen = S.heroOpen, sound = S.sound, autoCalm = S.autoCalm, dnd = S.dnd, streamer = S.streamer,
                 compact = S.compact, mentions = S.mentions, autoHide = S.autoHide, welcomed = S.welcomed,
             }
-            writefile(CFG.saveFile, HS:JSONEncode(out))
+            writefile(C.CFG.saveFile, HS:JSONEncode(out))
         end)
     end)
 end
@@ -713,7 +707,7 @@ function N.get(url)
     return nil
 end
 function N.loadRemote(force)
-    local rc = CFG.remote
+    local rc = C.CFG.remote
     if not rc.enabled then D.rstat.status = "off" return end
     D.rstat.status = "loading..."
     if not force and isfile and readfile then
@@ -921,7 +915,6 @@ local function anyIn(s, list)
     return nil
 end
 
--- returns sev, cats, hits, doubt, hint, ctoks, targeted, evasion(list), waveCount
 function D.analyze(player, msg, stateless)
     local norm = D.norm(msg)
     local glued = (norm:gsub(D.SYMS, ""))
@@ -1077,7 +1070,7 @@ function D.filteredWords(raw, tagged)
 end
 
 -- =====================================================================
--- R : reports / evidence (report text is always <= CFG.reportMax characters)
+-- R : reports / evidence
 -- =====================================================================
 R.POLICY = {
     profanity = { "Civility and Respect", "used profane and abusive language in public chat", "Abusive or profane language toward or around other players is not permitted." },
@@ -1131,7 +1124,7 @@ function R.tiny(i)
     return R.cut(s, 190)
 end
 function R.build(i, max)
-    max = math.min(max or CFG.reportMax, 1000)
+    max = math.min(max or C.CFG.reportMax, 1000)
     local p = R.POLICY[i.cat] or R.POLICY.profanity
     local spamCat = (i.cat == "spam")
     local jid = tostring(game.JobId)
@@ -1249,7 +1242,7 @@ function R.risk(d)
     end
     w += math.max(0, d.count - #d.incidents) * 0.3
     local r = w * 12 + d.tags * 10 + d.maxSev * 6 + math.min(25, (d.spam or 0) / 4)
-    if d.age and d.age < CFG.newAcct then r += 8 end
+    if d.age and d.age < C.CFG.newAcct then r += 8 end
     local rp = S.rep[tostring(d.userId)]
     if rp then r += math.min(12, math.max(0, (rp.n or 0) - d.count) * 1.5) end
     return math.min(100, math.floor(r + 0.5))
@@ -1286,11 +1279,11 @@ function R.log(info, status)
     if V.refreshHistory then V.refreshHistory() end
 end
 function R.submit(info, player)
-    local reason = CFG.reportReason[info.cat]
+    local reason = C.CFG.reportReason[info.cat]
     if not reason then return "noreason" end
     if typeof(player) ~= "Instance" or not player.Parent then return "gone" end
     if player == LP then return "self" end
-    local ok = pcall(function() Players:ReportAbuse(player, reason, R.build(info, math.min(CFG.reportMax, CFG.directMax))) end)
+    local ok = pcall(function() Players:ReportAbuse(player, reason, R.build(info, math.min(C.CFG.reportMax, C.CFG.directMax))) end)
     if not ok then ok = pcall(function() Players:ReportAbuse(player, reason, R.tiny(info)) end) end
     return ok and "sent" or "failed"
 end
@@ -1313,30 +1306,30 @@ function R.bind(btn, getInfo, getPlayer, onDone)
             armed = true
             token += 1
             local my = token
-            U.setBtn(btn, "⚠ Confirm?", T.AMBER)
+            U.setBtn(btn, "⚠ Confirm?", C.T.AMBER)
             task.delay(3, function()
-                if S.alive and armed and my == token and btn.Parent then armed = false U.setBtn(btn, "⚡ Report", T.RED) end
+                if S.alive and armed and my == token and btn.Parent then armed = false U.setBtn(btn, "⚡ Report", C.T.RED) end
             end)
             return
         end
         armed = false
         token += 1
-        local wait = CFG.reportCooldown - (os.clock() - S.lastReportAt)
-        if wait > 0 then U.toast("Cooldown: " .. math.ceil(wait) .. "s", T.AMBER) U.setBtn(btn, "⚡ Report", T.RED) return end
+        local wait = C.CFG.reportCooldown - (os.clock() - S.lastReportAt)
+        if wait > 0 then U.toast("Cooldown: " .. math.ceil(wait) .. "s", C.T.AMBER) U.setBtn(btn, "⚡ Report", C.T.RED) return end
         local info = getInfo()
         local status = R.submit(info, getPlayer())
         if status == "sent" then
             S.lastReportAt = os.clock()
             done = true
-            U.setBtn(btn, "✅ Reported", T.GREEN)
-            U.toast("✅ Report sent: " .. U.dn(info.name), T.GREEN)
+            U.setBtn(btn, "✅ Reported", C.T.GREEN)
+            U.toast("✅ Report sent: " .. U.dn(info.name), C.T.GREEN)
             R.log(info, "sent")
             if onDone then onDone() end
         else
             if status ~= "self" then U.copy(R.build(info)) R.log(info, "text copied") end
-            U.setBtn(btn, "📋 Text copied", T.BLUE)
-            U.toast(R.MSG[status] or "Report failed.", T.AMBER)
-            task.delay(2.5, function() if S.alive and btn.Parent and not done then U.setBtn(btn, "⚡ Report", T.RED) end end)
+            U.setBtn(btn, "📋 Text copied", C.T.BLUE)
+            U.toast(R.MSG[status] or "Report failed.", C.T.AMBER)
+            task.delay(2.5, function() if S.alive and btn.Parent and not done then U.setBtn(btn, "⚡ Report", C.T.RED) end end)
         end
     end)
 end
@@ -1353,7 +1346,7 @@ function H.record(p)
         r = {
             key = k, player = inst and p or nil, name = inst and p.Name or tostring(p), display = inst and p.DisplayName or tostring(p),
             userId = inst and p.UserId or 0, age = inst and p.AccountAge or 0, count = 0, tags = 0, reports = 0, spam = 0, maxSev = 0,
-            nextAlert = CFG.strikeAlert, incidents = {},
+            nextAlert = C.CFG.strikeAlert, incidents = {},
         }
         S.strikes[k] = r
     end
@@ -1422,24 +1415,24 @@ function H.register(player, name, msg, cats, sev, blocked, tagged, targeted, eva
         local dn = U.dn(name)
         if rec.count >= rec.nextAlert then
             rec.nextAlert = rec.count + 3
-            U.alert("🚨 Repeat offender: " .. dn .. " (" .. rec.count .. " strikes)", T.RED, true)
-            V.burst(T.RED, true)
+            U.alert("🚨 Repeat offender: " .. dn .. " (" .. rec.count .. " strikes)", C.T.RED, true)
+            V.burst(C.T.RED, true)
         elseif sev >= 5 then
-            U.alert("🚨 Severe: " .. dn .. " — " .. table.concat(cats, "+"), T.RED, true)
-            V.burst(T.RED, true)
+            U.alert("🚨 Severe: " .. dn .. " — " .. table.concat(cats, "+"), C.T.RED, true)
+            V.burst(C.T.RED, true)
         elseif sev >= 4 then
-            U.alert(dn .. " flagged (SEV " .. sev .. "): " .. table.concat(cats, "+"), T.RED, false)
+            U.alert(dn .. " flagged (SEV " .. sev .. "): " .. table.concat(cats, "+"), C.T.RED, false)
             U.ping("flag")
-            V.burst(T.RED, false)
+            V.burst(C.T.RED, false)
         elseif sev >= 3 then
-            V.burst(T.AMBER, false)
+            V.burst(C.T.AMBER, false)
         end
         if S.autoHide > 0 and typeof(player) == "Instance" and player ~= LP and not H.trusted(player) then
             local r = R.risk(rec)
             local u = S.hiddenUntil[player.UserId]
             if r >= S.autoHide and not (u and os.clock() < u) then
-                S.hiddenUntil[player.UserId] = os.clock() + CFG.autoHideLen
-                U.alert("🙈 Auto-hid " .. dn .. " (risk " .. r .. "%) for 10 min", T.AMBER, false)
+                S.hiddenUntil[player.UserId] = os.clock() + C.CFG.autoHideLen
+                U.alert("🙈 Auto-hid " .. dn .. " (risk " .. r .. "%) for 10 min", C.T.AMBER, false)
                 H.event("🙈 Auto-hid " .. name .. " (risk " .. r .. "%)")
             end
         end
@@ -1465,7 +1458,7 @@ function H.undo(player, inc)
 end
 function H.trusted(player)
     if typeof(player) ~= "Instance" or player == LP then return false end
-    return S.ignored[tostring(player.UserId)] == true or (CFG.ignoreFriends and S.friends[player.UserId] == true)
+    return S.ignored[tostring(player.UserId)] == true or (C.CFG.ignoreFriends and S.friends[player.UserId] == true)
 end
 function H.cacheFriend(p)
     if p == LP then return end
@@ -1495,7 +1488,7 @@ end
 function H.showContext(ge)
     local idx
     for i, e in ipairs(S.allLog) do if e == ge then idx = i break end end
-    if not idx then U.toast("Context expired (too old)", T.AMBER) return end
+    if not idx then U.toast("Context expired (too old)", C.T.AMBER) return end
     local L = {}
     for i = math.max(1, idx - 6), math.min(#S.allLog, idx + 4) do
         local e = S.allLog[i]
@@ -1530,33 +1523,33 @@ function H.joined(p)
     local now = os.clock()
     S.joinAt[p.UserId] = now
     S.joinTimes[#S.joinTimes + 1] = now
-    while #S.joinTimes > 0 and now - S.joinTimes[1] > CFG.raidWindow do table.remove(S.joinTimes, 1) end
-    local new = p.AccountAge < CFG.newAcct
+    while #S.joinTimes > 0 and now - S.joinTimes[1] > C.CFG.raidWindow do table.remove(S.joinTimes, 1) end
+    local new = p.AccountAge < C.CFG.newAcct
     H.event((new and "🆕 " or "➕ ") .. p.Name .. " joined (" .. p.AccountAge .. "d old)")
     local rp = S.rep[tostring(p.UserId)]
     if rp and (rp.n or 0) >= 3 and p ~= LP then
         H.event("🔁 Known offender joined: " .. p.Name .. " (" .. rp.n .. " past strikes)")
-        U.alert("🔁 Known offender joined: " .. U.dn(p.Name) .. " (" .. rp.n .. " past strikes)", T.AMBER, true)
+        U.alert("🔁 Known offender joined: " .. U.dn(p.Name) .. " (" .. rp.n .. " past strikes)", C.T.AMBER, true)
     end
-    if #S.joinTimes >= CFG.raidJoins and now - S.lastRaid > 60 then
+    if #S.joinTimes >= C.CFG.raidJoins and now - S.lastRaid > 60 then
         S.lastRaid = now
-        H.event("🚨 Raid warning: " .. #S.joinTimes .. " joins in " .. CFG.raidWindow .. "s")
-        U.alert("🚨 Possible raid: " .. #S.joinTimes .. " joins in " .. CFG.raidWindow .. "s", T.RED, true)
-        V.burst(T.RED, true)
+        H.event("🚨 Raid warning: " .. #S.joinTimes .. " joins in " .. C.CFG.raidWindow .. "s")
+        U.alert("🚨 Possible raid: " .. #S.joinTimes .. " joins in " .. C.CFG.raidWindow .. "s", C.T.RED, true)
+        V.burst(C.T.RED, true)
     end
     if V.cur == "Players" then V.refreshPlayers(false) end
 end
 function H.stormCheck(now)
     local n = 0
     for i = #S.mtimes, 1, -1 do
-        if now - S.mtimes[i] <= CFG.stormWindow then n += 1 else break end
+        if now - S.mtimes[i] <= C.CFG.stormWindow then n += 1 else break end
     end
-    if n >= CFG.stormMsgs then
+    if n >= C.CFG.stormMsgs then
         if not S.storm then
             S.storm = true
-            H.event("🌪 Chat storm: " .. n .. " msgs in " .. CFG.stormWindow .. "s — AI paused, feed condensed")
-            U.alert("🌪 Spam storm detected — feed condensed, AI paused", T.RED, true)
-            V.burst(T.RED, true)
+            H.event("🌪 Chat storm: " .. n .. " msgs in " .. C.CFG.stormWindow .. "s — AI paused, feed condensed")
+            U.alert("🌪 Spam storm detected — feed condensed, AI paused", C.T.RED, true)
+            V.burst(C.T.RED, true)
             if S.autoCalm then S.calmUntil = now + 25 end
         end
         S.stormUntil = now + 12
@@ -1571,12 +1564,12 @@ function H.mood()
     for _, t in ipairs({ S.mtimes, S.ftimes }) do
         while #t > 0 and now - t[1] > 180 do table.remove(t, 1) end
     end
-    if S.storm then return "storm", "Storm", T.RED, 1 end
+    if S.storm then return "storm", "Storm", C.T.RED, 1 end
     local idx = #S.ftimes / math.max(#S.mtimes, 6)
     local ten = math.clamp(idx * 3, 0, 1)
-    if idx < 0.06 then return "calm", "Calm", T.GREEN, ten end
-    if idx < 0.18 then return "heated", "Heated", T.AMBER, ten end
-    return "toxic", "Toxic", T.RED, ten
+    if idx < 0.06 then return "calm", "Calm", C.T.GREEN, ten end
+    if idx < 0.18 then return "heated", "Heated", C.T.AMBER, ten end
+    return "toxic", "Toxic", C.T.RED, ten
 end
 function H.spamFlag(player, cats)
     if typeof(player) ~= "Instance" or player == LP then return end
@@ -1585,9 +1578,9 @@ function H.spamFlag(player, cats)
             local now = os.clock()
             S.spamUntil[player.UserId] = now + 45
             local pk = U.key(player)
-            if CFG.autoQuar and not (S.quar[pk] and now < S.quar[pk]) and not H.trusted(player) then
-                S.quar[pk] = now + CFG.quarSecs
-                H.event("🔇 Auto-quarantined " .. player.Name .. " for " .. CFG.quarSecs .. "s (spam)")
+            if C.CFG.autoQuar and not (S.quar[pk] and now < S.quar[pk]) and not H.trusted(player) then
+                S.quar[pk] = now + C.CFG.quarSecs
+                H.event("🔇 Auto-quarantined " .. player.Name .. " for " .. C.CFG.quarSecs .. "s (spam)")
             end
             return
         end
@@ -1611,7 +1604,7 @@ H.PRESETS = {
 function H.preset(name)
     local p = H.PRESETS[name]
     if not p then return end
-    CFG.strikeAlert, CFG.confirmStrong, CFG.ignoreFriends = p.alert, p.strong, p.friends
+    C.CFG.strikeAlert, C.CFG.confirmStrong, C.CFG.ignoreFriends = p.alert, p.strong, p.friends
     S.shield, S.shieldLevel = p.shield, p.level
     A.setMode(p.ai)
     local c = V.ctl or {}
@@ -1620,9 +1613,8 @@ function H.preset(name)
     if c.alertSeg then c.alertSeg.set(tostring(p.alert)) end
     if c.shieldSeg then c.shieldSeg.set(p.level .. "+") end
     N.save()
-    U.toast("Preset applied: " .. name, T.NEON)
+    U.toast("Preset applied: " .. name, C.T.NEON)
 end
--- client-side chat filter: hides abuse / spammers / hidden players / calm mode in MY chat window only
 function H.installShield()
     if H.shieldSet then return true end
     if TCS.ChatVersion ~= Enum.ChatVersion.TextChatService then return false end
@@ -1661,8 +1653,8 @@ function H.installShield()
 end
 function H.calm(on)
     S.calmUntil = on and (os.clock() + 60) or 0
-    U.toast(on and "🧊 Calm mode: others' chat hidden for 60s (your view only)" or "🧊 Calm mode off", on and T.BLUE or T.NEON)
-    if on and not H.shieldSet then U.toast("Calm mode needs the new Roblox chat", T.AMBER) end
+    U.toast(on and "🧊 Calm mode: others' chat hidden for 60s (your view only)" or "🧊 Calm mode off", on and C.T.BLUE or C.T.NEON)
+    if on and not H.shieldSet then U.toast("Calm mode needs the new Roblox chat", C.T.AMBER) end
 end
 function H.mentions(msg)
     if not S.mentions then return false end
@@ -1676,751 +1668,6 @@ function H.mentions(msg)
         end
     end
     return false
-end
-
--- ---------------- AI ----------------
-A.rate = {
-    Groq = { gap = 2.2, min = 2.1, max = 30, nextAt = 0, coolUntil = 0, pen = 0 },
-    Gemini = { gap = 6, min = 4, max = 40, nextAt = 0, coolUntil = 0, pen = 1 },
-    OpenRouter = { gap = 3.3, min = 3, max = 30, nextAt = 0, coolUntil = 0, pen = 2 },
-    Pollinations = { gap = 6, min = 4, max = 25, nextAt = 0, coolUntil = 0, pen = 4 },
-}
-function A.providers()
-    local l = {}
-    if U.hasKey(KEYS.groq) then l[#l + 1] = { name = "Groq", url = CFG.groq.url, model = CFG.groq.model, key = KEYS.groq } end
-    if U.hasKey(KEYS.gemini) then l[#l + 1] = { name = "Gemini", url = CFG.gemini.url, model = CFG.gemini.model, key = KEYS.gemini, extra = { reasoning_effort = "none" }, minTokens = 200 } end
-    if U.hasKey(KEYS.openrouter) then l[#l + 1] = { name = "OpenRouter", url = CFG.openrouter.url, model = CFG.openrouter.model, key = KEYS.openrouter, openrouter = true } end
-    if CFG.pollinations.enabled then l[#l + 1] = { name = "Pollinations", url = CFG.pollinations.url, model = CFG.pollinations.model } end
-    return l
-end
-function A.ordered()
-    local now = os.clock()
-    local ready, cool = {}, {}
-    for _, p in ipairs(A.providers()) do
-        if A.rate[p.name].coolUntil > now then cool[#cool + 1] = p else ready[#ready + 1] = p end
-    end
-    table.sort(ready, function(a, b)
-        local ra, rb = A.rate[a.name], A.rate[b.name]
-        return math.max(ra.nextAt, now) + ra.pen < math.max(rb.nextAt, now) + rb.pen
-    end)
-    for _, p in ipairs(cool) do ready[#ready + 1] = p end
-    return ready
-end
-function A.slot(name)
-    local r = A.rate[name]
-    local now = os.clock()
-    local at = math.max(now, r.nextAt)
-    r.nextAt = at + r.gap
-    if at > now then task.wait(at - now) end
-end
-function A.try(p, rq, messages, maxTokens)
-    local r = A.rate[p.name]
-    local headers = { ["Content-Type"] = "application/json" }
-    if p.key then headers["Authorization"] = "Bearer " .. p.key end
-    if p.openrouter then headers["HTTP-Referer"] = "https://www.roblox.com" headers["X-Title"] = "Phantom OS" end
-    local lastErr, lastCode = p.name .. ": failed", 0
-    for attempt = 1, (p.extra and 2 or 1) do
-        local payload = { model = p.model, messages = messages, max_tokens = math.max(maxTokens or 300, p.minTokens or 0), temperature = 0 }
-        if p.extra and attempt == 1 then for k, v in pairs(p.extra) do payload[k] = v end end
-        local okE, body = pcall(HS.JSONEncode, HS, payload)
-        if not okE then return nil, p.name .. ": encode error", 0 end
-        A.slot(p.name)
-        local ok, res = pcall(rq, { Url = p.url, Method = "POST", Headers = headers, Body = body })
-        if ok and type(res) == "table" then
-            local code = res.StatusCode or res.status_code or (res.Success and 200) or 0
-            local raw = res.Body or ""
-            local okD, data = pcall(HS.JSONDecode, HS, raw)
-            local content, err
-            if okD and type(data) == "table" then
-                local ch = data.choices and data.choices[1]
-                if ch and ch.message and type(ch.message.content) == "string" then content = ch.message.content
-                elseif data.error then err = type(data.error) == "table" and (data.error.message or "api error") or tostring(data.error) end
-            end
-            if not content and not err and code >= 200 and code < 300 and type(raw) == "string" and raw ~= "" then content = raw end
-            if content and content ~= "" then r.gap = math.max(r.min, r.gap * 0.92) return content, nil, code end
-            lastCode = code
-            lastErr = p.name .. ": " .. tostring(err or ("HTTP " .. tostring(code)))
-            if code == 429 then
-                r.gap = math.min(r.max, r.gap * 2)
-                r.coolUntil = os.clock() + 30
-                return nil, p.name .. ": rate limited (429)", code
-            elseif code == 401 or code == 403 then
-                r.coolUntil = os.clock() + 300
-                return nil, p.name .. ": key rejected (" .. code .. ")", code
-            end
-            if not (code == 400 and p.extra and attempt == 1) then break end
-        else
-            r.coolUntil = os.clock() + 10
-            return nil, p.name .. ": request failed", 0
-        end
-    end
-    return nil, lastErr, lastCode
-end
-function A.call(messages, maxTokens)
-    local rq = N.requester()
-    if not rq then return nil, nil, "Executor has no HTTP request function.", 0 end
-    local order = A.ordered()
-    if #order == 0 then return nil, nil, "No AI provider enabled.", 0 end
-    local lastErr, lastCode = "unknown error", 0
-    S.ai.calls += 1
-    for _, p in ipairs(order) do
-        local t0 = os.clock()
-        local content, err, code = A.try(p, rq, messages, maxTokens)
-        if content then
-            S.ai.ok += 1
-            local st = S.ai.prov[p.name] or { n = 0, ms = 0 }
-            st.n += 1
-            st.ms += (os.clock() - t0) * 1000
-            S.ai.prov[p.name] = st
-            return content, p.name, nil, code
-        end
-        lastErr, lastCode = err or lastErr, code or lastCode
-    end
-    return nil, nil, lastErr, lastCode
-end
-A.SYSTEM = "Roblox chat moderator. Players write English/Hindi/Hinglish. Abbreviations or misspellings can hide Hindi abuse "
-    .. "(tmc/tmkc=teri maa ki.., mc/bc/bkl/bsdk, chuda/cuda/chud=chudai abuse, lund, gand) but may be harmless "
-    .. "(bc=because, mc=Minecraft, cud=cud, chod=leave). Also flag scam/spam scripts (free robux, loadstring, script ads, invite spam). "
-    .. "Use recent chat for context. Friendly banter is not a violation. "
-    .. "Reply ONLY JSON: {\"v\":0|1,\"c\":\"profanity|hindi|harass|hate|sexual|scam|threat|spam|offsite|none\",\"s\":0-5,\"r\":\"max 8 words\"}"
-A.VALID = { profanity = true, hindi = true, harass = true, hate = true, sexual = true, scam = true, threat = true, spam = true, offsite = true }
-
-function A.judge(item)
-    local prompt = "Chat:\n" .. (item.ctx ~= "" and item.ctx or "(none)") .. "\nJudge " .. item.name .. ": \"" .. item.msg:sub(1, 160) .. "\""
-        .. (item.hint ~= "" and ("\nNotes: " .. item.hint:sub(1, 160)) or "")
-    local text, prov = A.call({ { role = "system", content = A.SYSTEM }, { role = "user", content = prompt } }, 60)
-    if not text then return nil end
-    S.aiLast = prov or "-"
-    local data
-    local j = text:match("%b{}")
-    if j then
-        local ok, d = pcall(HS.JSONDecode, HS, j)
-        if ok and type(d) == "table" then data = d end
-    end
-    local viol, cat, sev, reason
-    if data then
-        local v = data.v
-        if v == nil then v = data.violation end
-        viol = (v == 1) or (v == true) or (v == "1") or (v == "true")
-        cat = tostring(data.c or data.category or "none"):lower()
-        sev = tonumber(data.s or data.severity) or 0
-        reason = tostring(data.r or data.reason or "")
-    else
-        local low = text:lower()
-        viol = (low:find("violation%W+true") ~= nil) or (low:find("\"v\"%W+1") ~= nil)
-        cat, sev, reason = "none", viol and 3 or 0, text:sub(1, 60)
-    end
-    if viol then
-        if not A.VALID[cat] then cat = "harass" end
-        sev = math.clamp(math.floor(sev + 0.5), 1, 5)
-    end
-    if #reason > 80 then reason = reason:sub(1, 80) end
-    if reason == "" then reason = viol and "violates chat rules" or "looks fine" end
-    local res = { violation = viol, category = cat, severity = sev, reason = reason }
-    S.verdictN += 1
-    if S.verdictN > 150 then S.verdict, S.verdictN = {}, 1 end
-    S.verdict[item.key] = res
-    return res
-end
-function A.learn(item, res)
-    if not res or not item.ctoks then return end
-    for _, tok in ipairs(item.ctoks) do
-        if not D.builtin[tok] and #tok >= 3 and #tok <= 14 then
-            if res.violation then
-                S.learnV[tok] = (S.learnV[tok] or 0) + 1
-                if S.learnV[tok] >= CFG.learnVotes and not D.exact[tok] then
-                    local cat = A.VALID[res.category] and res.category or "hindi"
-                    local sev = math.clamp(res.severity, 2, 4)
-                    D.add(tok, cat, sev, nil, false)
-                    S.learned[tok] = { cat = cat, sev = sev }
-                    N.save()
-                    U.toast("🧠 Learned new word: " .. tok, T.NEON)
-                end
-            else
-                S.safeV[tok] = (S.safeV[tok] or 0) + 1
-                if S.safeV[tok] >= 2 then S.whitelist[tok] = true N.save() end
-            end
-        end
-    end
-end
-function A.enqueue(item)
-    local q = S.queue
-    if #q >= CFG.queueMax then
-        local worst, wi = 0, nil
-        for i, x in ipairs(q) do if x.pri > worst then worst, wi = x.pri, i end end
-        if wi and worst >= item.pri then
-            local d = table.remove(q, wi)
-            pcall(d.handle.applyAI, nil)
-        else
-            pcall(item.handle.applyAI, nil)
-            return
-        end
-    end
-    local pos = #q + 1
-    for i, x in ipairs(q) do if x.pri > item.pri then pos = i break end end
-    table.insert(q, pos, item)
-    V.status()
-end
-function A.setMode(v)
-    S.aiMode = v:upper()
-    local c = U.cap(v)
-    if V.aiSeg then V.aiSeg.set(c) end
-    if V.aiSegSetup then V.aiSegSetup.set(c) end
-    N.save()
-end
-function A.startWorkers()
-    for _ = 1, CFG.workers do
-        task.spawn(function()
-            while S.alive do
-                local item = (not S.storm) and table.remove(S.queue, 1) or nil
-                if item then
-                    if os.clock() - item.t > 40 then
-                        pcall(item.handle.applyAI, nil)
-                    else
-                        local res = A.judge(item)
-                        if S.alive then
-                            pcall(item.handle.applyAI, res)
-                            A.learn(item, res)
-                            V.status()
-                        end
-                    end
-                else
-                    if S.storm and #S.queue > 0 then
-                        local d = table.remove(S.queue, 1)
-                        pcall(d.handle.applyAI, nil)
-                    end
-                    task.wait(0.25)
-                end
-            end
-        end)
-    end
-end
-
--- ---------------- chat intake ----------------
-function H.logMessage(player, msg, o)
-    local k = U.key(player)
-    local log = S.chatLog[k]
-    if not log then log = {} S.chatLog[k] = log end
-    local e = { t = os.clock(), time = os.date("%H:%M:%S"), text = msg, tagged = o.tagged or false, tagText = o.tagText, taggedOnly = o.taggedOnly or false }
-    log[#log + 1] = e
-    if #log > 15 then table.remove(log, 1) end
-    return e
-end
-function H.findRaw(player, tagged)
-    local log = S.chatLog[U.key(player)]
-    if not log then return nil end
-    local now = os.clock()
-    for i = #log, 1, -1 do
-        local e = log[i]
-        if now - e.t > 6 then break end
-        if not e.tagged and not e.taggedOnly and D.posMatch(tagged, e.text) then return e end
-    end
-    return nil
-end
-function H.takePending(player, raw)
-    local list = S.pending[player]
-    if not list then return nil end
-    for _, p in ipairs(list) do
-        if not p.done and D.posMatch(p.text, raw) then p.done = true return p.text end
-    end
-    return nil
-end
-function H.learnTag(raw, tt)
-    local words, total = D.filteredWords(raw, tt)
-    if #words == 0 or #words > 2 or #words >= total then return end
-    for _, w in ipairs(words) do
-        if #w >= 3 and #w <= 14 and not D.STOP[w] and not D.exact[w] and not S.whitelist[w] then
-            S.tagV[w] = (S.tagV[w] or 0) + 1
-            if S.tagV[w] >= CFG.tagVotes then
-                D.add(w, "profanity", 2, nil, false)
-                S.learned[w] = { cat = "profanity", sev = 2 }
-                N.save()
-                U.toast("🏷 Roblox keeps tagging '" .. w .. "' — learned", T.NEON)
-            end
-        end
-    end
-end
-function H.recentPush(name, msg)
-    local r = S.recent
-    r[#r + 1] = name .. ": " .. msg:sub(1, 70)
-    if #r > 6 then table.remove(r, 1) end
-end
-function H.snapshot()
-    local n, t = #S.recent, {}
-    for i = math.max(1, n - CFG.ctxLines + 1), n do t[#t + 1] = S.recent[i] end
-    return table.concat(t, "\n")
-end
-function H.commit(player, msg, blocked, tagText, taggedOnly)
-    local inst = typeof(player) == "Instance"
-    local name = inst and player.Name or tostring(player)
-    local now = os.clock()
-    local pk = U.key(player)
-    S.scanned += 1
-    S.secMsgs += 1
-    local mm = math.floor(os.time() / 60)
-    S.msgMin[mm] = (S.msgMin[mm] or 0) + 1
-    S.mtimes[#S.mtimes + 1] = now
-    local ps = H.pstat(player)
-    ps.msgs += 1
-    ps.times[#ps.times + 1] = now
-    local b10 = H.rate(player, 10)
-    if b10 > (ps.peak or 0) then ps.peak = b10 end
-    H.stormCheck(now)
-    local tagged = (tagText ~= nil) or taggedOnly or false
-    local nk = D.norm(msg)
-
-    local q = S.quar[pk]
-    if q and now < q and player ~= LP and not tagged and not blocked then
-        if D.quick(msg) < 3 then
-            S.quarCount += 1
-            local rec = S.strikes[pk]
-            if rec then rec.spam = (rec.spam or 0) + 1 end
-            local l2 = S.lastMsg[pk]
-            if l2 and l2.nk == nk then
-                l2.n += 1
-                l2.t = now
-                ps.dupMax = math.max(ps.dupMax or 0, l2.n)
-                ps.dupSecs = now - l2.first
-                if l2.entry then l2.entry.dups = l2.n end
-                l2.handle.bump(l2.n, 0, {}, false, nil)
-            end
-            return
-        end
-    end
-
-    local last = S.lastMsg[pk]
-    if last and last.nk == nk and now - last.t < 30 and last.handle and not blocked and not tagged then
-        last.n += 1
-        last.t = now
-        S.dupSuppressed += 1
-        local sev2, cats2, _, _, _, _, tg2, ev2, wv2 = D.analyze(player, msg)
-        local rec = S.strikes[pk]
-        if rec then rec.spam = (rec.spam or 0) + 1 end
-        ps.dupMax = math.max(ps.dupMax or 0, last.n)
-        ps.dupSecs = now - last.first
-        ps.dupText = msg:sub(1, 80)
-        if wv2 and wv2 >= 3 then ps.wave = math.max(ps.wave or 0, wv2) end
-        if last.entry then last.entry.dups = last.n end
-        last.handle.bump(last.n, sev2, cats2, tg2, ev2)
-        H.spamFlag(player, cats2)
-        return
-    end
-
-    local age = inst and player.AccountAge or 999
-    local watched = inst and S.watch[tostring(player.UserId)] == true
-    local trusted = H.trusted(player)
-    local sev, cats, _, doubt, hint, ctoks, targeted, evasion, wv = D.analyze(player, msg)
-    if wv and wv >= 3 then ps.wave = math.max(ps.wave or 0, wv) end
-    if trusted and not tagged then sev, cats, doubt, evasion = 0, {}, false, {} end
-    if tagged then
-        if sev < 3 then sev = 3 end
-        if #cats == 0 then cats = { "filtered" } end
-        doubt = false
-    end
-    if blocked and sev == 0 then sev, cats = 3, { "profanity" } end
-    H.spamFlag(player, cats)
-
-    -- extra signals
-    local mention = (player ~= LP) and H.mentions(msg) or false
-    local alertWord
-    if player ~= LP and next(S.alertWords) then
-        local lowText = " " .. D.fold(msg):lower() .. " "
-        for w in pairs(S.alertWords) do if lowText:find(w, 1, true) then alertWord = w break end end
-    end
-    local botSpeed = b10 >= 8
-    local ja = inst and S.joinAt[player.UserId]
-    local fastFirst = ja and ps.msgs == 1 and (now - ja) < 3 and player ~= LP
-    if watched and player ~= LP then U.alert("⭐ " .. U.dn(name) .. ": " .. msg:sub(1, 40), T.BLUE, false) end
-    if mention then
-        S.mentionCount += 1
-        U.alert("💬 " .. U.dn(name) .. " mentioned you: " .. msg:sub(1, 36), T.BLUE, false)
-    end
-    if alertWord then U.alert("🔔 \"" .. alertWord .. "\" — " .. U.dn(name) .. ": " .. msg:sub(1, 30), T.AMBER, false) end
-
-    U.button(page, "🚫 Add bad", T.RED, UDim2.new(1 / 3, -4, 0, 28), UDim2.new(0, 0, 0, 33), function()
-        local w = clean()
-        if #w < 2 then U.toast("Type a word first", T.AMBER) return end
-        if w:find(" ") then
-            S.cphrases[D.c2(w)] = { cat = "profanity", sev = 3 }
-        else
-            S.custom[w] = { cat = "profanity", sev = 3 }
-            S.whitelist[w] = nil
-            D.add(w, "profanity", 3, nil, false)
-        end
-        N.save()
-        wb.Text = ""
-        V.refreshWords(false)
-        U.toast("🚫 Added: " .. w, T.NEON)
-    end, 11)
-    U.button(page, "✅ Allow", T.GREEN, UDim2.new(1 / 3, -4, 0, 28), UDim2.new(1 / 3, 2, 0, 33), function()
-        local w = clean()
-        if #w < 2 or w:find(" ") then U.toast("Type a single word", T.AMBER) return end
-        S.whitelist[w] = true
-        S.custom[w], S.learned[w], D.remote[w] = nil, nil, nil
-        if not D.builtin[D.c2(w)] then
-            D.exact[D.c2(w)] = nil
-            D.exact[D.c1(w)] = nil
-        end
-        N.save()
-        wb.Text = ""
-        V.refreshWords(false)
-        U.toast("✅ Allowed: " .. w, T.NEON)
-    end, 11)
-    U.button(page, "🔔 Alert", T.AMBER, UDim2.new(1 / 3, -4, 0, 28), UDim2.new(2 / 3, 4, 0, 33), function()
-        local w = clean()
-        if #w < 2 then U.toast("Type a word or phrase first", T.AMBER) return end
-        S.alertWords[w] = true
-        N.save()
-        wb.Text = ""
-        V.refreshWords(false)
-        U.toast("🔔 You'll be alerted when someone says: " .. w, T.NEON)
-    end, 11)
-    local tb = U.textbox(page, "🧪 type a message to test", UDim2.new(0, 0, 0, 66), UDim2.new(1, -74, 0, 28))
-    U.button(page, "🧪 Test", T.NEOND, UDim2.new(0, 62, 0, 28), UDim2.new(1, -68, 0, 66), function()
-        if (tb.Text or "") == "" then U.toast("Type a message first", T.AMBER) return end
-        V.testMessage(tb.Text)
-    end, 11)
-    V.wordScroll = U.scroll(page, UDim2.new(0, 0, 0, 100), UDim2.new(1, 0, 1, -100))
-    V.wordRows = {}
-end
-function V.refreshWords(pop)
-    if not V.wordRows or not V.wordScroll then return end
-    for _, r in ipairs(V.wordRows) do r:Destroy() end
-    V.wordRows = {}
-    local o = 0
-    local function add(inst) o += 1 inst.LayoutOrder = o V.wordRows[#V.wordRows + 1] = inst return inst end
-    local function section(title, tbl, remove)
-        add(U.section(V.wordScroll, title .. " (" .. U.count(tbl) .. ")"))
-        local keys = {}
-        for k in pairs(tbl) do keys[#keys + 1] = k end
-        table.sort(keys)
-        if #keys == 0 then add(U.label(V.wordScroll, "—", 11, T.MUTED, Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 16) })) end
-        for i = 1, math.min(#keys, 40) do
-            local k = keys[i]
-            local v = tbl[k]
-            local row = add(U.new("Frame", { Size = UDim2.new(1, -6, 0, 28), BackgroundColor3 = T.CARD, BorderSizePixel = 0 }, V.wordScroll))
-            U.round(row, 9)
-            local extra = type(v) == "table" and (" · " .. tostring(v.cat) .. " SEV" .. tostring(v.sev)) or ""
-            U.label(row, k .. extra, 11, T.TXT, Enum.Font.Gotham, { Position = UDim2.new(0, 10, 0, 0), Size = UDim2.new(1, -44, 1, 0), TextWrapped = false })
-            U.button(row, "✕", T.PANEL, UDim2.new(0, 26, 0, 20), UDim2.new(1, -32, 0, 4), function() remove(k) end, 10)
-            if pop then U.pop(row, i * 0.02) end
-        end
-    end
-    section("Custom bad words", S.custom, function(k) H.removeWord(k, "custom") end)
-    section("Custom phrases", S.cphrases, function(k) S.cphrases[k] = nil N.save() V.refreshWords(false) end)
-    section("🔔 Alert words", S.alertWords, function(k) S.alertWords[k] = nil N.save() V.refreshWords(false) end)
-    section("Learned (AI / Roblox tags)", S.learned, function(k) H.removeWord(k, "learned") end)
-    section("Allowed words", S.whitelist, function(k) S.whitelist[k] = nil N.save() V.refreshWords(false) end)
-    add(U.label(V.wordScroll, "Built-in: " .. U.count(D.builtin) .. " exact + " .. #D.substr .. " pattern words · Internet list: " .. U.count(D.remote) .. " words", 10, T.MUTED, Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 28) }))
-end
-
--- ---------- AI tab ----------
-function V.addBubble(role, text)
-    V.aiOrder += 1
-    local bg, col, prefix, bt = T.CARD, T.TXT, "AI  ", T.GC
-    if role == "user" then bg, prefix, bt = Color3.fromRGB(16, 74, 58), "You  ", 0.15
-    elseif role == "sys" then bg, col, prefix = T.PANEL, T.AMBT, "⚙  " end
-    local l = U.label(V.aiScroll, prefix .. text, 12, col, Enum.Font.Gotham, {
-        Size = UDim2.new(1, -6, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = bt, BackgroundColor3 = bg,
-        TextYAlignment = Enum.TextYAlignment.Top, LayoutOrder = V.aiOrder,
-    })
-    U.round(l, 12)
-    U.pad(l, 10, 7, 10, 7)
-    U.pop(l, 0)
-    V.aiBubbles[#V.aiBubbles + 1] = l
-    if #V.aiBubbles > 50 then local old = table.remove(V.aiBubbles, 1) if old then old:Destroy() end end
-    return l
-end
-function V.command(text)
-    local cmd, arg = text:match("^/(%a+)%s*(.-)%s*$")
-    cmd = (cmd or ""):lower()
-    local argRaw = (arg or ""):lower()
-    arg = argRaw:gsub("[^%a]", "")
-    if cmd == "add" and #arg >= 2 then
-        S.custom[arg] = { cat = "profanity", sev = 3 }
-        D.add(arg, "profanity", 3, nil, false)
-        S.whitelist[arg] = nil
-        N.save()
-        V.addBubble("sys", "Added '" .. arg .. "' to the bad-word list.")
-    elseif cmd == "white" and #arg >= 2 then
-        S.whitelist[arg], S.custom[arg], S.learned[arg], D.remote[arg] = true, nil, nil, nil
-        N.save()
-        V.addBubble("sys", "'" .. arg .. "' is now ignored (whitelisted).")
-    elseif cmd == "alert" and #argRaw >= 2 then
-        S.alertWords[argRaw] = true
-        N.save()
-        V.addBubble("sys", "You'll be alerted when someone says '" .. argRaw .. "'.")
-    elseif cmd == "stats" then
-        local names = {}
-        for _, p in ipairs(A.providers()) do names[#names + 1] = p.name end
-        V.addBubble("sys", "Scanned " .. S.scanned .. " | Flagged " .. S.flagged .. " | Offenders " .. U.count(S.strikes) .. " | Tags " .. S.tags
-            .. " | Dupes merged " .. S.dupSuppressed .. " | Quarantined " .. S.quarCount
-            .. " | Learned " .. U.count(S.learned) .. " | Lists " .. D.rstat.words .. "w/" .. D.rstat.phrases .. "p (" .. D.rstat.status .. ")"
-            .. " | AI: " .. (#names > 0 and table.concat(names, ">") or "none") .. " | last " .. S.aiLast)
-    elseif cmd == "refresh" then
-        V.addBubble("sys", "Re-downloading internet lists…")
-        task.spawn(function()
-            D.remote, D.rphr = {}, {}
-            pcall(N.loadRemote, true)
-            if S.alive then V.addBubble("sys", "Lists: " .. D.rstat.words .. " words / " .. D.rstat.phrases .. " phrases (" .. D.rstat.status .. ")") end
-        end)
-    elseif cmd == "reset" then
-        S.strikes, S.chatLog = {}, {}
-        S.flagged, S.tags, S.lastFlagged = 0, 0, nil
-        H.refreshAll()
-        V.status()
-        V.addBubble("sys", "Strikes and logs cleared.")
-    else
-        V.addBubble("sys", "Commands: /add <word> • /white <word> • /alert <word or phrase> • /stats • /refresh • /reset")
-    end
-end
-function V.buildAI()
-    local page = V.pages.AI
-    V.aiScroll = U.scroll(page, UDim2.new(), UDim2.new(1, 0, 1, -100))
-    V.aiFollow = {}
-    U.follow(V.aiScroll, V.aiFollow, true)
-    V.aiOrder, V.aiBubbles = 0, {}
-    local chipRow = U.new("Frame", { Position = UDim2.new(0, 0, 1, -96), Size = UDim2.new(1, -6, 0, 26), BackgroundTransparency = 1 }, page)
-    for i, c in ipairs({ { "📊 Stats", "/stats" }, { "🔄 Lists", "/refresh" }, { "🧹 Reset", "/reset" }, { "ℹ Help", "/help" } }) do
-        U.button(chipRow, c[1], T.PANEL, UDim2.new(0.25, -4, 1, 0), UDim2.new((i - 1) / 4, 2, 0, 0), function() V.command(c[2]) end, 10)
-    end
-    local analyze = U.button(page, "🤖 Analyze last flagged message", T.NEOND, UDim2.new(1, -6, 0, 28), UDim2.new(0, 0, 1, -66), nil, 11)
-    local input = U.textbox(page, "Ask AI or type /help", UDim2.new(0, 0, 1, -34), UDim2.new(1, -70, 0, 32))
-    input.TextSize = 12
-    local send = U.button(page, "Send", T.NEON, UDim2.new(0, 62, 0, 32), UDim2.new(1, -64, 1, -34), nil, 12)
-    send.TextColor3 = T.BG
-    V.addBubble("sys", "Free AI ready. Live chat is auto-checked in the Live tab. Use the chips below or type /help.")
-
-    local convo, busy = {}, false
-    local function sendChat(override, shown)
-        if busy or not S.alive then return end
-        local text = override or (input.Text or ""):match("^%s*(.-)%s*$")
-        if not text or text == "" then return end
-        if not override then
-            input.Text = ""
-            if text:sub(1, 1) == "/" then V.command(text) return end
-        end
-        V.addBubble("user", shown or text)
-        table.insert(convo, { role = "user", content = text })
-        busy = true
-        U.setBtn(send, "…")
-        local thinking = V.addBubble("ai", "thinking")
-        local running = true
-        U.anim(function(t)
-            if not running or not thinking.Parent then return true end
-            thinking.Text = "AI  thinking" .. string.rep(".", math.floor(t * 3) % 4)
-        end)
-        task.spawn(function()
-            local msgs = { { role = "system", content = "You are a concise assistant inside a Roblox moderation tool that helps keep chats safe and kind. Keep answers short." } }
-            for i = math.max(1, #convo - 9), #convo do msgs[#msgs + 1] = convo[i] end
-            local reply, prov, err = A.call(msgs, 300)
-            running = false
-            if reply then
-                table.insert(convo, { role = "assistant", content = reply })
-                S.aiLast = prov or S.aiLast
-                reply = reply .. "\n(" .. tostring(prov) .. ")"
-            else
-                reply = "Error: " .. tostring(err)
-            end
-            if S.alive then
-                if thinking and thinking.Parent then thinking.Text = "AI  " .. reply else V.addBubble("ai", reply) end
-                U.setBtn(send, "Send")
-                V.status()
-            end
-            busy = false
-        end)
-    end
-    send.Activated:Connect(function() sendChat() end)
-    input.FocusLost:Connect(function(enter) if enter then sendChat() end end)
-    analyze.Activated:Connect(function()
-        local m = S.lastFlagged
-        if not m then V.addBubble("sys", "No flagged message yet.") return end
-        sendChat("Moderation review. Is this Roblox chat message a violation of Roblox Community Standards? Player: " .. m.name .. ". Message: \""
-            .. m.msg:sub(1, 200) .. "\". Auto-detected: " .. table.concat(m.cats, ", ") .. " (severity " .. m.sev
-            .. "/5). Reply briefly: verdict, whether it could be a false positive, and best report category.", "Analyze: " .. m.name .. ": " .. m.msg:sub(1, 60))
-    end)
-end
-
--- ---------- Setup tab ----------
-function V.buildSetup()
-    local sf = U.scroll(V.pages.Setup, UDim2.new(), UDim2.new(1, 0, 1, 0))
-    V.ctl = {}
-    local o = 0
-    local function nx() o += 1 return o end
-    local function rebuildSoon(d)
-        task.delay(d or 0.4, function() if S.alive then V.rebuild("Setup") end end)
-    end
-
-    U.section(sf, "Look & feel", nx())
-    U.swatchRow(sf, "🎨 Theme", V.THEMEORDER, S.theme, function(nm)
-        if nm == S.theme then return end
-        V.applyTheme(nm)
-        N.save()
-        rebuildSoon(0.45)
-    end, nx())
-    U.segRow(sf, "🪟 Glass", { "Solid", "Glass", "Ultra" }, S.glass, function(v)
-        U.applyGlass(v)
-        N.save()
-        rebuildSoon(0.35)
-    end, nx())
-    U.segRow(sf, "🔠 UI size", { "S", "M", "L" }, S.scale < 0.95 and "S" or (S.scale > 1.05 and "L" or "M"), function(v)
-        S.scale = (v == "S" and 0.85) or (v == "L" and 1.15) or 1
-        if V.scaleObj then U.tw(V.scaleObj, { Scale = S.scale }, 0.55, Enum.EasingStyle.Back) end
-        N.save()
-    end, nx())
-    U.segRow(sf, "⚡ Performance", { "Auto", "On", "Off" }, S.perf, function(v) S.perf = v N.save() end, nx())
-    U.toggle(sf, "📱 Compact cards (no avatars)", S.compact, function(v) S.compact = v N.save() rebuildSoon(0.3) end, nx())
-    U.toggle(sf, "🔊 Sound alerts", S.sound, function(v) S.sound = v N.save() if v then U.ping("flag") end end, nx())
-    U.toggle(sf, "🕶 Streamer mode (mask names)", S.streamer, function(v)
-        S.streamer = v
-        N.save()
-        U.toast(v and "🕶 Names masked — rebuilding lists" or "Names visible", T.NEON)
-        rebuildSoon(0.3)
-    end, nx())
-
-    U.section(sf, "Reports", nx())
-    U.segRow(sf, "📏 Report length", { "500", "800", "1000" }, tostring(CFG.reportMax <= 500 and 500 or (CFG.reportMax <= 800 and 800 or 1000)), function(v)
-        CFG.reportMax = tonumber(v) or 1000
-        N.save()
-        U.toast("📏 Reports capped at " .. CFG.reportMax .. " chars", T.NEON)
-    end, nx())
-
-    U.section(sf, "Quick preset", nx())
-    U.segRow(sf, "⚙ Mode", { "Relaxed", "Balanced", "Strict", "Paranoid" }, "Balanced", H.preset, nx())
-
-    U.section(sf, "Protection", nx())
-    U.toggle(sf, "🛡 Self-Guard (block my abuse)", S.guard, function(v) S.guard = v N.save() U.toast("Self-Guard " .. (v and "ON" or "OFF"), T.NEON) end, nx())
-    V.ctl.shield = U.toggle(sf, "🙈 Shield: hide abuse in my chat", S.shield, function(v)
-        S.shield = v
-        N.save()
-        U.toast(H.shieldSet and ("Shield " .. (v and "ON" or "OFF")) or "Shield needs the new Roblox chat (not available here)", H.shieldSet and T.NEON or T.AMBER)
-    end, nx())
-    V.ctl.shieldSeg = U.segRow(sf, "🙈 Shield level", { "2+", "3+", "4+" }, S.shieldLevel .. "+", function(v) S.shieldLevel = tonumber(v:sub(1, 1)) or 3 N.save() end, nx())
-    U.toggle(sf, "🧹 Hide spammers in my chat", S.hideSpam, function(v)
-        S.hideSpam = v
-        N.save()
-        U.toast(H.shieldSet and ("Spam hider " .. (v and "ON" or "OFF")) or "Needs the new Roblox chat (not available here)", H.shieldSet and T.NEON or T.AMBER)
-    end, nx())
-    U.toggle(sf, "🧊 Auto-calm during storms", S.autoCalm, function(v) S.autoCalm = v N.save() end, nx())
-    U.toggle(sf, "🤐 Auto-quarantine spammers (60s)", CFG.autoQuar, function(v) CFG.autoQuar = v N.save() end, nx())
-    U.segRow(sf, "🙈 Auto-hide at risk", { "Off", "60%", "80%" }, S.autoHide >= 80 and "80%" or (S.autoHide >= 60 and "60%" or "Off"), function(v)
-        S.autoHide = (v == "80%" and 80) or (v == "60%" and 60) or 0
-        N.save()
-        U.toast(S.autoHide > 0 and ("🙈 Players reaching " .. S.autoHide .. "% risk get hidden for 10 min") or "Auto-hide off", T.NEON)
-    end, nx())
-    U.segRow(sf, "🌪 Storm at msgs/5s", { "20", "30", "50" }, tostring(CFG.stormMsgs <= 20 and 20 or (CFG.stormMsgs >= 50 and 50 or 30)), function(v) CFG.stormMsgs = tonumber(v) or 30 N.save() end, nx())
-    V.ctl.friends = U.toggle(sf, "👥 Don't scan my friends", CFG.ignoreFriends, function(v) CFG.ignoreFriends = v N.save() end, nx())
-
-    U.section(sf, "Alerts", nx())
-    U.segRow(sf, "🔔 Pop-up alerts", { "Off", "Smart", "All" }, U.cap(S.notifyMode), function(v) S.notifyMode = v:upper() N.save() end, nx())
-    U.toggle(sf, "🔕 Do-Not-Disturb (quiet alerts)", S.dnd, function(v) S.dnd = v N.save() U.toast(v and "🔕 DND on — alerts only go to 🔔" or "🔔 Alerts on", T.NEON) end, nx())
-    U.toggle(sf, "💬 Notify when someone mentions me", S.mentions, function(v) S.mentions = v N.save() end, nx())
-    V.aiSegSetup = U.segRow(sf, "🤖 AI mode", { "Smart", "Strict", "Off" }, U.cap(S.aiMode), A.setMode, nx())
-    V.ctl.alertSeg = U.segRow(sf, "🚨 Alert at", { "2", "3", "5" }, tostring(CFG.strikeAlert), function(v) CFG.strikeAlert = tonumber(v) or 3 N.save() U.toast("Alert threshold: " .. v, T.NEON) end, nx())
-    U.toggle(sf, "💾 Save log file on close", S.autoSave, function(v) S.autoSave = v N.save() end, nx())
-
-    U.section(sf, "AI providers (auto-rotation)", nx())
-    V.provLabels, V.provDots = {}, {}
-    for _, name in ipairs({ "Groq", "Gemini", "OpenRouter", "Pollinations" }) do
-        local row = U.new("Frame", { Size = UDim2.new(1, -6, 0, 30), BackgroundColor3 = T.CARD, BorderSizePixel = 0, LayoutOrder = nx() }, sf)
-        U.round(row, 10)
-        local dot = U.new("Frame", { Size = UDim2.new(0, 8, 0, 8), Position = UDim2.new(0, 12, 0.5, -4), BackgroundColor3 = T.MUTED, BorderSizePixel = 0 }, row)
-        U.new("UICorner", { CornerRadius = UDim.new(1, 0) }, dot)
-        V.provDots[name] = dot
-        U.label(row, name, 12, T.TXT, Enum.Font.GothamMedium, { Position = UDim2.new(0, 28, 0, 0), Size = UDim2.new(0.5, 0, 1, 0), TextWrapped = false })
-        V.provLabels[name] = U.label(row, "", 11, T.MUTED, Enum.Font.Gotham, { Position = UDim2.new(0.4, 0, 0, 0), Size = UDim2.new(0.6, -12, 1, 0), TextXAlignment = Enum.TextXAlignment.Right, TextWrapped = false })
-        U.anim(function(t)
-            if not dot.Parent then return true end
-            if V.provReady and V.provReady[name] then dot.BackgroundTransparency = 0.45 - math.sin(t * 2.6 + #name) * 0.45
-            else dot.BackgroundTransparency = 0 end
-        end)
-    end
-    U.label(sf, "Free keys go in KEYS at the top (Groq is the fastest). Keyless Pollinations is always the fallback.", 10, T.MUTED, Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 28), LayoutOrder = nx() })
-
-    U.section(sf, "Internet lists", nx())
-    V.listsLabel = U.label(sf, "", 11, T.TXT, Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 28), LayoutOrder = nx() })
-    U.button(sf, "🔄 Re-download lists", T.CARD, UDim2.new(1, -6, 0, 32), nil, function()
-        U.toast("Downloading lists…", T.BLUE)
-        task.spawn(function()
-            D.remote, D.rphr = {}, {}
-            pcall(N.loadRemote, true)
-            if S.alive then U.toast("Lists: " .. D.rstat.words .. " words / " .. D.rstat.phrases .. " phrases", T.BLUE) end
-        end)
-    end, 11).LayoutOrder = nx()
-
-    U.section(sf, "Tools", nx())
-    U.button(sf, "🩺 Diagnostics (what works on my executor)", T.CARD, UDim2.new(1, -6, 0, 32), nil, function() V.openDiag() end, 11).LayoutOrder = nx()
-    U.button(sf, "📌 Pinned messages", T.CARD, UDim2.new(1, -6, 0, 32), nil, function() V.openPins() end, 11).LayoutOrder = nx()
-    U.button(sf, "👋 Show welcome guide", T.CARD, UDim2.new(1, -6, 0, 32), nil, function() V.openWelcome() end, 11).LayoutOrder = nx()
-
-    U.section(sf, "Data", nx())
-    U.button(sf, "📊 Copy session summary", T.CARD, UDim2.new(1, -6, 0, 32), nil, function() U.toast(U.copy(R.summary()) and "📊 Copied" or "⚠ No clipboard", T.NEON) end, 11).LayoutOrder = nx()
-    U.button(sf, "💾 Save full log to file", T.CARD, UDim2.new(1, -6, 0, 32), nil, function()
-        local ok, name = R.saveFile()
-        U.toast(ok and ("💾 Saved: " .. name) or "⚠ writefile not available", ok and T.NEON or T.AMBER)
-    end, 11).LayoutOrder = nx()
-    U.button(sf, "📤 Copy learned words (JSON)", T.CARD, UDim2.new(1, -6, 0, 32), nil, function()
-        U.toast(U.copy(HS:JSONEncode({ learned = S.learned, custom = S.custom, cphrases = S.cphrases, whitelist = S.whitelist })) and "📤 Copied" or "⚠ No clipboard", T.NEON)
-    end, 11).LayoutOrder = nx()
-    local impRow = U.new("Frame", { Size = UDim2.new(1, -6, 0, 32), BackgroundTransparency = 1, LayoutOrder = nx() }, sf)
-    local impBox = U.textbox(impRow, "paste exported JSON here", UDim2.new(), UDim2.new(1, -76, 1, 0))
-    U.button(impRow, "📥 Import", T.NEOND, UDim2.new(0, 70, 1, 0), UDim2.new(1, -70, 0, 0), function()
-        local ok, n = N.import(impBox.Text or "")
-        if ok then impBox.Text = "" end
-        U.toast(ok and ("📥 Imported " .. n .. " entries") or ("⚠ " .. tostring(n)), ok and T.NEON or T.AMBER)
-        if ok then V.refreshWords(false) end
-    end, 11)
-    U.button(sf, "🧠 Clear learned words", T.CARD, UDim2.new(1, -6, 0, 32), nil, function()
-        for tok in pairs(S.learned) do
-            if not D.builtin[D.c2(tok)] and not S.custom[tok] then D.exact[D.c2(tok)] = nil D.exact[D.c1(tok)] = nil end
-        end
-        S.learned = {}
-        N.save()
-        V.refreshWords(false)
-        U.toast("🧠 Learned words cleared", T.AMBER)
-    end, 11).LayoutOrder = nx()
-    U.button(sf, "🔁 Clear offender memory", T.CARD, UDim2.new(1, -6, 0, 32), nil, function() S.rep = {} N.save() V.refreshMemory(false) U.toast("🔁 Offender memory cleared", T.AMBER) end, 11).LayoutOrder = nx()
-    U.button(sf, "🔊 Clear ignore / watch / hidden", T.CARD, UDim2.new(1, -6, 0, 32), nil, function()
-        S.ignored, S.watch, S.hidden, S.hiddenUntil = {}, {}, {}, {}
-        N.save()
-        H.schedule()
-        U.toast("🔊 Lists cleared", T.AMBER)
-    end, 11).LayoutOrder = nx()
-    U.button(sf, "🧹 Reset strikes & logs", T.RED, UDim2.new(1, -6, 0, 32), nil, function()
-        S.strikes, S.chatLog, S.lastMsg, S.pstats = {}, {}, {}, {}
-        S.flagged, S.tags, S.lastFlagged = 0, 0, nil
-        H.refreshAll()
-        V.status()
-        U.toast("🧹 Strikes and logs cleared", T.AMBER)
-    end, 11).LayoutOrder = nx()
-    U.label(sf, "Nothing is ever copied automatically — the clipboard is only used when you tap a button. RightCtrl shows/hides the window · ◉ collapses to an orb · ✦ opens quick actions · 🔔 opens notifications. Report real violations only.", 10, T.MUTED, Enum.Font.Gotham, { Size = UDim2.new(1, -6, 0, 62), LayoutOrder = nx() })
-end
-function V.refreshProviders()
-    if not V.provLabels or not V.statusDot or not V.statusDot.Parent then return end
-    local enabled = { Groq = U.hasKey(KEYS.groq), Gemini = U.hasKey(KEYS.gemini), OpenRouter = U.hasKey(KEYS.openrouter), Pollinations = CFG.pollinations.enabled }
-    local now = os.clock()
-    local ready, cool = false, false
-    V.provReady = {}
-    for name, lbl in pairs(V.provLabels) do
-        local dot = V.provDots[name]
-        if not enabled[name] then
-            lbl.Text, lbl.TextColor3 = "○ off (no key)", T.MUTED
-            if dot then dot.BackgroundColor3 = T.MUTED end
-        elseif A.rate[name].coolUntil > now then
-            cool = true
-            lbl.Text, lbl.TextColor3 = "cooling " .. math.ceil(A.rate[name].coolUntil - now) .. "s", T.AMBER
-            if dot then dot.BackgroundColor3 = T.AMBER end
-        else
-            ready = true
-            V.provReady[name] = true
-            lbl.Text, lbl.TextColor3 = "ready", T.GREEN
-            if dot then dot.BackgroundColor3 = T.GREEN end
-        end
-    end
-    U.tw(V.statusDot, { BackgroundColor3 = ready and T.GREEN or (cool and T.AMBER or T.RED) }, 0.5)
-    if V.listsLabel and V.listsLabel.Parent then
-        V.listsLabel.Text = "🌐 " .. D.rstat.words .. " words · " .. D.rstat.phrases .. " phrases · " .. D.rstat.status
-    end
 end
 
 -- =====================================================================
@@ -2497,7 +1744,7 @@ task.spawn(function()
     pcall(N.loadRemote, false)
     if S.alive then
         V.refreshWords(false)
-        U.toast("🌐 Lists: " .. D.rstat.words .. " words / " .. D.rstat.phrases .. " phrases (" .. D.rstat.status .. ")", T.BLUE)
+        U.toast("🌐 Lists: " .. D.rstat.words .. " words / " .. D.rstat.phrases .. " phrases (" .. D.rstat.status .. ")", C.T.BLUE)
     end
 end)
 task.spawn(function()
@@ -2516,7 +1763,7 @@ task.spawn(function()
     end
 end)
 task.delay(1.4, function()
-    if S.alive then U.toast("🔮 v11 ready · reports ≤" .. CFG.reportMax .. " chars · no auto-copy", T.NEON) end
+    if S.alive then U.toast("🔮 v11 ready · reports ≤" .. C.CFG.reportMax .. " chars · no auto-copy", C.T.NEON) end
 end)
 task.delay(2.2, function()
     if S.alive and not S.welcomed then
