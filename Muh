@@ -115,19 +115,17 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- ✅ OFFICIAL ROBLOX CHAT VERIFIED BADGE FOR ASHU (9685785248)
+-- ✅ BULLETPROOF ROBLOX CHAT VERIFIED BADGE FOR ASHU
 -- ========================================================
 pcall(function()
-    local ROBLOX_VERIFIED_ICON = utf8.char(0xE000) -- Native Roblox Verified Badge Glyph
-
     if TextChatService then
         local prevCallback = TextChatService.OnIncomingMessage
         TextChatService.OnIncomingMessage = function(message)
             local props = (prevCallback and prevCallback(message)) or Instance.new("TextChatMessageProperties")
             if message and message.TextSource and message.TextSource.UserId == MODERATOR_USER_ID then
                 local basePrefix = (props.PrefixText and props.PrefixText ~= "") and props.PrefixText or message.PrefixText
-                if basePrefix and not basePrefix:find(ROBLOX_VERIFIED_ICON, 1, true) then
-                    props.PrefixText = ROBLOX_VERIFIED_ICON .. " " .. basePrefix
+                if basePrefix and not basePrefix:find("☑️", 1, true) then
+                    props.PrefixText = "☑️ " .. basePrefix
                 end
             end
             return props
@@ -408,7 +406,7 @@ local function setLagFreeMode(enable)
             for obj, origTrans in pairs(savedGraphics.decals) do
                 if lagFreeActive then break end
                 if obj and obj.Parent then
-                    pcall(function() obj.Transparency = origTrans end)
+                    obj.Transparency = origTrans
                 end
             end
         end)
@@ -1245,7 +1243,7 @@ Tab:CreateToggle({
                     statusBadge:Set(string.format("💤 ʀᴇꜱᴛɪɴɢ ꜰᴏʀ %.1f ꜱᴇᴄᴏɴᴅꜱ...", restTime))
                     if smartAntiMute and antiMuteStatusBadge then
                         local p = getServerPingMs()
-                        antiMuteStatusBadge:Set(string.format("🛡️ ᴩɪɴɢ: %dms  •  ʙᴜᴄᴋᴇᴛ ʀᴇꜰʀᴇꜱʜ: %.1fs (ɴᴏ ᴄʜᴀᴛ ᴅᴇʟᴀʏ)", p, restTime))
+                        antiMuteStatusBadge:Set(string.format("🛡️ ᴩɪɴɢ: %dms  •  ʙᴜᴄᴋᴇᴛ ʀᴇꜰʀᴇꜱʜ: %.1fs (ɴᴏ ᴄʜὰᴛ ᴅᴇʟᴀʏ)", p, restTime))
                     end
                     task.wait(restTime)
                     statusBadge:Set("🔥 ꜱᴩᴀᴍᴍɪɴɢ ᴀᴄᴛɪᴠᴇ & ʀᴜɴɴɪɴɢ...")
@@ -2177,7 +2175,7 @@ task.spawn(function()
             copyIdBtn.Text = "✓ ᴄᴏᴩɪᴇᴅ"
             copyIdBtn.TextColor3 = Color3.fromRGB(75, 240, 150)
             TXR_Lib:Notify({
-                Title = "ᴛxʀ_ᴀꜱʜᴜ  ✓",
+                Title = "TxR_AsHU  ✓",
                 Content = "Developer ID Copied: " .. tostring(DEV_USER_ID),
                 Duration = 2,
                 Image = 4483345998
@@ -2190,12 +2188,12 @@ task.spawn(function()
             end)
         end)
 
-        -- Unique Font Main Name (ᴛxʀ_ᴀꜱʜᴜ) + Auto-Snapped Verified Seal Right Next to Text
+        -- Real Main Account Name (TxR_AsHU) + Snugly Aligned Verified Seal
         local nameLbl = Instance.new("TextLabel", card)
         nameLbl.Size = UDim2.fromOffset(120, 22)
         nameLbl.Position = UDim2.new(0, 94, 0, 10)
         nameLbl.BackgroundTransparency = 1
-        nameLbl.Text = "ᴛxʀ_ᴀꜱʜᴜ"
+        nameLbl.Text = "TxR_AsHU"
         nameLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
         nameLbl.Font = Enum.Font.GothamBlack
         nameLbl.TextSize = 17
@@ -2204,13 +2202,13 @@ task.spawn(function()
         local verifiedSeal = Instance.new("Frame", card)
         verifiedSeal.Size = UDim2.fromOffset(15, 15)
         verifiedSeal.AnchorPoint = Vector2.new(0, 0.5)
-        verifiedSeal.Position = UDim2.new(0, 94 + math.max(66, nameLbl.TextBounds.X) + 5, 0, 21)
+        verifiedSeal.Position = UDim2.new(0, 94 + math.max(78, nameLbl.TextBounds.X) + 5, 0, 21)
         verifiedSeal.BackgroundColor3 = Color3.new(1, 1, 1)
         Instance.new("UICorner", verifiedSeal).CornerRadius = UDim.new(1, 0)
 
         nameLbl:GetPropertyChangedSignal("TextBounds"):Connect(function()
             if verifiedSeal and verifiedSeal.Parent then
-                verifiedSeal.Position = UDim2.new(0, 94 + math.max(66, nameLbl.TextBounds.X) + 5, 0, 21)
+                verifiedSeal.Position = UDim2.new(0, 94 + math.max(78, nameLbl.TextBounds.X) + 5, 0, 21)
             end
         end)
 
