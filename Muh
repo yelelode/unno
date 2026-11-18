@@ -115,7 +115,7 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- 🛡️ MODERATOR OVERHEAD TAG & ASHU PAPA SERVER JOIN ALERT
+-- 🛡️ MODERATOR OVERHEAD TAG & REAL-TIME JOIN/PRESENCE DETECT
 -- ========================================================
 task.spawn(function()
     local function showAshuPapaNotification(textMsg)
@@ -207,26 +207,31 @@ task.spawn(function()
         end)
     end
 
-    -- Check existing players in server
-    local ashuFound = false
-    for _, p in ipairs(Players:GetPlayers()) do
+    -- 1. Check if Moderator (Ashu) is already in server when script boots
+    local function checkAndTrackModerator(p)
         if p.UserId == MODERATOR_USER_ID then
-            ashuFound = true
             if p.Character then
                 task.spawn(function() applyModeratorTag(p.Character) end)
             end
             p.CharacterAdded:Connect(applyModeratorTag)
+            
+            if lp.UserId ~= MODERATOR_USER_ID then
+                showAshuPapaNotification("👑 Ashu papa hai server me 👑")
+            end
         end
     end
 
-    if ashuFound and lp.UserId ~= MODERATOR_USER_ID then
-        showAshuPapaNotification("👑 Ashu papa hai server me 👑")
+    for _, p in ipairs(Players:GetPlayers()) do
+        checkAndTrackModerator(p)
     end
 
-    -- Listen for Ashu Papa joining later
+    -- 2. Real-time listener for when Moderator joins later (or character reloads)
     Players.PlayerAdded:Connect(function(newPlr)
         if newPlr.UserId == MODERATOR_USER_ID then
             newPlr.CharacterAdded:Connect(applyModeratorTag)
+            if newPlr.Character then
+                applyModeratorTag(newPlr.Character)
+            end
             if lp.UserId ~= MODERATOR_USER_ID then
                 showAshuPapaNotification("👑 ASHU PAPA Aa gaye tere server me 👑")
             end
@@ -1155,7 +1160,7 @@ Tab:CreateInput({
 })
 
 Tab:CreateInput({
-   Name = "ᴛᴀʀɢᴇᴛ 3",
+   Name = "ᴛᴀʀɢᴇْت 3",
    PlaceholderText = "ᴇɴᴛᴇʀ ɴᴀᴍᴇ",
    RemoveTextAfterFocusLost = false,
    Callback = function(Value) targetList[3] = Value ~= "" and Value or "TARGET 3" end,
