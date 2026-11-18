@@ -270,7 +270,7 @@ end
 
 
 -- ========================================================
--- PART 2: 144HZ SILK UI ENGINE, SPRING PHYSICS & GLASS POLISH
+-- PART 2: HYPER-FLUID 144HZ SPRING PHYSICS ENGINE (BEYOND iOS PROMOTION)
 -- ========================================================
 local function getSafeGuiRoot()
     local root
@@ -297,6 +297,59 @@ end
 pcall(function() cleanOldUI(getSafeGuiRoot()) end)
 pcall(function() cleanOldUI(CoreGui) end)
 
+-- Central 144Hz Critically-Damped Spring Pool (Zero Tween Cut-off, True Physics Inertia)
+local activeSprings = {}
+
+local function setSpringTarget(instance, targetScale, stiffness, damping)
+    if not instance or not instance.Parent then return end
+    local uiScale = instance:FindFirstChildOfClass("UIScale")
+    if not uiScale then
+        uiScale = Instance.new("UIScale")
+        uiScale.Scale = 1
+        uiScale.Parent = instance
+    end
+
+    local entry = activeSprings[uiScale]
+    if not entry then
+        entry = {
+            scale = uiScale,
+            current = uiScale.Scale,
+            velocity = 0,
+            target = targetScale,
+            stiffness = stiffness or 380,
+            damping = damping or 26
+        }
+        activeSprings[uiScale] = entry
+    else
+        entry.target = targetScale
+        if stiffness then entry.stiffness = stiffness end
+        if damping then entry.damping = damping end
+    end
+end
+
+RunService.RenderStepped:Connect(function(dt)
+    local h = math.min(dt, 0.033)
+    for uiScale, s in pairs(activeSprings) do
+        if not uiScale or not uiScale.Parent then
+            activeSprings[uiScale] = nil
+        else
+            local displacement = s.current - s.target
+            local accel = (-s.stiffness * displacement) - (s.damping * s.velocity)
+            s.velocity = s.velocity + accel * h
+            s.current = s.current + s.velocity * h
+
+            if math.abs(displacement) < 0.0004 and math.abs(s.velocity) < 0.002 then
+                s.current = s.target
+                s.velocity = 0
+                uiScale.Scale = s.target
+                activeSprings[uiScale] = nil
+            else
+                uiScale.Scale = s.current
+            end
+        end
+    end
+end)
+
 local function isTopbarButton(obj)
     local curr = obj.Parent
     while curr do
@@ -319,7 +372,7 @@ local function isCustomDevCard(obj)
     return false
 end
 
--- 144Hz Tactile Spring Click + Hover Sheen Physics
+-- Sub-Pixel Spring Press + Magnetic Hover Physics
 local function attachSmoothClick(btn)
     if not btn or not btn:IsA("GuiButton") or btn:GetAttribute("TXR_ClickHooked") then
         return
@@ -335,72 +388,64 @@ local function attachSmoothClick(btn)
         targetObj = btn.Parent
     end
 
-    local uiScale = targetObj:FindFirstChildOfClass("UIScale")
-    if not uiScale then
-        uiScale = Instance.new("UIScale")
-        uiScale.Scale = 1
-        uiScale.Parent = targetObj
-    end
-
-    local pressTween = TweenInfo.new(0.075, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    local releaseTween = TweenInfo.new(0.42, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    local hoverInTween = TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    local hoverOutTween = TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local isHovered = false
+    local isPressed = false
 
     btn.MouseEnter:Connect(function()
-        TweenService:Create(uiScale, hoverInTween, {Scale = 1.012}):Play()
+        isHovered = true
+        if not isPressed then
+            setSpringTarget(targetObj, 1.015, 340, 24)
+        end
     end)
 
     btn.MouseLeave:Connect(function()
-        TweenService:Create(uiScale, hoverOutTween, {Scale = 1}):Play()
+        isHovered = false
+        if not isPressed then
+            setSpringTarget(targetObj, 1.0, 320, 24)
+        end
     end)
 
     btn.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            TweenService:Create(uiScale, pressTween, {Scale = 0.968}):Play()
+            isPressed = true
+            setSpringTarget(targetObj, 0.962, 520, 30)
         end
     end)
 
     btn.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            TweenService:Create(uiScale, releaseTween, {Scale = 1}):Play()
+            isPressed = false
+            setSpringTarget(targetObj, isHovered and 1.015 or 1.0, 420, 22)
         end
     end)
 end
 
--- Smooth Tab Switch & Waterfall Entrance Animation
+-- Hyper-Fluid Tab Page Switch + Elastic Waterfall Stagger
 local function hookSmoothTabPage(scrollFrame)
     if not scrollFrame or not scrollFrame:IsA("ScrollingFrame") or scrollFrame:GetAttribute("TXR_PageSmooth") then
         return
     end
     scrollFrame:SetAttribute("TXR_PageSmooth", true)
     scrollFrame.ScrollBarThickness = 2
-    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 225, 255)
-    scrollFrame.ScrollBarImageTransparency = 0.45
-
-    local pageScale = scrollFrame:FindFirstChildOfClass("UIScale") or Instance.new("UIScale", scrollFrame)
-    pageScale.Scale = 1
+    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 235, 255)
+    scrollFrame.ScrollBarImageTransparency = 0.35
 
     scrollFrame:GetPropertyChangedSignal("Visible"):Connect(function()
         if scrollFrame.Visible then
-            pageScale.Scale = 0.975
-            TweenService:Create(pageScale, TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                Scale = 1
-            }):Play()
+            local pScale = scrollFrame:FindFirstChildOfClass("UIScale") or Instance.new("UIScale", scrollFrame)
+            pScale.Scale = 0.972
+            setSpringTarget(scrollFrame, 1.0, 360, 25)
 
-            -- Staggered card entrance glide
             local visibleIdx = 0
             for _, child in ipairs(scrollFrame:GetChildren()) do
                 if child:IsA("Frame") and child.Visible and not child:GetAttribute("TXR_CustomCard") then
                     visibleIdx += 1
-                    if visibleIdx <= 10 then
+                    if visibleIdx <= 12 then
                         local cScale = child:FindFirstChildOfClass("UIScale") or Instance.new("UIScale", child)
-                        cScale.Scale = 0.96
-                        task.delay((visibleIdx - 1) * 0.022, function()
-                            if child and child.Parent and cScale then
-                                TweenService:Create(cScale, TweenInfo.new(0.30, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                                    Scale = 1
-                                }):Play()
+                        cScale.Scale = 0.955
+                        task.delay((visibleIdx - 1) * 0.018, function()
+                            if child and child.Parent then
+                                setSpringTarget(child, 1.0, 410, 23)
                             end
                         end)
                     end
@@ -410,22 +455,19 @@ local function hookSmoothTabPage(scrollFrame)
     end)
 end
 
--- Fluid Spring Animation for Toggle Switches & Slider Bars
+-- Silky Spring Toggle Knob + Interactive Pill Glow
 local function hookFluidControls(obj)
     if not obj or not obj:IsA("Frame") or obj:GetAttribute("TXR_FluidHooked") then
         return
     end
-    -- Detect Rayfield Toggle Switch Pill (approx 40-46px wide, 20-24px tall)
     if obj.Size.X.Offset >= 38 and obj.Size.X.Offset <= 48 and obj.Size.Y.Offset >= 18 and obj.Size.Y.Offset <= 26 then
         local knob = obj:FindFirstChildWhichIsA("Frame")
         if knob and knob.Size.X.Offset >= 12 and knob.Size.X.Offset <= 22 then
             obj:SetAttribute("TXR_FluidHooked", true)
-            local knobScale = knob:FindFirstChildOfClass("UIScale") or Instance.new("UIScale", knob)
             knob:GetPropertyChangedSignal("Position"):Connect(function()
-                knobScale.Scale = 0.85
-                TweenService:Create(knobScale, TweenInfo.new(0.34, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                    Scale = 1
-                }):Play()
+                local kScale = knob:FindFirstChildOfClass("UIScale") or Instance.new("UIScale", knob)
+                kScale.Scale = 0.80
+                setSpringTarget(knob, 1.0, 480, 21)
             end)
         end
     end
@@ -469,7 +511,7 @@ local function enforceModeListOrder(lbl)
     end
 end
 
--- Instant Smoked Glass + Smooth Animations
+-- Instant Smoked Glass + 144Hz Spring Engine
 local function applyGlassyStyle(obj)
     if not obj or not obj.Parent then return end
 
@@ -531,14 +573,12 @@ local function applyGlassyStyle(obj)
             obj.BackgroundColor3 = Color3.fromRGB(14, 16, 22)
             obj.BackgroundTransparency = 0.40
 
-            -- Smooth Silk Window Entrance Pop-In
+            -- 144Hz Critically-Damped Spring Window Entrance
             if not obj:GetAttribute("TXR_MainAnimated") then
                 obj:SetAttribute("TXR_MainAnimated", true)
                 local mainScale = obj:FindFirstChildOfClass("UIScale") or Instance.new("UIScale", obj)
-                mainScale.Scale = 0.93
-                TweenService:Create(mainScale, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                    Scale = 1
-                }):Play()
+                mainScale.Scale = 0.91
+                setSpringTarget(obj, 1.0, 320, 23)
             end
 
             local grad = obj:FindFirstChild("TXR_AcrylicMain") or Instance.new("UIGradient", obj)
@@ -1904,7 +1944,7 @@ task.spawn(function()
             scannerLine.Position = UDim2.fromScale(scanX, 0)
             scannerLine.BackgroundColor3 = lerpedDot
 
-            local lerpAlpha = 1 - math.exp(-safeDt * 14)
+            local lerpAlpha = 1 - math.exp(-safeDt * 18)
             for i = 1, candleCount do
                 local c = candles[i]
                 c.wick.Position = c.wick.Position:Lerp(UDim2.new(0.5, 0, c.tWickY, 0), lerpAlpha)
@@ -2298,21 +2338,18 @@ task.spawn(function()
         copyBtn.AutoButtonColor = false
         Instance.new("UICorner", copyBtn).CornerRadius = UDim.new(0, 9)
 
-        local copyBtnScale = Instance.new("UIScale", copyBtn)
-        copyBtnScale.Scale = 1
-
         local copying = false
         copyBtn.MouseButton1Click:Connect(function()
             if copying then return end
             copying = true
             pcall(function() copyClip(DISCORD_LINK) end)
 
-            TweenService:Create(copyBtnScale, TweenInfo.new(0.1), {Scale = 0.9}):Play()
-            task.delay(0.1, function()
-                TweenService:Create(copyBtnScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+            setSpringTarget(copyBtn, 0.88, 520, 24)
+            task.delay(0.08, function()
+                setSpringTarget(copyBtn, 1.0, 400, 20)
             end)
 
-            TweenService:Create(copyBtn, TweenInfo.new(0.25), {
+            TweenService:Create(copyBtn, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                 BackgroundColor3 = Color3.fromRGB(35, 195, 105)
             }):Play()
             copyBtn.Text = "✓ ᴄᴏᴩɪᴇᴅ"
@@ -2326,7 +2363,7 @@ task.spawn(function()
 
             task.delay(1.8, function()
                 if copyBtn and copyBtn.Parent then
-                    TweenService:Create(copyBtn, TweenInfo.new(0.3), {
+                    TweenService:Create(copyBtn, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                         BackgroundColor3 = Color3.fromRGB(88, 101, 242)
                     }):Play()
                     copyBtn.Text = "ᴄᴏᴩʏ ɪɴᴠɪᴛᴇ"
