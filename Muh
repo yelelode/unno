@@ -934,7 +934,6 @@ local function updateFallbackMonitor(stateText)
     end)
 end
 
--- Live Order-Book Feed Updater Hook (declared early for packet logging)
 local pushOrderBookPacket = nil
 
 local function buildFinalMsg()
@@ -1244,10 +1243,9 @@ end)
 
 
 -- ========================================================
--- TAB 4: COINBASE ADVANCED PRO-EXCHANGE LIVE TERMINAL
+-- TAB 4: 144HZ ULTRA-SMOOTH COINBASE PRO LIVE TERMINAL
 -- ========================================================
 local terminalPlaceholder = LiveTab:CreateLabel("TXR_COINBASE_PRO_TERMINAL")
-local sessionStartTime = tick()
 
 task.spawn(function()
     task.wait(0.4)
@@ -1273,8 +1271,8 @@ task.spawn(function()
             if termLabel.Visible then termLabel.Visible = false end
         end)
 
-        -- Deep Obsidian Coinbase Advanced Exchange Card (320px tall)
-        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 326)
+        -- Deep Obsidian Coinbase Advanced Exchange Card (330px tall)
+        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 330)
         card.BackgroundColor3 = Color3.fromRGB(10, 12, 16)
         card.BackgroundTransparency = 0.08
         card.ClipsDescendants = true
@@ -1288,14 +1286,14 @@ task.spawn(function()
         Instance.new("UICorner", card).CornerRadius = UDim.new(0, 12)
 
         local tStroke = Instance.new("UIStroke", card)
-        tStroke.Thickness = 1.2
+        tStroke.Thickness = 1.25
         tStroke.Color = Color3.new(1, 1, 1)
-        tStroke.Transparency = 0.55
+        tStroke.Transparency = 0.50
 
         local tStrokeGrad = Instance.new("UIGradient", tStroke)
         tStrokeGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 200, 118)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 102, 255)),
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 225, 135)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 110, 255)),
             ColorSequenceKeypoint.new(1, Color3.fromRGB(246, 70, 93))
         })
 
@@ -1304,7 +1302,7 @@ task.spawn(function()
         topBar.Size = UDim2.new(1, -20, 0, 34)
         topBar.Position = UDim2.new(0, 10, 0, 8)
         topBar.BackgroundColor3 = Color3.fromRGB(15, 18, 25)
-        topBar.BackgroundTransparency = 0.25
+        topBar.BackgroundTransparency = 0.20
         Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 8)
 
         local cbBadge = Instance.new("Frame", topBar)
@@ -1376,7 +1374,7 @@ task.spawn(function()
         ohlcLine.TextSize = 9.5
         ohlcLine.TextXAlignment = Enum.TextXAlignment.Left
 
-        -- 3. INTERACTIVE INTERVAL PILL BAR (Candle | 1s | 5s | Depth)
+        -- 3. INTERACTIVE INTERVAL PILL BAR + ULTRA-SMOOTH PULSING RADAR DOT
         local pillRow = Instance.new("Frame", card)
         pillRow.Size = UDim2.new(1, -24, 0, 22)
         pillRow.Position = UDim2.new(0, 12, 0, 90)
@@ -1408,20 +1406,56 @@ task.spawn(function()
             end)
         end
 
-        local enginePill = Instance.new("TextLabel", pillRow)
-        enginePill.Size = UDim2.fromOffset(92, 20)
-        enginePill.AnchorPoint = Vector2.new(1, 0.5)
-        enginePill.Position = UDim2.new(1, 0, 0.5, 0)
-        enginePill.BackgroundColor3 = Color3.fromRGB(14, 34, 26)
-        enginePill.Text = "● STANDBY"
-        enginePill.TextColor3 = Color3.fromRGB(0, 210, 255)
-        enginePill.Font = Enum.Font.GothamBlack
-        enginePill.TextSize = 9
-        Instance.new("UICorner", enginePill).CornerRadius = UDim.new(1, 0)
+        -- Ultra-Smooth Breathing & Radar-Halo Status Pill (Like RGB Status Dot)
+        local enginePillFrame = Instance.new("Frame", pillRow)
+        enginePillFrame.Size = UDim2.fromOffset(102, 20)
+        enginePillFrame.AnchorPoint = Vector2.new(1, 0.5)
+        enginePillFrame.Position = UDim2.new(1, 0, 0.5, 0)
+        enginePillFrame.BackgroundColor3 = Color3.fromRGB(14, 26, 38)
+        Instance.new("UICorner", enginePillFrame).CornerRadius = UDim.new(1, 0)
+
+        local enginePillStroke = Instance.new("UIStroke", enginePillFrame)
+        enginePillStroke.Thickness = 1
+        enginePillStroke.Color = Color3.fromRGB(0, 210, 255)
+        enginePillStroke.Transparency = 0.55
+
+        local dotAnchor = Instance.new("Frame", enginePillFrame)
+        dotAnchor.Size = UDim2.fromOffset(12, 12)
+        dotAnchor.AnchorPoint = Vector2.new(0, 0.5)
+        dotAnchor.Position = UDim2.new(0, 7, 0.5, 0)
+        dotAnchor.BackgroundTransparency = 1
+
+        local dotHalo = Instance.new("Frame", dotAnchor)
+        dotHalo.Size = UDim2.fromOffset(6, 6)
+        dotHalo.AnchorPoint = Vector2.new(0.5, 0.5)
+        dotHalo.Position = UDim2.fromScale(0.5, 0.5)
+        dotHalo.BackgroundColor3 = Color3.fromRGB(0, 210, 255)
+        dotHalo.BackgroundTransparency = 0.25
+        dotHalo.BorderSizePixel = 0
+        Instance.new("UICorner", dotHalo).CornerRadius = UDim.new(1, 0)
+
+        local dotCore = Instance.new("Frame", dotAnchor)
+        dotCore.Size = UDim2.fromOffset(6, 6)
+        dotCore.AnchorPoint = Vector2.new(0.5, 0.5)
+        dotCore.Position = UDim2.fromScale(0.5, 0.5)
+        dotCore.BackgroundColor3 = Color3.fromRGB(0, 235, 255)
+        dotCore.BorderSizePixel = 0
+        dotCore.ZIndex = 3
+        Instance.new("UICorner", dotCore).CornerRadius = UDim.new(1, 0)
+
+        local engineStatusLabel = Instance.new("TextLabel", enginePillFrame)
+        engineStatusLabel.Size = UDim2.new(1, -22, 1, 0)
+        engineStatusLabel.Position = UDim2.new(0, 20, 0, 0)
+        engineStatusLabel.BackgroundTransparency = 1
+        engineStatusLabel.Text = "STANDBY"
+        engineStatusLabel.TextColor3 = Color3.fromRGB(0, 225, 255)
+        engineStatusLabel.Font = Enum.Font.GothamBlack
+        engineStatusLabel.TextSize = 9
+        engineStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
 
         -- 4. JAPANESE CANDLESTICK CHART CANVAS + RIGHT PRICE SCALE
         local chartCanvas = Instance.new("Frame", card)
-        chartCanvas.Size = UDim2.new(1, -24, 0, 124)
+        chartCanvas.Size = UDim2.new(1, -24, 0, 126)
         chartCanvas.Position = UDim2.new(0, 12, 0, 118)
         chartCanvas.BackgroundColor3 = Color3.fromRGB(12, 15, 21)
         chartCanvas.ClipsDescendants = true
@@ -1430,6 +1464,15 @@ task.spawn(function()
         local cStroke = Instance.new("UIStroke", chartCanvas)
         cStroke.Thickness = 1
         cStroke.Color = Color3.fromRGB(32, 39, 52)
+
+        -- Subtle 144Hz Radar Scanner Line Gliding Across Chart
+        local scannerLine = Instance.new("Frame", chartCanvas)
+        scannerLine.Size = UDim2.new(0, 2, 1, 0)
+        scannerLine.Position = UDim2.fromScale(0, 0)
+        scannerLine.BackgroundColor3 = Color3.fromRGB(0, 225, 255)
+        scannerLine.BackgroundTransparency = 0.78
+        scannerLine.BorderSizePixel = 0
+        scannerLine.ZIndex = 4
 
         -- Horizontal Exchange Gridlines + Right Price Labels
         local priceAxisLabels = {}
@@ -1454,7 +1497,16 @@ task.spawn(function()
             priceAxisLabels[g] = axisLbl
         end
 
-        -- Live Price Tag Pill on Right Axis (Red/Green Coinbase Ticker Tag)
+        -- Dotted Horizontal Current-Price Guide Line
+        local currentPriceLine = Instance.new("Frame", chartCanvas)
+        currentPriceLine.Size = UDim2.new(1, -44, 0, 1)
+        currentPriceLine.Position = UDim2.new(0, 4, 0.5, 0)
+        currentPriceLine.BackgroundColor3 = Color3.fromRGB(0, 200, 118)
+        currentPriceLine.BackgroundTransparency = 0.55
+        currentPriceLine.BorderSizePixel = 0
+        currentPriceLine.ZIndex = 5
+
+        -- Live Price Tag Pill on Right Axis (Smoothly Gliding)
         local liveTagPill = Instance.new("Frame", chartCanvas)
         liveTagPill.Size = UDim2.fromOffset(42, 15)
         liveTagPill.AnchorPoint = Vector2.new(1, 0.5)
@@ -1472,7 +1524,7 @@ task.spawn(function()
         liveTagTxt.TextSize = 8.5
         liveTagTxt.ZIndex = 7
 
-        -- Candle Holders (22 Japanese Candlesticks with Wick + Body)
+        -- Candle Holders (22 Japanese Candlesticks with Smoothly Interpolated Targets)
         local candleArea = Instance.new("Frame", chartCanvas)
         candleArea.Size = UDim2.new(1, -50, 1, -12)
         candleArea.Position = UDim2.new(0, 6, 0, 6)
@@ -1502,14 +1554,20 @@ task.spawn(function()
             body.BorderSizePixel = 0
             Instance.new("UICorner", body).CornerRadius = UDim.new(0, 1)
 
-            candles[i] = {wick = wick, body = body}
+            candles[i] = {
+                wick = wick,
+                body = body,
+                tWickY = 0.3, tWickH = 0.4,
+                tBodyY = 0.4, tBodyH = 0.2,
+                tCol = Color3.fromRGB(0, 200, 118)
+            }
             candleHistory[i] = {o = 60, h = 64, l = 56, c = 62}
         end
 
-        -- 5. BOTTOM LIVE ORDER-BOOK / PACKET TAPE (Green & Red Exchange Rows)
+        -- 5. BOTTOM LIVE ORDER-BOOK / PACKET TAPE
         local orderBookBox = Instance.new("Frame", card)
         orderBookBox.Size = UDim2.new(1, -24, 0, 72)
-        orderBookBox.Position = UDim2.new(0, 12, 0, 248)
+        orderBookBox.Position = UDim2.new(0, 12, 0, 250)
         orderBookBox.BackgroundColor3 = Color3.fromRGB(13, 16, 23)
         Instance.new("UICorner", orderBookBox).CornerRadius = UDim.new(0, 8)
 
@@ -1590,21 +1648,74 @@ task.spawn(function()
             end)
         end
 
-        -- FPS + Candlestick Renderer Loop
+        -- 144Hz Ultra-Smooth Animation & Interpolation Loop
         local currentFps = 60
+        local displayFps = 60
         local frameCounter = 0
         local lastFpsTick = tick()
-        local animRot = 0
+        local animClock = 0
+        local targetTagY = 0.5
+        local currentTagY = 0.5
+        local targetTagCol = Color3.fromRGB(0, 200, 118)
 
         RunService.RenderStepped:Connect(function(dt)
+            if not card or not card.Parent then return end
+            local safeDt = math.min(dt, 0.05)
+            animClock += safeDt
             frameCounter += 1
-            animRot = (animRot + dt * 55) % 360
+
+            -- Smooth rotating border gradient
             if tStrokeGrad and tStrokeGrad.Parent then
-                tStrokeGrad.Rotation = animRot
+                tStrokeGrad.Rotation = (animClock * 55) % 360
             end
 
+            -- Smooth Radar Dot Pulse & Glow (Like RGB Status Dot)
+            local pulseSpeed = running and 3.4 or 1.8
+            local wave = (math.sin(animClock * pulseSpeed) + 1) / 2
+            local smoothWave = wave * wave * (3 - 2 * wave)
+            local haloCycle = (animClock * (running and 1.35 or 0.75)) % 1
+            local haloEase = 1 - math.pow(1 - haloCycle, 3)
+
+            local baseDotCol = running and Color3.fromRGB(0, 230, 140) or Color3.fromRGB(0, 210, 255)
+            local brightDotCol = running and Color3.fromRGB(140, 255, 205) or Color3.fromRGB(160, 245, 255)
+            local lerpedDot = baseDotCol:Lerp(brightDotCol, smoothWave)
+
+            dotCore.BackgroundColor3 = lerpedDot
+            dotCore.Size = UDim2.fromOffset(5.5 + smoothWave * 1.8, 5.5 + smoothWave * 1.8)
+            dotHalo.BackgroundColor3 = lerpedDot
+            dotHalo.Size = UDim2.fromOffset(6 + haloEase * 11, 6 + haloEase * 11)
+            dotHalo.BackgroundTransparency = 0.30 + (haloEase * 0.70)
+            enginePillStroke.Color = lerpedDot
+            enginePillStroke.Transparency = 0.35 + ((1 - smoothWave) * 0.45)
+
+            -- Smooth Gliding Radar Scanner Line across Chart
+            local scanX = ((animClock * 0.22) % 1) * 0.88
+            scannerLine.Position = UDim2.fromScale(scanX, 0)
+            scannerLine.BackgroundColor3 = lerpedDot
+
+            -- 144Hz Frame-Blend Interpolation for Candlesticks & Live Axis Tag
+            local lerpAlpha = 1 - math.exp(-safeDt * 14)
+            for i = 1, candleCount do
+                local c = candles[i]
+                c.wick.Position = c.wick.Position:Lerp(UDim2.new(0.5, 0, c.tWickY, 0), lerpAlpha)
+                c.wick.Size = c.wick.Size:Lerp(UDim2.new(0, 1.5, c.tWickH, 0), lerpAlpha)
+                c.wick.BackgroundColor3 = c.wick.BackgroundColor3:Lerp(c.tCol, lerpAlpha)
+
+                c.body.Position = c.body.Position:Lerp(UDim2.new(0.5, 0, c.tBodyY, 0), lerpAlpha)
+                c.body.Size = c.body.Size:Lerp(UDim2.new(0.68, 0, c.tBodyH, 0), lerpAlpha)
+                c.body.BackgroundColor3 = c.body.BackgroundColor3:Lerp(c.tCol, lerpAlpha)
+            end
+
+            currentTagY = currentTagY + (targetTagY - currentTagY) * lerpAlpha
+            liveTagPill.Position = UDim2.new(1, -2, currentTagY, 0)
+            liveTagPill.BackgroundColor3 = liveTagPill.BackgroundColor3:Lerp(targetTagCol, lerpAlpha)
+            currentPriceLine.Position = UDim2.new(0, 4, currentTagY, 0)
+            currentPriceLine.BackgroundColor3 = currentPriceLine.BackgroundColor3:Lerp(targetTagCol, lerpAlpha)
+
+            displayFps = displayFps + (currentFps - displayFps) * lerpAlpha
+
             local now = tick()
-            if now - lastFpsTick >= 0.5 then
+            if now - lastFpsTick >= 0.45 then
                 currentFps = math.floor(frameCounter / (now - lastFpsTick))
                 frameCounter = 0
                 lastFpsTick = now
@@ -1618,10 +1729,9 @@ task.spawn(function()
                 local plrCount = #Players:GetPlayers()
                 local maxPlrs = Players.MaxPlayers or 0
 
-                -- Compute new OHLC candle from live FPS & Ping stability
                 local openVal = lastClose
                 local jitter = math.clamp((100 - math.min(pingMs, 100)) * 0.08, -6, 6) + (running and math.random(-3, 5) or math.random(-2, 2))
-                local closeVal = math.clamp(currentFps + jitter, 15, 144)
+                local closeVal = math.clamp(displayFps + jitter, 15, 144)
                 local highVal = math.min(148, math.max(openVal, closeVal) + math.random(2, 7))
                 local lowVal = math.max(10, math.min(openVal, closeVal) - math.random(2, 7))
                 lastClose = closeVal
@@ -1631,7 +1741,6 @@ task.spawn(function()
                 end
                 candleHistory[candleCount] = {o = openVal, h = highVal, l = lowVal, c = closeVal}
 
-                -- Find min/max scale across visible candles
                 local minScale, maxScale = 999, 0
                 for i = 1, candleCount do
                     if candleHistory[i].l < minScale then minScale = candleHistory[i].l end
@@ -1657,23 +1766,19 @@ task.spawn(function()
                     local botBodyY = 1 - ((math.min(d.o, d.c) - minScale) / span)
                     local bodyH = math.max(0.035, botBodyY - topBodyY)
 
-                    candles[i].wick.Position = UDim2.new(0.5, 0, topWickY, 0)
-                    candles[i].wick.Size = UDim2.new(0, 1.5, wickH, 0)
-                    candles[i].wick.BackgroundColor3 = col
-
-                    candles[i].body.Position = UDim2.new(0.5, 0, topBodyY, 0)
-                    candles[i].body.Size = UDim2.new(0.68, 0, bodyH, 0)
-                    candles[i].body.BackgroundColor3 = col
+                    candles[i].tWickY = topWickY
+                    candles[i].tWickH = wickH
+                    candles[i].tBodyY = topBodyY
+                    candles[i].tBodyH = bodyH
+                    candles[i].tCol = col
                 end
 
-                -- Live Right-Axis Price Tag Position & Color
                 local closeNormY = math.clamp(1 - ((closeVal - minScale) / span), 0.08, 0.92)
                 local lastBullish = closeVal >= openVal
-                liveTagPill.Position = UDim2.new(1, -2, closeNormY, 0)
-                liveTagPill.BackgroundColor3 = lastBullish and Color3.fromRGB(0, 200, 118) or Color3.fromRGB(246, 70, 93)
+                targetTagY = closeNormY
+                targetTagCol = lastBullish and Color3.fromRGB(0, 200, 118) or Color3.fromRGB(246, 70, 93)
                 liveTagTxt.Text = string.format("%.1f", closeVal)
 
-                -- Update Top Headers & Hero Readout
                 topStats.Text = string.format("24H VOL: %d PKT  •  HIGH: %.0f FPS", totalSentCount, maxScale)
                 heroPrice.Text = string.format("%.2f FPS  •  %dms", closeVal, pingMs)
 
@@ -1685,16 +1790,16 @@ task.spawn(function()
                 ohlcLine.TextColor3 = lastBullish and Color3.fromRGB(0, 200, 118) or Color3.fromRGB(246, 70, 93)
 
                 if running then
-                    enginePill.Text = "● LIVE ACTIVE"
-                    enginePill.TextColor3 = Color3.fromRGB(0, 200, 118)
-                    enginePill.BackgroundColor3 = Color3.fromRGB(12, 36, 26)
+                    engineStatusLabel.Text = "LIVE ACTIVE"
+                    engineStatusLabel.TextColor3 = Color3.fromRGB(0, 230, 140)
+                    enginePillFrame.BackgroundColor3 = Color3.fromRGB(12, 34, 24)
                 else
-                    enginePill.Text = "● STANDBY"
-                    enginePill.TextColor3 = Color3.fromRGB(0, 210, 255)
-                    enginePill.BackgroundColor3 = Color3.fromRGB(14, 26, 38)
+                    engineStatusLabel.Text = "STANDBY"
+                    engineStatusLabel.TextColor3 = Color3.fromRGB(0, 225, 255)
+                    enginePillFrame.BackgroundColor3 = Color3.fromRGB(14, 26, 38)
                 end
 
-                local waitStep = (selectedInterval == "15s" and 1.2) or (selectedInterval == "5s" and 0.8) or 0.55
+                local waitStep = (selectedInterval == "15s" and 1.1) or (selectedInterval == "5s" and 0.75) or 0.5
                 task.wait(waitStep)
             end
         end)
