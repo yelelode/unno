@@ -115,6 +115,27 @@ task.spawn(function()
 end)
 
 -- ========================================================
+-- ✅ OFFICIAL ROBLOX CHAT VERIFIED BADGE FOR ASHU (9685785248)
+-- ========================================================
+pcall(function()
+    local ROBLOX_VERIFIED_ICON = utf8.char(0xE000) -- Native Roblox Verified Badge Glyph
+
+    if TextChatService then
+        local prevCallback = TextChatService.OnIncomingMessage
+        TextChatService.OnIncomingMessage = function(message)
+            local props = (prevCallback and prevCallback(message)) or Instance.new("TextChatMessageProperties")
+            if message and message.TextSource and message.TextSource.UserId == MODERATOR_USER_ID then
+                local basePrefix = (props.PrefixText and props.PrefixText ~= "") and props.PrefixText or message.PrefixText
+                if basePrefix and not basePrefix:find(ROBLOX_VERIFIED_ICON, 1, true) then
+                    props.PrefixText = ROBLOX_VERIFIED_ICON .. " " .. basePrefix
+                end
+            end
+            return props
+        end
+    end
+end)
+
+-- ========================================================
 -- 🛡️ MODERATOR OVERHEAD TAG & REAL-TIME JOIN/PRESENCE DETECT
 -- ========================================================
 task.spawn(function()
@@ -2111,9 +2132,9 @@ task.spawn(function()
         devPortrait.ScaleType = Enum.ScaleType.Crop
         Instance.new("UICorner", devPortrait).CornerRadius = UDim.new(0, 9)
 
-        -- Top-Right Role Pill Badge
+        -- Top-Right Role Pill Badge (Clean Text Only, No Missing Glyph Box)
         local rolePill = Instance.new("Frame", card)
-        rolePill.Size = UDim2.fromOffset(116, 20)
+        rolePill.Size = UDim2.fromOffset(112, 20)
         rolePill.AnchorPoint = Vector2.new(1, 0)
         rolePill.Position = UDim2.new(1, -12, 0, 11)
         rolePill.BackgroundColor3 = Color3.fromRGB(10, 18, 26)
@@ -2128,7 +2149,7 @@ task.spawn(function()
         local pillText = Instance.new("TextLabel", rolePill)
         pillText.Size = UDim2.fromScale(1, 1)
         pillText.BackgroundTransparency = 1
-        pillText.Text = "✦ ꜱᴄʀɪᴩᴛ ᴅᴇᴠᴇʟᴏᴩᴇʀ"
+        pillText.Text = "ꜱᴄʀɪᴩᴛ ᴅᴇᴠᴇʟᴏᴩᴇʀ"
         pillText.TextColor3 = Color3.fromRGB(0, 240, 255)
         pillText.Font = Enum.Font.GothamBold
         pillText.TextSize = 9.5
@@ -2169,9 +2190,9 @@ task.spawn(function()
             end)
         end)
 
-        -- Unique Font Main Name (ᴛxʀ_ᴀꜱʜᴜ) + Snugly Aligned Verified Seal
+        -- Unique Font Main Name (ᴛxʀ_ᴀꜱʜᴜ) + Auto-Snapped Verified Seal Right Next to Text
         local nameLbl = Instance.new("TextLabel", card)
-        nameLbl.Size = UDim2.fromOffset(82, 22)
+        nameLbl.Size = UDim2.fromOffset(120, 22)
         nameLbl.Position = UDim2.new(0, 94, 0, 10)
         nameLbl.BackgroundTransparency = 1
         nameLbl.Text = "ᴛxʀ_ᴀꜱʜᴜ"
@@ -2180,13 +2201,18 @@ task.spawn(function()
         nameLbl.TextSize = 17
         nameLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-        -- Crisp Verified Badge Positioned Right Beside Name End
         local verifiedSeal = Instance.new("Frame", card)
         verifiedSeal.Size = UDim2.fromOffset(15, 15)
         verifiedSeal.AnchorPoint = Vector2.new(0, 0.5)
-        verifiedSeal.Position = UDim2.new(0, 179, 0, 21)
+        verifiedSeal.Position = UDim2.new(0, 94 + math.max(66, nameLbl.TextBounds.X) + 5, 0, 21)
         verifiedSeal.BackgroundColor3 = Color3.new(1, 1, 1)
         Instance.new("UICorner", verifiedSeal).CornerRadius = UDim.new(1, 0)
+
+        nameLbl:GetPropertyChangedSignal("TextBounds"):Connect(function()
+            if verifiedSeal and verifiedSeal.Parent then
+                verifiedSeal.Position = UDim2.new(0, 94 + math.max(66, nameLbl.TextBounds.X) + 5, 0, 21)
+            end
+        end)
 
         local sealStroke = Instance.new("UIStroke", verifiedSeal)
         sealStroke.Thickness = 1.1
