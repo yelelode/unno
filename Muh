@@ -270,7 +270,8 @@ end
 
 
 -- ========================================================
--- PART 2: HYPER-FLUID 144HZ SPRING PHYSICS ENGINE (BEYOND iOS PROMOTION)
+-- PART 2: PURE RAYFIELD NATIVE SMOOTHNESS + LIGHTWEIGHT GLASS
+-- (Zero conflicting tweens/scales so Rayfield runs at full native FPS)
 -- ========================================================
 local function getSafeGuiRoot()
     local root
@@ -297,70 +298,6 @@ end
 pcall(function() cleanOldUI(getSafeGuiRoot()) end)
 pcall(function() cleanOldUI(CoreGui) end)
 
--- Central 144Hz Critically-Damped Spring Pool (Zero Tween Cut-off, True Physics Inertia)
-local activeSprings = {}
-
-local function setSpringTarget(instance, targetScale, stiffness, damping)
-    if not instance or not instance.Parent then return end
-    local uiScale = instance:FindFirstChildOfClass("UIScale")
-    if not uiScale then
-        uiScale = Instance.new("UIScale")
-        uiScale.Scale = 1
-        uiScale.Parent = instance
-    end
-
-    local entry = activeSprings[uiScale]
-    if not entry then
-        entry = {
-            scale = uiScale,
-            current = uiScale.Scale,
-            velocity = 0,
-            target = targetScale,
-            stiffness = stiffness or 380,
-            damping = damping or 26
-        }
-        activeSprings[uiScale] = entry
-    else
-        entry.target = targetScale
-        if stiffness then entry.stiffness = stiffness end
-        if damping then entry.damping = damping end
-    end
-end
-
-RunService.RenderStepped:Connect(function(dt)
-    local h = math.min(dt, 0.033)
-    for uiScale, s in pairs(activeSprings) do
-        if not uiScale or not uiScale.Parent then
-            activeSprings[uiScale] = nil
-        else
-            local displacement = s.current - s.target
-            local accel = (-s.stiffness * displacement) - (s.damping * s.velocity)
-            s.velocity = s.velocity + accel * h
-            s.current = s.current + s.velocity * h
-
-            if math.abs(displacement) < 0.0004 and math.abs(s.velocity) < 0.002 then
-                s.current = s.target
-                s.velocity = 0
-                uiScale.Scale = s.target
-                activeSprings[uiScale] = nil
-            else
-                uiScale.Scale = s.current
-            end
-        end
-    end
-end)
-
-local function isTopbarButton(obj)
-    local curr = obj.Parent
-    while curr do
-        if curr.Name == "Topbar" or curr.Name == "Shadow" then
-            return true
-        end
-        curr = curr.Parent
-    end
-    return false
-end
-
 local function isCustomDevCard(obj)
     local curr = obj
     while curr do
@@ -370,107 +307,6 @@ local function isCustomDevCard(obj)
         curr = curr.Parent
     end
     return false
-end
-
--- Sub-Pixel Spring Press + Magnetic Hover Physics
-local function attachSmoothClick(btn)
-    if not btn or not btn:IsA("GuiButton") or btn:GetAttribute("TXR_ClickHooked") then
-        return
-    end
-    btn:SetAttribute("TXR_ClickHooked", true)
-
-    if isTopbarButton(btn) then
-        return
-    end
-
-    local targetObj = btn
-    if btn.BackgroundTransparency >= 0.95 and btn.Parent and btn.Parent:IsA("Frame") and btn.Parent.Size.Y.Offset <= 58 then
-        targetObj = btn.Parent
-    end
-
-    local isHovered = false
-    local isPressed = false
-
-    btn.MouseEnter:Connect(function()
-        isHovered = true
-        if not isPressed then
-            setSpringTarget(targetObj, 1.015, 340, 24)
-        end
-    end)
-
-    btn.MouseLeave:Connect(function()
-        isHovered = false
-        if not isPressed then
-            setSpringTarget(targetObj, 1.0, 320, 24)
-        end
-    end)
-
-    btn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isPressed = true
-            setSpringTarget(targetObj, 0.962, 520, 30)
-        end
-    end)
-
-    btn.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isPressed = false
-            setSpringTarget(targetObj, isHovered and 1.015 or 1.0, 420, 22)
-        end
-    end)
-end
-
--- Hyper-Fluid Tab Page Switch + Elastic Waterfall Stagger
-local function hookSmoothTabPage(scrollFrame)
-    if not scrollFrame or not scrollFrame:IsA("ScrollingFrame") or scrollFrame:GetAttribute("TXR_PageSmooth") then
-        return
-    end
-    scrollFrame:SetAttribute("TXR_PageSmooth", true)
-    scrollFrame.ScrollBarThickness = 2
-    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 235, 255)
-    scrollFrame.ScrollBarImageTransparency = 0.35
-
-    scrollFrame:GetPropertyChangedSignal("Visible"):Connect(function()
-        if scrollFrame.Visible then
-            local pScale = scrollFrame:FindFirstChildOfClass("UIScale") or Instance.new("UIScale", scrollFrame)
-            pScale.Scale = 0.972
-            setSpringTarget(scrollFrame, 1.0, 360, 25)
-
-            local visibleIdx = 0
-            for _, child in ipairs(scrollFrame:GetChildren()) do
-                if child:IsA("Frame") and child.Visible and not child:GetAttribute("TXR_CustomCard") then
-                    visibleIdx += 1
-                    if visibleIdx <= 12 then
-                        local cScale = child:FindFirstChildOfClass("UIScale") or Instance.new("UIScale", child)
-                        cScale.Scale = 0.955
-                        task.delay((visibleIdx - 1) * 0.018, function()
-                            if child and child.Parent then
-                                setSpringTarget(child, 1.0, 410, 23)
-                            end
-                        end)
-                    end
-                end
-            end
-        end
-    end)
-end
-
--- Silky Spring Toggle Knob + Interactive Pill Glow
-local function hookFluidControls(obj)
-    if not obj or not obj:IsA("Frame") or obj:GetAttribute("TXR_FluidHooked") then
-        return
-    end
-    if obj.Size.X.Offset >= 38 and obj.Size.X.Offset <= 48 and obj.Size.Y.Offset >= 18 and obj.Size.Y.Offset <= 26 then
-        local knob = obj:FindFirstChildWhichIsA("Frame")
-        if knob and knob.Size.X.Offset >= 12 and knob.Size.X.Offset <= 22 then
-            obj:SetAttribute("TXR_FluidHooked", true)
-            knob:GetPropertyChangedSignal("Position"):Connect(function()
-                local kScale = knob:FindFirstChildOfClass("UIScale") or Instance.new("UIScale", knob)
-                kScale.Scale = 0.80
-                setSpringTarget(knob, 1.0, 480, 21)
-            end)
-        end
-    end
 end
 
 local modeOrderMap = {
@@ -511,12 +347,14 @@ local function enforceModeListOrder(lbl)
     end
 end
 
--- Instant Smoked Glass + 144Hz Spring Engine
+-- Lightweight Smoked Glass (Applies once without blocking Rayfield native tweens)
 local function applyGlassyStyle(obj)
     if not obj or not obj.Parent then return end
 
     if obj:IsA("ScrollingFrame") then
-        hookSmoothTabPage(obj)
+        obj.ScrollBarThickness = 2
+        obj.ScrollBarImageColor3 = Color3.fromRGB(0, 225, 255)
+        obj.ScrollBarImageTransparency = 0.45
     end
 
     if obj:IsA("TextLabel") or obj:IsA("TextButton") then
@@ -544,10 +382,6 @@ local function applyGlassyStyle(obj)
         obj.Visible = false
     end
 
-    if obj:IsA("GuiButton") then
-        attachSmoothClick(obj)
-    end
-
     if isCustomDevCard(obj) then
         return
     end
@@ -566,20 +400,12 @@ local function applyGlassyStyle(obj)
         end
     end
 
-    if obj:IsA("Frame") then
-        hookFluidControls(obj)
+    if obj:IsA("Frame") and not obj:GetAttribute("TXR_GlassStyled") then
+        obj:SetAttribute("TXR_GlassStyled", true)
         local n = obj.Name
         if n == "Main" then
             obj.BackgroundColor3 = Color3.fromRGB(14, 16, 22)
-            obj.BackgroundTransparency = 0.40
-
-            -- 144Hz Critically-Damped Spring Window Entrance
-            if not obj:GetAttribute("TXR_MainAnimated") then
-                obj:SetAttribute("TXR_MainAnimated", true)
-                local mainScale = obj:FindFirstChildOfClass("UIScale") or Instance.new("UIScale", obj)
-                mainScale.Scale = 0.91
-                setSpringTarget(obj, 1.0, 320, 23)
-            end
+            obj.BackgroundTransparency = 0.36
 
             local grad = obj:FindFirstChild("TXR_AcrylicMain") or Instance.new("UIGradient", obj)
             grad.Name = "TXR_AcrylicMain"
@@ -590,17 +416,17 @@ local function applyGlassyStyle(obj)
             })
             grad.Transparency = NumberSequence.new({
                 NumberSequenceKeypoint.new(0, 0.04),
-                NumberSequenceKeypoint.new(1, 0.25)
+                NumberSequenceKeypoint.new(1, 0.24)
             })
             grad.Rotation = 115
         elseif n == "Topbar" then
             obj.BackgroundColor3 = Color3.fromRGB(10, 12, 18)
-            obj.BackgroundTransparency = 0.52
+            obj.BackgroundTransparency = 0.48
         elseif n == "Elements" or n == "TabBar" or n == "Placeholder" or n == "List" then
             obj.BackgroundTransparency = 1
         elseif obj.Parent and obj.Parent:IsA("ScrollingFrame") and obj.BackgroundTransparency < 0.85 then
             obj.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
-            obj.BackgroundTransparency = 0.52
+            obj.BackgroundTransparency = 0.48
 
             local cardSheen = obj:FindFirstChild("TXR_CardGlassSheen") or Instance.new("UIGradient", obj)
             cardSheen.Name = "TXR_CardGlassSheen"
@@ -611,13 +437,13 @@ local function applyGlassyStyle(obj)
             })
             cardSheen.Transparency = NumberSequence.new({
                 NumberSequenceKeypoint.new(0, 0.02),
-                NumberSequenceKeypoint.new(1, 0.20)
+                NumberSequenceKeypoint.new(1, 0.18)
             })
             cardSheen.Rotation = 25
         elseif obj.Parent and obj.Parent.Parent and obj.Parent.Parent:IsA("ScrollingFrame") and obj.BackgroundTransparency < 0.85 then
             if obj.Size.Y.Offset >= 24 and obj.Size.Y.Offset <= 40 then
                 obj.BackgroundColor3 = Color3.fromRGB(14, 17, 24)
-                obj.BackgroundTransparency = 0.48
+                obj.BackgroundTransparency = 0.45
             end
         end
     end
@@ -801,7 +627,7 @@ local BioLivePreview = RgbTab:CreateColorPicker({
     Callback = function(Value) end
 })
 
-RunService.RenderStepped:Connect(function(dt)
+RunService.Heartbeat:Connect(function(dt)
     if not rgbEnabled then return end
     local safeDt = math.min(dt, 0.05)
     smoothPhase = smoothPhase + (safeDt * rgbSpeed)
@@ -817,22 +643,23 @@ RunService.RenderStepped:Connect(function(dt)
         currentNameColor = targetNameCol
         currentBioColor = targetBioCol
     end
-
-    pcall(function()
-        NameLivePreview:Set(currentNameColor)
-        BioLivePreview:Set(currentBioColor)
-    end)
 end)
 
 task.spawn(function()
     while true do
-        if rgbEnabled and colorEvent then
+        if rgbEnabled then
             pcall(function()
-                colorEvent:FireServer("PickingRPNameColor", currentNameColor)
-                colorEvent:FireServer("PickingRPBioColor", currentBioColor)
+                NameLivePreview:Set(currentNameColor)
+                BioLivePreview:Set(currentBioColor)
             end)
+            if colorEvent then
+                pcall(function()
+                    colorEvent:FireServer("PickingRPNameColor", currentNameColor)
+                    colorEvent:FireServer("PickingRPBioColor", currentBioColor)
+                end)
+            end
         end
-        task.wait(ultraSmoothRgb and 0.05 or 0.15)
+        task.wait(ultraSmoothRgb and 0.06 or 0.15)
     end
 end)
 
@@ -1392,7 +1219,7 @@ end)
 
 
 -- ========================================================
--- TAB 4: 144HZ ULTRA-SMOOTH COINBASE PRO LIVE TERMINAL
+-- TAB 4: COINBASE PRO LIVE TERMINAL (NATIVE SMOOTH TWEENS)
 -- ========================================================
 local terminalPlaceholder = LiveTab:CreateLabel("TXR_COINBASE_PRO_TERMINAL")
 local sessionStartTime = tick()
@@ -1523,7 +1350,7 @@ task.spawn(function()
         ohlcLine.TextSize = 9
         ohlcLine.TextXAlignment = Enum.TextXAlignment.Left
 
-        -- 3. INTERACTIVE INTERVAL PILL BAR + ULTRA-SMOOTH PULSING RADAR DOT
+        -- 3. INTERACTIVE INTERVAL PILL BAR + SMOOTH PULSING RADAR DOT
         local pillRow = Instance.new("Frame", card)
         pillRow.Size = UDim2.new(1, -24, 0, 20)
         pillRow.Position = UDim2.new(0, 12, 0, 84)
@@ -1615,14 +1442,6 @@ task.spawn(function()
         local cStroke = Instance.new("UIStroke", chartCanvas)
         cStroke.Thickness = 1
         cStroke.Color = Color3.fromRGB(30, 36, 48)
-
-        local scannerLine = Instance.new("Frame", chartCanvas)
-        scannerLine.Size = UDim2.new(0, 1.5, 1, -16)
-        scannerLine.Position = UDim2.fromScale(0, 0)
-        scannerLine.BackgroundColor3 = Color3.fromRGB(0, 225, 255)
-        scannerLine.BackgroundTransparency = 0.80
-        scannerLine.BorderSizePixel = 0
-        scannerLine.ZIndex = 4
 
         local priceAxisLabels = {}
         for g = 1, 4 do
@@ -1726,15 +1545,7 @@ task.spawn(function()
             volBar.BackgroundTransparency = 0.62
             volBar.BorderSizePixel = 0
 
-            candles[i] = {
-                wick = wick,
-                body = body,
-                vol = volBar,
-                tWickY = 0.25, tWickH = 0.35,
-                tBodyY = 0.35, tBodyH = 0.16,
-                tVolH = 0.14,
-                tCol = Color3.fromRGB(0, 200, 118)
-            }
+            candles[i] = {wick = wick, body = body, vol = volBar}
             candleHistory[i] = {o = 60, h = 64, l = 56, c = 62, v = 0.15}
         end
 
@@ -1894,91 +1705,49 @@ task.spawn(function()
             end)
         end
 
-        -- 144Hz Ultra-Smooth Animation & Interpolation Loop
+        -- Lightweight Native Tween Loop for Terminal
         local currentFps = 60
-        local displayFps = 60
         local frameCounter = 0
         local lastFpsTick = tick()
         local animClock = 0
         local candleTimer = 5.0
-        local targetTagY = 0.45
-        local currentTagY = 0.45
-        local targetTagCol = Color3.fromRGB(0, 200, 118)
 
-        RunService.RenderStepped:Connect(function(dt)
+        RunService.Heartbeat:Connect(function(dt)
             if not card or not card.Parent then return end
-            local safeDt = math.min(dt, 0.05)
-            animClock += safeDt
             frameCounter += 1
-
-            candleTimer -= safeDt
-            if candleTimer <= 0 then
-                candleTimer = (selectedInterval == "15s" and 15.0) or (selectedInterval == "5s" and 5.0) or 2.0
-            end
-            local tSec = math.max(0, math.ceil(candleTimer))
-            liveTagTimer.Text = string.format("00:%02d", tSec)
-
-            if tStrokeGrad and tStrokeGrad.Parent then
-                tStrokeGrad.Rotation = (animClock * 55) % 360
-            end
-
-            local pulseSpeed = running and 3.4 or 1.8
-            local wave = (math.sin(animClock * pulseSpeed) + 1) / 2
-            local smoothWave = wave * wave * (3 - 2 * wave)
-            local haloCycle = (animClock * (running and 1.35 or 0.75)) % 1
-            local haloEase = 1 - math.pow(1 - haloCycle, 3)
-
-            local baseDotCol = running and Color3.fromRGB(0, 230, 140) or Color3.fromRGB(0, 210, 255)
-            local brightDotCol = running and Color3.fromRGB(140, 255, 205) or Color3.fromRGB(160, 245, 255)
-            local lerpedDot = baseDotCol:Lerp(brightDotCol, smoothWave)
-
-            dotCore.BackgroundColor3 = lerpedDot
-            dotCore.Size = UDim2.fromOffset(5.5 + smoothWave * 1.8, 5.5 + smoothWave * 1.8)
-            dotHalo.BackgroundColor3 = lerpedDot
-            dotHalo.Size = UDim2.fromOffset(6 + haloEase * 11, 6 + haloEase * 11)
-            dotHalo.BackgroundTransparency = 0.30 + (haloEase * 0.70)
-            enginePillStroke.Color = lerpedDot
-            enginePillStroke.Transparency = 0.35 + ((1 - smoothWave) * 0.45)
-
-            local scanX = ((animClock * 0.22) % 1) * 0.86
-            scannerLine.Position = UDim2.fromScale(scanX, 0)
-            scannerLine.BackgroundColor3 = lerpedDot
-
-            local lerpAlpha = 1 - math.exp(-safeDt * 18)
-            for i = 1, candleCount do
-                local c = candles[i]
-                c.wick.Position = c.wick.Position:Lerp(UDim2.new(0.5, 0, c.tWickY, 0), lerpAlpha)
-                c.wick.Size = c.wick.Size:Lerp(UDim2.new(0, 1, c.tWickH, 0), lerpAlpha)
-                c.wick.BackgroundColor3 = c.wick.BackgroundColor3:Lerp(c.tCol, lerpAlpha)
-
-                c.body.Position = c.body.Position:Lerp(UDim2.new(0.5, 0, c.tBodyY, 0), lerpAlpha)
-                c.body.Size = c.body.Size:Lerp(UDim2.new(0.65, 0, c.tBodyH, 0), lerpAlpha)
-                c.body.BackgroundColor3 = c.body.BackgroundColor3:Lerp(c.tCol, lerpAlpha)
-
-                c.vol.Size = c.vol.Size:Lerp(UDim2.new(0.65, 0, c.tVolH, 0), lerpAlpha)
-                c.vol.BackgroundColor3 = c.vol.BackgroundColor3:Lerp(c.tCol, lerpAlpha)
-            end
-
-            currentTagY = currentTagY + (targetTagY - currentTagY) * lerpAlpha
-            liveTagPill.Position = UDim2.new(1, -2, currentTagY, 0)
-            liveTagPill.BackgroundColor3 = liveTagPill.BackgroundColor3:Lerp(targetTagCol, lerpAlpha)
-            dottedContainer.Position = UDim2.new(0, 4, currentTagY, 0)
-            for d = 1, #dotSegments do
-                dotSegments[d].BackgroundColor3 = dotSegments[d].BackgroundColor3:Lerp(targetTagCol, lerpAlpha)
-            end
-
-            displayFps = displayFps + (currentFps - displayFps) * lerpAlpha
-
             local now = tick()
-            if now - lastFpsTick >= 0.45 then
+            if now - lastFpsTick >= 0.5 then
                 currentFps = math.floor(frameCounter / (now - lastFpsTick))
                 frameCounter = 0
                 lastFpsTick = now
             end
+
+            if not card.Visible then return end
+            animClock += dt
+            candleTimer -= dt
+            if candleTimer <= 0 then
+                candleTimer = (selectedInterval == "15s" and 15.0) or (selectedInterval == "5s" and 5.0) or 2.0
+            end
+            liveTagTimer.Text = string.format("00:%02d", math.max(0, math.ceil(candleTimer)))
+
+            if tStrokeGrad and tStrokeGrad.Parent then
+                tStrokeGrad.Rotation = (animClock * 50) % 360
+            end
+
+            local wave = (math.sin(animClock * (running and 3.2 or 1.8)) + 1) / 2
+            local haloCycle = (animClock * (running and 1.2 or 0.7)) % 1
+            local baseDotCol = running and Color3.fromRGB(0, 230, 140) or Color3.fromRGB(0, 210, 255)
+
+            dotCore.BackgroundColor3 = baseDotCol
+            dotHalo.BackgroundColor3 = baseDotCol
+            dotHalo.Size = UDim2.fromOffset(6 + haloCycle * 10, 6 + haloCycle * 10)
+            dotHalo.BackgroundTransparency = 0.35 + (haloCycle * 0.65)
+            enginePillStroke.Transparency = 0.40 + ((1 - wave) * 0.40)
         end)
 
         local shortJobId = (game.JobId and #game.JobId >= 8) and string.upper(string.sub(game.JobId, 1, 8)) or "LOCAL-SRV"
         local lastClose = 60
+        local smoothTween = TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
         task.spawn(function()
             while card and card.Parent do
@@ -1993,7 +1762,7 @@ task.spawn(function()
 
                 local openVal = lastClose
                 local jitter = math.clamp((100 - math.min(pingMs, 100)) * 0.08, -6, 6) + (running and math.random(-3, 5) or math.random(-2, 2))
-                local closeVal = math.clamp(displayFps + jitter, 15, 144)
+                local closeVal = math.clamp(currentFps + jitter, 15, 144)
                 local highVal = math.min(148, math.max(openVal, closeVal) + math.random(2, 7))
                 local lowVal = math.max(10, math.min(openVal, closeVal) - math.random(2, 7))
                 local volNorm = math.clamp(((rxKbps + txKbps) / 60) + (running and 0.14 or 0.04), 0.05, 0.28)
@@ -2029,18 +1798,39 @@ task.spawn(function()
                     local botBodyY = (1 - ((math.min(d.o, d.c) - minScale) / span)) * 0.74
                     local bodyH = math.max(0.03, botBodyY - topBodyY)
 
-                    candles[i].tWickY = topWickY
-                    candles[i].tWickH = wickH
-                    candles[i].tBodyY = topBodyY
-                    candles[i].tBodyH = bodyH
-                    candles[i].tVolH = d.v
-                    candles[i].tCol = col
+                    candles[i].wick.BackgroundColor3 = col
+                    candles[i].body.BackgroundColor3 = col
+                    candles[i].vol.BackgroundColor3 = col
+
+                    TweenService:Create(candles[i].wick, smoothTween, {
+                        Position = UDim2.new(0.5, 0, topWickY, 0),
+                        Size = UDim2.new(0, 1, wickH, 0)
+                    }):Play()
+
+                    TweenService:Create(candles[i].body, smoothTween, {
+                        Position = UDim2.new(0.5, 0, topBodyY, 0),
+                        Size = UDim2.new(0.65, 0, bodyH, 0)
+                    }):Play()
+
+                    TweenService:Create(candles[i].vol, smoothTween, {
+                        Size = UDim2.new(0.65, 0, d.v, 0)
+                    }):Play()
                 end
 
                 local closeNormY = math.clamp((1 - ((closeVal - minScale) / span)) * 0.74, 0.08, 0.76)
                 local lastBullish = closeVal >= openVal
-                targetTagY = closeNormY
-                targetTagCol = lastBullish and Color3.fromRGB(0, 200, 118) or Color3.fromRGB(246, 70, 93)
+                local tagCol = lastBullish and Color3.fromRGB(0, 200, 118) or Color3.fromRGB(246, 70, 93)
+
+                TweenService:Create(liveTagPill, smoothTween, {
+                    Position = UDim2.new(1, -2, closeNormY, 0),
+                    BackgroundColor3 = tagCol
+                }):Play()
+                TweenService:Create(dottedContainer, smoothTween, {
+                    Position = UDim2.new(0, 4, closeNormY, 0)
+                }):Play()
+                for d = 1, #dotSegments do
+                    dotSegments[d].BackgroundColor3 = tagCol
+                end
                 liveTagPrice.Text = string.format("%.2f", closeVal)
 
                 local kbSent = totalBytesSent / 1024
@@ -2052,7 +1842,7 @@ task.spawn(function()
                 heroDelta.Text = string.format("▲ +%.2f%% CLEAN", cleanPct)
 
                 ohlcLine.Text = string.format("O:%.2f  H:%.2f  L:%.2f  C:%.2f", openVal, highVal, lowVal, closeVal)
-                ohlcLine.TextColor3 = lastBullish and Color3.fromRGB(0, 200, 118) or Color3.fromRGB(246, 70, 93)
+                ohlcLine.TextColor3 = tagCol
 
                 local srvClock = math.floor(workspace.DistributedGameTime)
                 local sH = math.floor(srvClock / 3600) % 24
@@ -2078,7 +1868,7 @@ task.spawn(function()
                     enginePillFrame.BackgroundColor3 = Color3.fromRGB(14, 26, 38)
                 end
 
-                local waitStep = (selectedInterval == "15s" and 1.1) or (selectedInterval == "5s" and 0.75) or 0.5
+                local waitStep = (selectedInterval == "15s" and 1.1) or (selectedInterval == "5s" and 0.75) or 0.55
                 task.wait(waitStep)
             end
         end)
@@ -2344,11 +2134,6 @@ task.spawn(function()
             copying = true
             pcall(function() copyClip(DISCORD_LINK) end)
 
-            setSpringTarget(copyBtn, 0.88, 520, 24)
-            task.delay(0.08, function()
-                setSpringTarget(copyBtn, 1.0, 400, 20)
-            end)
-
             TweenService:Create(copyBtn, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                 BackgroundColor3 = Color3.fromRGB(35, 195, 105)
             }):Play()
@@ -2374,7 +2159,7 @@ task.spawn(function()
     end
 
     local animT = 0
-    RunService.RenderStepped:Connect(function(dt)
+    RunService.Heartbeat:Connect(function(dt)
         animT = animT + dt
         if cardStrokeGrad and cardStrokeGrad.Parent then
             cardStrokeGrad.Rotation = (animT * 75) % 360
