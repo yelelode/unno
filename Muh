@@ -2001,7 +2001,7 @@ end)
 
 
 -- ========================================================
--- TAB 5: CLEAN SCRIPT DEVELOPER CARD & EMP CLAN DISCORD
+-- TAB 5: ZERO-LOAD CYBER-EXECUTIVE DEVELOPER & CLAN CARDS
 -- ========================================================
 local DEV_USER_ID = 9685785248
 local DISCORD_LINK = "https://discord.gg/8aE54JJ8Rp"
@@ -2039,16 +2039,16 @@ task.spawn(function()
         end)
     end
 
-    local cardStrokeGrad, dStrokeGrad
+    local cardStrokeGrad, emblemRingGrad, verifiedRingGrad, dStrokeGrad
 
     if profileLabel and profileLabel.Parent and profileLabel.Parent:IsA("Frame") then
         local card = profileLabel.Parent
         card:SetAttribute("TXR_CustomCard", true)
         lockHideLabel(profileLabel, devCardPlaceholder)
 
-        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 96)
+        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 114)
         card.BackgroundColor3 = Color3.new(1, 1, 1)
-        card.BackgroundTransparency = 0.45
+        card.BackgroundTransparency = 0.28
         card.ClipsDescendants = true
 
         for _, child in ipairs(card:GetChildren()) do
@@ -2058,86 +2058,203 @@ task.spawn(function()
         end
 
         local cardCorner = card:FindFirstChildOfClass("UICorner") or Instance.new("UICorner", card)
-        cardCorner.CornerRadius = UDim.new(0, 10)
+        cardCorner.CornerRadius = UDim.new(0, 12)
 
         local cardStroke = Instance.new("UIStroke", card)
-        cardStroke.Thickness = 1.1
+        cardStroke.Thickness = 1.3
         cardStroke.Color = Color3.new(1, 1, 1)
-        cardStroke.Transparency = 0.65
+        cardStroke.Transparency = 0.42
 
         cardStrokeGrad = Instance.new("UIGradient", cardStroke)
         cardStrokeGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 30, 75)),
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 25, 85)),
             ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 240, 255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 30, 75))
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(165, 65, 255))
         })
 
         local bgGrad = Instance.new("UIGradient", card)
         bgGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(48, 20, 38)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(22, 25, 36)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(16, 36, 48))
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(36, 18, 34)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(16, 20, 30)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 30, 42))
         })
-        bgGrad.Rotation = 12
+        bgGrad.Rotation = 18
 
-        local accentBar = Instance.new("Frame", card)
-        accentBar.Size = UDim2.new(0, 4, 0.68, 0)
-        accentBar.Position = UDim2.new(0, 12, 0.5, 0)
-        accentBar.AnchorPoint = Vector2.new(0, 0.5)
-        accentBar.BackgroundColor3 = Color3.fromRGB(0, 240, 255)
-        accentBar.BorderSizePixel = 0
-        Instance.new("UICorner", accentBar).CornerRadius = UDim.new(1, 0)
+        -- Pure-UI Zero-Load Cyber Monogram Emblem
+        local emblemRing = Instance.new("Frame", card)
+        emblemRing.Size = UDim2.fromOffset(58, 58)
+        emblemRing.AnchorPoint = Vector2.new(0, 0.5)
+        emblemRing.Position = UDim2.new(0, 14, 0.5, 0)
+        emblemRing.BackgroundColor3 = Color3.new(1, 1, 1)
+        Instance.new("UICorner", emblemRing).CornerRadius = UDim.new(0, 16)
 
+        emblemRingGrad = Instance.new("UIGradient", emblemRing)
+        emblemRingGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 245, 255)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 30, 95)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 245, 255))
+        })
+
+        local emblemInner = Instance.new("Frame", emblemRing)
+        emblemInner.Size = UDim2.fromOffset(52, 52)
+        emblemInner.AnchorPoint = Vector2.new(0.5, 0.5)
+        emblemInner.Position = UDim2.fromScale(0.5, 0.5)
+        emblemInner.BackgroundColor3 = Color3.fromRGB(14, 17, 24)
+        Instance.new("UICorner", emblemInner).CornerRadius = UDim.new(0, 14)
+
+        local emblemTxt = Instance.new("TextLabel", emblemInner)
+        emblemTxt.Size = UDim2.fromScale(1, 1)
+        emblemTxt.BackgroundTransparency = 1
+        emblemTxt.Text = "ᴛxʀ"
+        emblemTxt.TextColor3 = Color3.fromRGB(0, 245, 255)
+        emblemTxt.Font = Enum.Font.GothamBlack
+        emblemTxt.TextSize = 16
+
+        -- Top-Right Role Pill Badge
         local rolePill = Instance.new("Frame", card)
         rolePill.Size = UDim2.fromOffset(118, 20)
         rolePill.AnchorPoint = Vector2.new(1, 0)
         rolePill.Position = UDim2.new(1, -12, 0, 12)
-        rolePill.BackgroundColor3 = Color3.fromRGB(12, 15, 22)
-        rolePill.BackgroundTransparency = 0.5
-
+        rolePill.BackgroundColor3 = Color3.fromRGB(10, 18, 26)
+        rolePill.BackgroundTransparency = 0.25
         Instance.new("UICorner", rolePill).CornerRadius = UDim.new(1, 0)
+
         local pillStroke = Instance.new("UIStroke", rolePill)
         pillStroke.Thickness = 1
         pillStroke.Color = Color3.fromRGB(0, 240, 255)
-        pillStroke.Transparency = 0.65
+        pillStroke.Transparency = 0.45
 
         local pillText = Instance.new("TextLabel", rolePill)
         pillText.Size = UDim2.fromScale(1, 1)
         pillText.BackgroundTransparency = 1
-        pillText.Text = "ꜱᴄʀɪᴘᴛ ᴅᴇᴠᴇʟᴏᴩᴇʀ"
+        pillText.Text = "✦ ꜱᴄʀɪᴩᴛ ᴅᴇᴠᴇʟᴏᴩᴇʀ"
         pillText.TextColor3 = Color3.fromRGB(0, 240, 255)
         pillText.Font = Enum.Font.GothamBold
-        pillText.TextSize = 10
+        pillText.TextSize = 9.5
 
+        -- One-Tap Copy Developer User ID Button
+        local copyIdBtn = Instance.new("TextButton", card)
+        copyIdBtn.Size = UDim2.fromOffset(74, 20)
+        copyIdBtn.AnchorPoint = Vector2.new(1, 0)
+        copyIdBtn.Position = UDim2.new(1, -12, 0, 38)
+        copyIdBtn.BackgroundColor3 = Color3.fromRGB(20, 26, 38)
+        copyIdBtn.Text = "ᴄᴏᴩʏ ɪᴅ"
+        copyIdBtn.TextColor3 = Color3.fromRGB(210, 225, 245)
+        copyIdBtn.Font = Enum.Font.GothamBold
+        copyIdBtn.TextSize = 9.5
+        copyIdBtn.AutoButtonColor = false
+        Instance.new("UICorner", copyIdBtn).CornerRadius = UDim.new(0, 6)
+
+        local idBtnStroke = Instance.new("UIStroke", copyIdBtn)
+        idBtnStroke.Thickness = 1
+        idBtnStroke.Color = Color3.fromRGB(0, 225, 255)
+        idBtnStroke.Transparency = 0.65
+
+        copyIdBtn.MouseButton1Click:Connect(function()
+            pcall(function() copyClip(tostring(DEV_USER_ID)) end)
+            copyIdBtn.Text = "✓ ᴄᴏᴩɪᴇᴅ"
+            copyIdBtn.TextColor3 = Color3.fromRGB(75, 240, 150)
+            TXR_Lib:Notify({
+                Title = "ᴀꜱʜᴜ  ✓",
+                Content = "Developer ID Copied: " .. tostring(DEV_USER_ID),
+                Duration = 2,
+                Image = 4483345998
+            })
+            task.delay(1.5, function()
+                if copyIdBtn and copyIdBtn.Parent then
+                    copyIdBtn.Text = "ᴄᴏᴩʏ ɪᴅ"
+                    copyIdBtn.TextColor3 = Color3.fromRGB(210, 225, 245)
+                end
+            end)
+        end)
+
+        -- Developer Name + Premium Glowing 3D Verified Emblem
         local nameLbl = Instance.new("TextLabel", card)
-        nameLbl.Size = UDim2.new(1, -150, 0, 22)
-        nameLbl.Position = UDim2.new(0, 26, 0, 12)
+        nameLbl.Size = UDim2.fromOffset(58, 22)
+        nameLbl.Position = UDim2.new(0, 84, 0, 11)
         nameLbl.BackgroundTransparency = 1
         nameLbl.Text = "ᴀꜱʜᴜ"
         nameLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
         nameLbl.Font = Enum.Font.GothamBlack
-        nameLbl.TextSize = 17
+        nameLbl.TextSize = 18
         nameLbl.TextXAlignment = Enum.TextXAlignment.Left
 
+        -- Premium Verified Medallion Badge (Pure-UI Glowing Cyan-Blue Seal)
+        local verifiedSeal = Instance.new("Frame", card)
+        verifiedSeal.Size = UDim2.fromOffset(18, 18)
+        verifiedSeal.AnchorPoint = Vector2.new(0, 0.5)
+        verifiedSeal.Position = UDim2.new(0, 144, 0, 22)
+        verifiedSeal.BackgroundColor3 = Color3.new(1, 1, 1)
+        Instance.new("UICorner", verifiedSeal).CornerRadius = UDim.new(1, 0)
+
+        local sealStroke = Instance.new("UIStroke", verifiedSeal)
+        sealStroke.Thickness = 1.3
+        sealStroke.Color = Color3.fromRGB(165, 248, 255)
+        sealStroke.Transparency = 0.2
+
+        verifiedRingGrad = Instance.new("UIGradient", verifiedSeal)
+        verifiedRingGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 245, 255)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 115, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 245, 255))
+        })
+
+        local sealCheck = Instance.new("TextLabel", verifiedSeal)
+        sealCheck.Size = UDim2.fromScale(1, 1)
+        sealCheck.BackgroundTransparency = 1
+        sealCheck.Text = "✓"
+        sealCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
+        sealCheck.Font = Enum.Font.GothamBlack
+        sealCheck.TextSize = 11
+
+        local checkStroke = Instance.new("UIStroke", sealCheck)
+        checkStroke.Thickness = 0.8
+        checkStroke.Color = Color3.fromRGB(0, 45, 95)
+        checkStroke.Transparency = 0.3
+
         local handleLbl = Instance.new("TextLabel", card)
-        handleLbl.Size = UDim2.new(1, -40, 0, 16)
-        handleLbl.Position = UDim2.new(0, 26, 0, 38)
+        handleLbl.Size = UDim2.new(1, -170, 0, 16)
+        handleLbl.Position = UDim2.new(0, 84, 0, 35)
         handleLbl.BackgroundTransparency = 1
         handleLbl.Text = "@TXRdragon1  •  ɪᴅ: " .. tostring(DEV_USER_ID)
-        handleLbl.TextColor3 = Color3.fromRGB(205, 215, 235)
+        handleLbl.TextColor3 = Color3.fromRGB(195, 210, 232)
         handleLbl.Font = Enum.Font.GothamMedium
-        handleLbl.TextSize = 11
+        handleLbl.TextSize = 10.5
         handleLbl.TextXAlignment = Enum.TextXAlignment.Left
 
         local subLbl = Instance.new("TextLabel", card)
-        subLbl.Size = UDim2.new(1, -40, 0, 16)
-        subLbl.Position = UDim2.new(0, 26, 0, 60)
+        subLbl.Size = UDim2.new(1, -100, 0, 14)
+        subLbl.Position = UDim2.new(0, 84, 0, 55)
         subLbl.BackgroundTransparency = 1
         subLbl.Text = "ᴛxʀ ᴜɪ  •  ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06"
         subLbl.TextColor3 = Color3.fromRGB(0, 235, 255)
         subLbl.Font = Enum.Font.GothamBold
-        subLbl.TextSize = 10.5
+        subLbl.TextSize = 10
         subLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+        -- Mini Feature Chips Row
+        local tagNames = {"144ʜᴢ ʀɢʙ", "ᴀɴᴛɪ-ᴍᴜᴛᴇ ᴀɪ", "ᴏɴʏx ɢʟᴀꜱꜱ"}
+        for idx, tStr in ipairs(tagNames) do
+            local chip = Instance.new("Frame", card)
+            chip.Size = UDim2.fromOffset(72, 18)
+            chip.Position = UDim2.new(0, 84 + ((idx - 1) * 77), 0, 77)
+            chip.BackgroundColor3 = Color3.fromRGB(16, 22, 32)
+            chip.BackgroundTransparency = 0.25
+            Instance.new("UICorner", chip).CornerRadius = UDim.new(0, 5)
+
+            local cStroke = Instance.new("UIStroke", chip)
+            cStroke.Thickness = 1
+            cStroke.Color = Color3.fromRGB(0, 225, 255)
+            cStroke.Transparency = 0.78
+
+            local cTxt = Instance.new("TextLabel", chip)
+            cTxt.Size = UDim2.fromScale(1, 1)
+            cTxt.BackgroundTransparency = 1
+            cTxt.Text = tStr
+            cTxt.TextColor3 = Color3.fromRGB(215, 230, 245)
+            cTxt.Font = Enum.Font.GothamBold
+            cTxt.TextSize = 8.5
+        end
 
         task.spawn(function()
             pcall(function()
@@ -2154,9 +2271,9 @@ task.spawn(function()
         dCard:SetAttribute("TXR_CustomCard", true)
         lockHideLabel(discordLabel, discordCardPlaceholder)
 
-        dCard.Size = UDim2.new(dCard.Size.X.Scale, dCard.Size.X.Offset, 0, 74)
+        dCard.Size = UDim2.new(dCard.Size.X.Scale, dCard.Size.X.Offset, 0, 78)
         dCard.BackgroundColor3 = Color3.new(1, 1, 1)
-        dCard.BackgroundTransparency = 0.45
+        dCard.BackgroundTransparency = 0.28
         dCard.ClipsDescendants = true
 
         for _, child in ipairs(dCard:GetChildren()) do
@@ -2166,12 +2283,12 @@ task.spawn(function()
         end
 
         local dCorner = dCard:FindFirstChildOfClass("UICorner") or Instance.new("UICorner", dCard)
-        dCorner.CornerRadius = UDim.new(0, 11)
+        dCorner.CornerRadius = UDim.new(0, 12)
 
         local dStroke = Instance.new("UIStroke", dCard)
-        dStroke.Thickness = 1.1
+        dStroke.Thickness = 1.25
         dStroke.Color = Color3.new(1, 1, 1)
-        dStroke.Transparency = 0.65
+        dStroke.Transparency = 0.45
 
         dStrokeGrad = Instance.new("UIGradient", dStroke)
         dStrokeGrad.Color = ColorSequence.new({
@@ -2182,18 +2299,23 @@ task.spawn(function()
 
         local dGrad = Instance.new("UIGradient", dCard)
         dGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(48, 56, 118)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(24, 28, 44)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(18, 22, 34))
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 48, 104)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 24, 38)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(14, 18, 28))
         })
         dGrad.Rotation = 15
 
         local srvIcon = Instance.new("Frame", dCard)
-        srvIcon.Size = UDim2.fromOffset(46, 46)
+        srvIcon.Size = UDim2.fromOffset(48, 48)
         srvIcon.AnchorPoint = Vector2.new(0, 0.5)
-        srvIcon.Position = UDim2.new(0, 12, 0.5, 0)
+        srvIcon.Position = UDim2.new(0, 14, 0.5, 0)
         srvIcon.BackgroundColor3 = Color3.new(1, 1, 1)
-        Instance.new("UICorner", srvIcon).CornerRadius = UDim.new(0, 13)
+        Instance.new("UICorner", srvIcon).CornerRadius = UDim.new(0, 14)
+
+        local srvStroke = Instance.new("UIStroke", srvIcon)
+        srvStroke.Thickness = 1.2
+        srvStroke.Color = Color3.fromRGB(165, 180, 255)
+        srvStroke.Transparency = 0.45
 
         local srvIconGrad = Instance.new("UIGradient", srvIcon)
         srvIconGrad.Color = ColorSequence.new({
@@ -2208,40 +2330,40 @@ task.spawn(function()
         srvTxt.Text = "ᴇᴍᴩ"
         srvTxt.TextColor3 = Color3.new(1, 1, 1)
         srvTxt.Font = Enum.Font.GothamBlack
-        srvTxt.TextSize = 14
+        srvTxt.TextSize = 15
 
         local srvHeader = Instance.new("TextLabel", dCard)
-        srvHeader.Size = UDim2.new(1, -180, 0, 14)
-        srvHeader.Position = UDim2.new(0, 68, 0, 11)
+        srvHeader.Size = UDim2.new(1, -185, 0, 14)
+        srvHeader.Position = UDim2.new(0, 72, 0, 12)
         srvHeader.BackgroundTransparency = 1
-        srvHeader.Text = "ᴏꜰꜰɪᴄɪᴀʟ ᴅɪꜱᴄᴏʀᴅ  •  ● ᴀᴄᴛɪᴠᴇ"
-        srvHeader.TextColor3 = Color3.fromRGB(75, 235, 145)
+        srvHeader.Text = "ᴏꜰꜰɪᴄɪᴀʟ ᴄᴏᴍᴍᴜɴɪᴛʏ  •  ● ᴏɴʟɪɴᴇ"
+        srvHeader.TextColor3 = Color3.fromRGB(75, 240, 150)
         srvHeader.Font = Enum.Font.GothamBold
         srvHeader.TextSize = 9.5
         srvHeader.TextXAlignment = Enum.TextXAlignment.Left
 
         local srvTitle = Instance.new("TextLabel", dCard)
-        srvTitle.Size = UDim2.new(1, -180, 0, 20)
-        srvTitle.Position = UDim2.new(0, 68, 0, 26)
+        srvTitle.Size = UDim2.new(1, -185, 0, 20)
+        srvTitle.Position = UDim2.new(0, 72, 0, 28)
         srvTitle.BackgroundTransparency = 1
         srvTitle.Text = "ᴇᴍᴩ ᴄʟᴀɴ"
         srvTitle.TextColor3 = Color3.new(255, 255, 255)
         srvTitle.Font = Enum.Font.GothamBlack
-        srvTitle.TextSize = 15
+        srvTitle.TextSize = 16
         srvTitle.TextXAlignment = Enum.TextXAlignment.Left
 
         local srvLink = Instance.new("TextLabel", dCard)
-        srvLink.Size = UDim2.new(1, -180, 0, 14)
-        srvLink.Position = UDim2.new(0, 68, 0, 48)
+        srvLink.Size = UDim2.new(1, -185, 0, 14)
+        srvLink.Position = UDim2.new(0, 72, 0, 50)
         srvLink.BackgroundTransparency = 1
         srvLink.Text = "discord.gg/8aE54JJ8Rp"
-        srvLink.TextColor3 = Color3.fromRGB(195, 208, 235)
+        srvLink.TextColor3 = Color3.fromRGB(185, 200, 230)
         srvLink.Font = Enum.Font.Code
         srvLink.TextSize = 10.5
         srvLink.TextXAlignment = Enum.TextXAlignment.Left
 
         local copyBtn = Instance.new("TextButton", dCard)
-        copyBtn.Size = UDim2.fromOffset(96, 34)
+        copyBtn.Size = UDim2.fromOffset(100, 36)
         copyBtn.AnchorPoint = Vector2.new(1, 0.5)
         copyBtn.Position = UDim2.new(1, -12, 0.5, 0)
         copyBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
@@ -2250,7 +2372,12 @@ task.spawn(function()
         copyBtn.Font = Enum.Font.GothamBold
         copyBtn.TextSize = 11
         copyBtn.AutoButtonColor = false
-        Instance.new("UICorner", copyBtn).CornerRadius = UDim.new(0, 9)
+        Instance.new("UICorner", copyBtn).CornerRadius = UDim.new(0, 10)
+
+        local copyBtnStroke = Instance.new("UIStroke", copyBtn)
+        copyBtnStroke.Thickness = 1
+        copyBtnStroke.Color = Color3.fromRGB(170, 185, 255)
+        copyBtnStroke.Transparency = 0.55
 
         local copying = false
         copyBtn.MouseButton1Click:Connect(function()
@@ -2287,6 +2414,12 @@ task.spawn(function()
         animT = animT + dt
         if cardStrokeGrad and cardStrokeGrad.Parent then
             cardStrokeGrad.Rotation = (animT * 75) % 360
+        end
+        if emblemRingGrad and emblemRingGrad.Parent then
+            emblemRingGrad.Rotation = -(animT * 95) % 360
+        end
+        if verifiedRingGrad and verifiedRingGrad.Parent then
+            verifiedRingGrad.Rotation = (animT * 120) % 360
         end
         if dStrokeGrad and dStrokeGrad.Parent then
             dStrokeGrad.Rotation = -(animT * 65) % 360
