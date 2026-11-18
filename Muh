@@ -525,7 +525,7 @@ local Window = TXR_Lib:CreateWindow({
 })
 
 -- ========================================================
--- MODULAR FUTURISTIC TABS (CLEAN SEPARATION)
+-- MODULAR FUTURISTIC TABS
 -- ========================================================
 local Tab = Window:CreateTab("Main Controls", 4483345998)
 local EngineTab = Window:CreateTab("Smart Engines", 4483345998)
@@ -934,6 +934,9 @@ local function updateFallbackMonitor(stateText)
     end)
 end
 
+-- Live Order-Book Feed Updater Hook (declared early for packet logging)
+local pushOrderBookPacket = nil
+
 local function buildFinalMsg()
     local currentTarget = targetList[targetIndex]
     if not currentTarget or currentTarget == "" then
@@ -943,6 +946,7 @@ local function buildFinalMsg()
     lastTargetUsed = string.upper(currentTarget)
 
     local msg = buildRawMsgForTarget(currentTarget)
+    local packetState = "CLEAN"
 
     if autoFallbackEnabled then
         local attempts = 0
@@ -959,11 +963,17 @@ local function buildFinalMsg()
             tagMemoryCache[lastTargetUsed] = true
             local safeDotted = dotFormatName(lastTargetUsed)
             msg = string.format("★ %s // %s // ᴇᴍᴩ ᴏɴ ᴛᴏᴩ ★", safeDotted, getRandomWord())
+            packetState = "FALLBACK"
             updateFallbackMonitor("ꜱᴀꜰᴇ ꜰᴀʟʟʙᴀᴄᴋ ᴅᴇᴩʟᴏʏᴇᴅ ✓")
         else
             filterStats.passed += 1
+            packetState = (attempts > 0) and "REROLLED" or "CLEAN"
             updateFallbackMonitor("0 ᴛᴀɢꜱ • ᴄʟᴇᴀɴ ᴅᴇʟɪᴠᴇʀʏ ✓")
         end
+    end
+
+    if pushOrderBookPacket then
+        pushOrderBookPacket(lastTargetUsed, #msg, packetState)
     end
 
     return msg
@@ -986,7 +996,7 @@ end)
 
 
 -- ========================================================
--- TAB 1: MAIN CONTROLS (CLEAN & FOCUSED)
+-- TAB 1: MAIN CONTROLS
 -- ========================================================
 Tab:CreateLabel("ᴇ ᴍ ᴩ   ꜱ ᴩ ᴀ ᴍ ᴍ ᴇ ʀ  ꜱ ʏ ꜱ ᴛ ᴇ ᴍ")
 Tab:CreateLabel("ꜱᴄʀɪᴩᴛ ᴍᴀᴅᴇ ʙʏ: ᴀꜱʜᴜ")
@@ -1129,7 +1139,7 @@ Tab:CreateToggle({
 
 
 -- ========================================================
--- TAB 2: SMART ENGINES (DEDICATED AI & PROTECTION SUITE)
+-- TAB 2: SMART ENGINES
 -- ========================================================
 EngineTab:CreateLabel("ɴᴇᴜʀᴀʟ ᴄʜᴀᴛ & ᴩᴇʀꜰᴏʀᴍᴀɴᴄᴇ ᴇɴɢɪɴᴇꜱ")
 
@@ -1234,9 +1244,9 @@ end)
 
 
 -- ========================================================
--- TAB 4: CRYPTO-TERMINAL STYLE LIVE TELEMETRY TERMINAL
+-- TAB 4: COINBASE ADVANCED PRO-EXCHANGE LIVE TERMINAL
 -- ========================================================
-local terminalPlaceholder = LiveTab:CreateLabel("TXR_CRYPTO_LIVE_TERMINAL")
+local terminalPlaceholder = LiveTab:CreateLabel("TXR_COINBASE_PRO_TERMINAL")
 local sessionStartTime = tick()
 
 task.spawn(function()
@@ -1246,7 +1256,7 @@ task.spawn(function()
     local termLabel
 
     for _, obj in ipairs(guiRoot:GetDescendants()) do
-        if obj:IsA("TextLabel") and obj.Text == "TXR_CRYPTO_LIVE_TERMINAL" then
+        if obj:IsA("TextLabel") and obj.Text == "TXR_COINBASE_PRO_TERMINAL" then
             termLabel = obj
             break
         end
@@ -1263,10 +1273,10 @@ task.spawn(function()
             if termLabel.Visible then termLabel.Visible = false end
         end)
 
-        -- Large Crypto-Trading Style Terminal Card
-        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 232)
-        card.BackgroundColor3 = Color3.new(1, 1, 1)
-        card.BackgroundTransparency = 0.35
+        -- Deep Obsidian Coinbase Advanced Exchange Card (320px tall)
+        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 326)
+        card.BackgroundColor3 = Color3.fromRGB(10, 12, 16)
+        card.BackgroundTransparency = 0.08
         card.ClipsDescendants = true
 
         for _, child in ipairs(card:GetChildren()) do
@@ -1284,148 +1294,303 @@ task.spawn(function()
 
         local tStrokeGrad = Instance.new("UIGradient", tStroke)
         tStrokeGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 170)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 210, 255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(165, 65, 255))
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 200, 118)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 102, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(246, 70, 93))
         })
 
-        local tBgGrad = Instance.new("UIGradient", card)
-        tBgGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(14, 22, 30)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(16, 19, 28)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(22, 16, 34))
-        })
-        tBgGrad.Rotation = 25
+        -- 1. TOP EXCHANGE PAIR BAR (Coinbase Blue Badge + EMP-SRV + 24H Stats)
+        local topBar = Instance.new("Frame", card)
+        topBar.Size = UDim2.new(1, -20, 0, 34)
+        topBar.Position = UDim2.new(0, 10, 0, 8)
+        topBar.BackgroundColor3 = Color3.fromRGB(15, 18, 25)
+        topBar.BackgroundTransparency = 0.25
+        Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 8)
 
-        -- Top Header Bar (Asset Ticker Style: EMP/SERVER • LIVE)
-        local tickerTitle = Instance.new("TextLabel", card)
-        tickerTitle.Size = UDim2.new(0.65, 0, 0, 20)
-        tickerTitle.Position = UDim2.new(0, 14, 0, 10)
-        tickerTitle.BackgroundTransparency = 1
-        tickerTitle.Text = "ᴇᴍᴩ / ꜱᴇʀᴠᴇʀ  •  ɴᴇᴛᴡᴏʀᴋ ᴛᴇʀᴍɪɴᴀʟ"
-        tickerTitle.TextColor3 = Color3.fromRGB(240, 248, 255)
-        tickerTitle.Font = Enum.Font.GothamBlack
-        tickerTitle.TextSize = 12.5
-        tickerTitle.TextXAlignment = Enum.TextXAlignment.Left
+        local cbBadge = Instance.new("Frame", topBar)
+        cbBadge.Size = UDim2.fromOffset(20, 20)
+        cbBadge.AnchorPoint = Vector2.new(0, 0.5)
+        cbBadge.Position = UDim2.new(0, 8, 0.5, 0)
+        cbBadge.BackgroundColor3 = Color3.fromRGB(0, 82, 255)
+        Instance.new("UICorner", cbBadge).CornerRadius = UDim.new(1, 0)
 
-        local livePill = Instance.new("Frame", card)
-        livePill.Size = UDim2.fromOffset(88, 20)
-        livePill.AnchorPoint = Vector2.new(1, 0)
-        livePill.Position = UDim2.new(1, -12, 0, 10)
-        livePill.BackgroundColor3 = Color3.fromRGB(10, 32, 24)
-        livePill.BackgroundTransparency = 0.35
-        Instance.new("UICorner", livePill).CornerRadius = UDim.new(1, 0)
+        local cbLetter = Instance.new("TextLabel", cbBadge)
+        cbLetter.Size = UDim2.fromScale(1, 1)
+        cbLetter.BackgroundTransparency = 1
+        cbLetter.Text = "E"
+        cbLetter.TextColor3 = Color3.new(1, 1, 1)
+        cbLetter.Font = Enum.Font.GothamBlack
+        cbLetter.TextSize = 11
 
-        local livePillStroke = Instance.new("UIStroke", livePill)
-        livePillStroke.Thickness = 1
-        livePillStroke.Color = Color3.fromRGB(0, 255, 155)
-        livePillStroke.Transparency = 0.45
+        local pairTitle = Instance.new("TextLabel", topBar)
+        pairTitle.Size = UDim2.fromOffset(115, 20)
+        pairTitle.AnchorPoint = Vector2.new(0, 0.5)
+        pairTitle.Position = UDim2.new(0, 34, 0.5, 0)
+        pairTitle.BackgroundTransparency = 1
+        pairTitle.Text = "EMP-SRV ▾"
+        pairTitle.TextColor3 = Color3.fromRGB(245, 248, 255)
+        pairTitle.Font = Enum.Font.GothamBlack
+        pairTitle.TextSize = 12
+        pairTitle.TextXAlignment = Enum.TextXAlignment.Left
 
-        local liveStatusTxt = Instance.new("TextLabel", livePill)
-        liveStatusTxt.Size = UDim2.fromScale(1, 1)
-        liveStatusTxt.BackgroundTransparency = 1
-        liveStatusTxt.Text = "● ꜱᴛᴀɴᴅʙʏ"
-        liveStatusTxt.TextColor3 = Color3.fromRGB(0, 235, 255)
-        liveStatusTxt.Font = Enum.Font.GothamBold
-        liveStatusTxt.TextSize = 9.5
+        local topStats = Instance.new("TextLabel", topBar)
+        topStats.Size = UDim2.new(1, -155, 1, 0)
+        topStats.AnchorPoint = Vector2.new(1, 0.5)
+        topStats.Position = UDim2.new(1, -8, 0.5, 0)
+        topStats.BackgroundTransparency = 1
+        topStats.Text = "24H VOL: 0 PKT  •  HIGH: 60 FPS"
+        topStats.TextColor3 = Color3.fromRGB(132, 142, 156)
+        topStats.Font = Enum.Font.GothamBold
+        topStats.TextSize = 9
+        topStats.TextXAlignment = Enum.TextXAlignment.Right
 
-        -- Big Hero Metric (Current Ping + FPS Index like Crypto Price)
-        local heroMetric = Instance.new("TextLabel", card)
-        heroMetric.Size = UDim2.new(0.6, 0, 0, 26)
-        heroMetric.Position = UDim2.new(0, 14, 0, 34)
-        heroMetric.BackgroundTransparency = 1
-        heroMetric.Text = "60 FPS  •  65 ms"
-        heroMetric.TextColor3 = Color3.fromRGB(0, 255, 170)
-        heroMetric.Font = Enum.Font.GothamBlack
-        heroMetric.TextSize = 18
-        heroMetric.TextXAlignment = Enum.TextXAlignment.Left
+        -- 2. BIG HERO INDEX & OHLC SUB-HEADER
+        local heroPrice = Instance.new("TextLabel", card)
+        heroPrice.Size = UDim2.new(0.62, 0, 0, 26)
+        heroPrice.Position = UDim2.new(0, 12, 0, 46)
+        heroPrice.BackgroundTransparency = 1
+        heroPrice.Text = "60.00 FPS / 65ms"
+        heroPrice.TextColor3 = Color3.fromRGB(255, 255, 255)
+        heroPrice.Font = Enum.Font.GothamBlack
+        heroPrice.TextSize = 17
+        heroPrice.TextXAlignment = Enum.TextXAlignment.Left
 
-        local deltaBadge = Instance.new("TextLabel", card)
-        deltaBadge.Size = UDim2.new(0.38, 0, 0, 26)
-        deltaBadge.AnchorPoint = Vector2.new(1, 0)
-        deltaBadge.Position = UDim2.new(1, -14, 0, 34)
-        deltaBadge.BackgroundTransparency = 1
-        deltaBadge.Text = "+100.0% ᴄʟᴇᴀɴ"
-        deltaBadge.TextColor3 = Color3.fromRGB(0, 255, 170)
-        deltaBadge.Font = Enum.Font.GothamBold
-        deltaBadge.TextSize = 11.5
-        deltaBadge.TextXAlignment = Enum.TextXAlignment.Right
+        local heroDelta = Instance.new("TextLabel", card)
+        heroDelta.Size = UDim2.new(0.36, 0, 0, 26)
+        heroDelta.AnchorPoint = Vector2.new(1, 0)
+        heroDelta.Position = UDim2.new(1, -12, 0, 46)
+        heroDelta.BackgroundTransparency = 1
+        heroDelta.Text = "▲ +100.00% CLEAN"
+        heroDelta.TextColor3 = Color3.fromRGB(0, 200, 118)
+        heroDelta.Font = Enum.Font.GothamBold
+        heroDelta.TextSize = 10.5
+        heroDelta.TextXAlignment = Enum.TextXAlignment.Right
 
-        -- Live Sparkline Graph Container (Crypto Chart Bars)
-        local chartBox = Instance.new("Frame", card)
-        chartBox.Size = UDim2.new(1, -28, 0, 48)
-        chartBox.Position = UDim2.new(0, 14, 0, 66)
-        chartBox.BackgroundColor3 = Color3.fromRGB(10, 14, 20)
-        chartBox.BackgroundTransparency = 0.45
-        chartBox.ClipsDescendants = true
-        Instance.new("UICorner", chartBox).CornerRadius = UDim.new(0, 8)
+        local ohlcLine = Instance.new("TextLabel", card)
+        ohlcLine.Size = UDim2.new(1, -24, 0, 14)
+        ohlcLine.Position = UDim2.new(0, 12, 0, 72)
+        ohlcLine.BackgroundTransparency = 1
+        ohlcLine.Text = "O: 60  H: 60  L: 60  C: 60  •  SRV: 0/0 PLR"
+        ohlcLine.TextColor3 = Color3.fromRGB(0, 200, 118)
+        ohlcLine.Font = Enum.Font.Code
+        ohlcLine.TextSize = 9.5
+        ohlcLine.TextXAlignment = Enum.TextXAlignment.Left
 
-        local chartStroke = Instance.new("UIStroke", chartBox)
-        chartStroke.Thickness = 1
-        chartStroke.Color = Color3.fromRGB(0, 220, 255)
-        chartStroke.Transparency = 0.78
+        -- 3. INTERACTIVE INTERVAL PILL BAR (Candle | 1s | 5s | Depth)
+        local pillRow = Instance.new("Frame", card)
+        pillRow.Size = UDim2.new(1, -24, 0, 22)
+        pillRow.Position = UDim2.new(0, 12, 0, 90)
+        pillRow.BackgroundTransparency = 1
 
-        local bars = {}
-        local barCount = 28
-        for i = 1, barCount do
-            local b = Instance.new("Frame", chartBox)
-            b.AnchorPoint = Vector2.new(0, 1)
-            b.Size = UDim2.new(1 / barCount, -2, 0.45, 0)
-            b.Position = UDim2.new((i - 1) / barCount, 1, 1, -2)
-            b.BackgroundColor3 = Color3.fromRGB(0, 255, 170)
-            b.BorderSizePixel = 0
-            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 2)
-            bars[i] = b
+        local selectedInterval = "1s"
+        local pillButtons = {}
+        local pillNames = {"Candle", "1s", "5s", "15s"}
+
+        for idx, pName in ipairs(pillNames) do
+            local pBtn = Instance.new("TextButton", pillRow)
+            pBtn.Size = UDim2.fromOffset(46, 20)
+            pBtn.Position = UDim2.fromOffset((idx - 1) * 52, 1)
+            pBtn.BackgroundColor3 = (pName == selectedInterval) and Color3.fromRGB(28, 34, 46) or Color3.fromRGB(16, 20, 28)
+            pBtn.Text = pName
+            pBtn.TextColor3 = (pName == selectedInterval) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(132, 142, 156)
+            pBtn.Font = Enum.Font.GothamBold
+            pBtn.TextSize = 9.5
+            pBtn.AutoButtonColor = false
+            Instance.new("UICorner", pBtn).CornerRadius = UDim.new(1, 0)
+            pillButtons[pName] = pBtn
+
+            pBtn.MouseButton1Click:Connect(function()
+                selectedInterval = pName
+                for k, b in pairs(pillButtons) do
+                    b.BackgroundColor3 = (k == selectedInterval) and Color3.fromRGB(28, 34, 46) or Color3.fromRGB(16, 20, 28)
+                    b.TextColor3 = (k == selectedInterval) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(132, 142, 156)
+                end
+            end)
         end
 
-        -- 4-Cell Telemetry Matrix Grid (Client + Server Live Data)
-        local gridContainer = Instance.new("Frame", card)
-        gridContainer.Size = UDim2.new(1, -28, 0, 96)
-        gridContainer.Position = UDim2.new(0, 14, 0, 122)
-        gridContainer.BackgroundTransparency = 1
+        local enginePill = Instance.new("TextLabel", pillRow)
+        enginePill.Size = UDim2.fromOffset(92, 20)
+        enginePill.AnchorPoint = Vector2.new(1, 0.5)
+        enginePill.Position = UDim2.new(1, 0, 0.5, 0)
+        enginePill.BackgroundColor3 = Color3.fromRGB(14, 34, 26)
+        enginePill.Text = "● STANDBY"
+        enginePill.TextColor3 = Color3.fromRGB(0, 210, 255)
+        enginePill.Font = Enum.Font.GothamBlack
+        enginePill.TextSize = 9
+        Instance.new("UICorner", enginePill).CornerRadius = UDim.new(1, 0)
 
-        local function createMetricTile(xScale, yScale, titleStr)
-            local tile = Instance.new("Frame", gridContainer)
-            tile.Size = UDim2.new(0.485, 0, 0, 44)
-            tile.Position = UDim2.new(xScale, 0, yScale, 0)
-            tile.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
-            tile.BackgroundTransparency = 0.42
-            Instance.new("UICorner", tile).CornerRadius = UDim.new(0, 8)
+        -- 4. JAPANESE CANDLESTICK CHART CANVAS + RIGHT PRICE SCALE
+        local chartCanvas = Instance.new("Frame", card)
+        chartCanvas.Size = UDim2.new(1, -24, 0, 124)
+        chartCanvas.Position = UDim2.new(0, 12, 0, 118)
+        chartCanvas.BackgroundColor3 = Color3.fromRGB(12, 15, 21)
+        chartCanvas.ClipsDescendants = true
+        Instance.new("UICorner", chartCanvas).CornerRadius = UDim.new(0, 8)
 
-            local ts = Instance.new("UIStroke", tile)
-            ts.Thickness = 1
-            ts.Color = Color3.fromRGB(255, 255, 255)
-            ts.Transparency = 0.88
+        local cStroke = Instance.new("UIStroke", chartCanvas)
+        cStroke.Thickness = 1
+        cStroke.Color = Color3.fromRGB(32, 39, 52)
 
-            local tLbl = Instance.new("TextLabel", tile)
-            tLbl.Size = UDim2.new(1, -16, 0, 14)
-            tLbl.Position = UDim2.new(0, 8, 0, 5)
-            tLbl.BackgroundTransparency = 1
-            tLbl.Text = titleStr
-            tLbl.TextColor3 = Color3.fromRGB(145, 160, 185)
-            tLbl.Font = Enum.Font.GothamBold
-            tLbl.TextSize = 9
-            tLbl.TextXAlignment = Enum.TextXAlignment.Left
+        -- Horizontal Exchange Gridlines + Right Price Labels
+        local priceAxisLabels = {}
+        for g = 1, 4 do
+            local yFrac = (g - 0.5) / 4
+            local gridLine = Instance.new("Frame", chartCanvas)
+            gridLine.Size = UDim2.new(1, -44, 0, 1)
+            gridLine.Position = UDim2.new(0, 4, yFrac, 0)
+            gridLine.BackgroundColor3 = Color3.fromRGB(26, 32, 44)
+            gridLine.BorderSizePixel = 0
 
-            local vLbl = Instance.new("TextLabel", tile)
-            vLbl.Size = UDim2.new(1, -16, 0, 18)
-            vLbl.Position = UDim2.new(0, 8, 0, 20)
-            vLbl.BackgroundTransparency = 1
-            vLbl.Text = "--"
-            vLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-            vLbl.Font = Enum.Font.GothamBlack
-            vLbl.TextSize = 12
-            vLbl.TextXAlignment = Enum.TextXAlignment.Left
-
-            return vLbl
+            local axisLbl = Instance.new("TextLabel", chartCanvas)
+            axisLbl.Size = UDim2.fromOffset(40, 12)
+            axisLbl.AnchorPoint = Vector2.new(1, 0.5)
+            axisLbl.Position = UDim2.new(1, -3, yFrac, 0)
+            axisLbl.BackgroundTransparency = 1
+            axisLbl.Text = tostring(120 - (g * 25))
+            axisLbl.TextColor3 = Color3.fromRGB(115, 126, 145)
+            axisLbl.Font = Enum.Font.Code
+            axisLbl.TextSize = 8.5
+            axisLbl.TextXAlignment = Enum.TextXAlignment.Right
+            priceAxisLabels[g] = axisLbl
         end
 
-        local tilePlayersVal = createMetricTile(0, 0, "ꜱᴇʀᴠᴇʀ ʟᴏᴀᴅ (ᴩʟᴀʏᴇʀꜱ)")
-        local tileSentVal    = createMetricTile(0.515, 0, "ᴩᴀᴄᴋᴇᴛꜱ ꜱᴇɴᴛ (ᴍꜱɢꜱ)")
-        local tilePacingVal  = createMetricTile(0, 0.52, "ᴀᴄᴛɪᴠᴇ ᴩᴀᴄɪɴɢ / ᴍᴏᴅᴇ")
-        local tileUptimeVal  = createMetricTile(0.515, 0.52, "ꜱᴇꜱꜱɪᴏɴ ᴜᴩᴛɪᴍᴇ")
+        -- Live Price Tag Pill on Right Axis (Red/Green Coinbase Ticker Tag)
+        local liveTagPill = Instance.new("Frame", chartCanvas)
+        liveTagPill.Size = UDim2.fromOffset(42, 15)
+        liveTagPill.AnchorPoint = Vector2.new(1, 0.5)
+        liveTagPill.Position = UDim2.new(1, -2, 0.5, 0)
+        liveTagPill.BackgroundColor3 = Color3.fromRGB(0, 200, 118)
+        liveTagPill.ZIndex = 6
+        Instance.new("UICorner", liveTagPill).CornerRadius = UDim.new(0, 3)
 
-        -- Smooth FPS Tracker & Sparkline Updater
+        local liveTagTxt = Instance.new("TextLabel", liveTagPill)
+        liveTagTxt.Size = UDim2.fromScale(1, 1)
+        liveTagTxt.BackgroundTransparency = 1
+        liveTagTxt.Text = "60.0"
+        liveTagTxt.TextColor3 = Color3.new(1, 1, 1)
+        liveTagTxt.Font = Enum.Font.GothamBlack
+        liveTagTxt.TextSize = 8.5
+        liveTagTxt.ZIndex = 7
+
+        -- Candle Holders (22 Japanese Candlesticks with Wick + Body)
+        local candleArea = Instance.new("Frame", chartCanvas)
+        candleArea.Size = UDim2.new(1, -50, 1, -12)
+        candleArea.Position = UDim2.new(0, 6, 0, 6)
+        candleArea.BackgroundTransparency = 1
+
+        local candleCount = 22
+        local candles = {}
+        local candleHistory = {}
+        for i = 1, candleCount do
+            local slot = Instance.new("Frame", candleArea)
+            slot.Size = UDim2.new(1 / candleCount, 0, 1, 0)
+            slot.Position = UDim2.new((i - 1) / candleCount, 0, 0, 0)
+            slot.BackgroundTransparency = 1
+
+            local wick = Instance.new("Frame", slot)
+            wick.AnchorPoint = Vector2.new(0.5, 0)
+            wick.Size = UDim2.new(0, 1.5, 0.4, 0)
+            wick.Position = UDim2.new(0.5, 0, 0.3, 0)
+            wick.BackgroundColor3 = Color3.fromRGB(0, 200, 118)
+            wick.BorderSizePixel = 0
+
+            local body = Instance.new("Frame", slot)
+            body.AnchorPoint = Vector2.new(0.5, 0)
+            body.Size = UDim2.new(0.68, 0, 0.2, 0)
+            body.Position = UDim2.new(0.5, 0, 0.4, 0)
+            body.BackgroundColor3 = Color3.fromRGB(0, 200, 118)
+            body.BorderSizePixel = 0
+            Instance.new("UICorner", body).CornerRadius = UDim.new(0, 1)
+
+            candles[i] = {wick = wick, body = body}
+            candleHistory[i] = {o = 60, h = 64, l = 56, c = 62}
+        end
+
+        -- 5. BOTTOM LIVE ORDER-BOOK / PACKET TAPE (Green & Red Exchange Rows)
+        local orderBookBox = Instance.new("Frame", card)
+        orderBookBox.Size = UDim2.new(1, -24, 0, 72)
+        orderBookBox.Position = UDim2.new(0, 12, 0, 248)
+        orderBookBox.BackgroundColor3 = Color3.fromRGB(13, 16, 23)
+        Instance.new("UICorner", orderBookBox).CornerRadius = UDim.new(0, 8)
+
+        local obHeader = Instance.new("TextLabel", orderBookBox)
+        obHeader.Size = UDim2.new(1, -16, 0, 14)
+        obHeader.Position = UDim2.new(0, 8, 0, 4)
+        obHeader.BackgroundTransparency = 1
+        obHeader.Text = "LIVE PACKET TAPE (SIZE)          TARGET          STATUS"
+        obHeader.TextColor3 = Color3.fromRGB(115, 126, 145)
+        obHeader.Font = Enum.Font.Code
+        obHeader.TextSize = 8.5
+        obHeader.TextXAlignment = Enum.TextXAlignment.Left
+
+        local tapeRows = {}
+        for r = 1, 3 do
+            local rFrame = Instance.new("Frame", orderBookBox)
+            rFrame.Size = UDim2.new(1, -16, 0, 15)
+            rFrame.Position = UDim2.new(0, 8, 0, 18 + ((r - 1) * 17))
+            rFrame.BackgroundColor3 = Color3.fromRGB(0, 200, 118)
+            rFrame.BackgroundTransparency = 0.90
+            Instance.new("UICorner", rFrame).CornerRadius = UDim.new(0, 3)
+
+            local leftTxt = Instance.new("TextLabel", rFrame)
+            leftTxt.Size = UDim2.new(0.45, 0, 1, 0)
+            leftTxt.Position = UDim2.new(0, 6, 0, 0)
+            leftTxt.BackgroundTransparency = 1
+            leftTxt.Text = "0.00s  •  0B"
+            leftTxt.TextColor3 = Color3.fromRGB(0, 200, 118)
+            leftTxt.Font = Enum.Font.Code
+            leftTxt.TextSize = 9
+            leftTxt.TextXAlignment = Enum.TextXAlignment.Left
+
+            local midTxt = Instance.new("TextLabel", rFrame)
+            midTxt.Size = UDim2.new(0.32, 0, 1, 0)
+            midTxt.Position = UDim2.new(0.42, 0, 0, 0)
+            midTxt.BackgroundTransparency = 1
+            midTxt.Text = "READY"
+            midTxt.TextColor3 = Color3.fromRGB(225, 232, 245)
+            midTxt.Font = Enum.Font.GothamBold
+            midTxt.TextSize = 9
+            midTxt.TextXAlignment = Enum.TextXAlignment.Center
+
+            local rightTxt = Instance.new("TextLabel", rFrame)
+            rightTxt.Size = UDim2.new(0.26, -6, 1, 0)
+            rightTxt.AnchorPoint = Vector2.new(1, 0)
+            rightTxt.Position = UDim2.new(1, -6, 0, 0)
+            rightTxt.BackgroundTransparency = 1
+            rightTxt.Text = "STANDBY"
+            rightTxt.TextColor3 = Color3.fromRGB(0, 200, 118)
+            rightTxt.Font = Enum.Font.GothamBlack
+            rightTxt.TextSize = 9
+            rightTxt.TextXAlignment = Enum.TextXAlignment.Right
+
+            tapeRows[r] = {bg = rFrame, left = leftTxt, mid = midTxt, right = rightTxt}
+        end
+
+        pushOrderBookPacket = function(targetName, byteSize, stateTag)
+            pcall(function()
+                for r = 3, 2, -1 do
+                    tapeRows[r].left.Text = tapeRows[r - 1].left.Text
+                    tapeRows[r].mid.Text = tapeRows[r - 1].mid.Text
+                    tapeRows[r].right.Text = tapeRows[r - 1].right.Text
+                    tapeRows[r].left.TextColor3 = tapeRows[r - 1].left.TextColor3
+                    tapeRows[r].right.TextColor3 = tapeRows[r - 1].right.TextColor3
+                    tapeRows[r].bg.BackgroundColor3 = tapeRows[r - 1].bg.BackgroundColor3
+                end
+
+                local isGreen = (stateTag == "CLEAN" or stateTag == "REROLLED")
+                local rowCol = isGreen and Color3.fromRGB(0, 200, 118) or Color3.fromRGB(246, 70, 93)
+                local pMs = getServerPingMs()
+
+                tapeRows[1].left.Text = string.format("%dms  •  %dB", pMs, byteSize)
+                tapeRows[1].mid.Text = string.sub(targetName, 1, 12)
+                tapeRows[1].right.Text = stateTag
+                tapeRows[1].left.TextColor3 = rowCol
+                tapeRows[1].right.TextColor3 = rowCol
+                tapeRows[1].bg.BackgroundColor3 = rowCol
+            end)
+        end
+
+        -- FPS + Candlestick Renderer Loop
         local currentFps = 60
         local frameCounter = 0
         local lastFpsTick = tick()
@@ -1433,7 +1598,7 @@ task.spawn(function()
 
         RunService.RenderStepped:Connect(function(dt)
             frameCounter += 1
-            animRot = (animRot + dt * 65) % 360
+            animRot = (animRot + dt * 55) % 360
             if tStrokeGrad and tStrokeGrad.Parent then
                 tStrokeGrad.Rotation = animRot
             end
@@ -1446,60 +1611,91 @@ task.spawn(function()
             end
         end)
 
+        local lastClose = 60
         task.spawn(function()
             while card and card.Parent do
                 local pingMs = getServerPingMs()
                 local plrCount = #Players:GetPlayers()
                 local maxPlrs = Players.MaxPlayers or 0
-                local elapsed = math.floor(tick() - sessionStartTime)
-                local mins = math.floor(elapsed / 60)
-                local secs = elapsed % 60
 
-                -- Hero FPS & Ping readout
-                heroMetric.Text = string.format("%d FPS  •  %d ms", currentFps, pingMs)
-                if pingMs <= 110 then
-                    heroMetric.TextColor3 = Color3.fromRGB(0, 255, 170)
-                elseif pingMs <= 210 then
-                    heroMetric.TextColor3 = Color3.fromRGB(255, 200, 45)
-                else
-                    heroMetric.TextColor3 = Color3.fromRGB(255, 70, 95)
+                -- Compute new OHLC candle from live FPS & Ping stability
+                local openVal = lastClose
+                local jitter = math.clamp((100 - math.min(pingMs, 100)) * 0.08, -6, 6) + (running and math.random(-3, 5) or math.random(-2, 2))
+                local closeVal = math.clamp(currentFps + jitter, 15, 144)
+                local highVal = math.min(148, math.max(openVal, closeVal) + math.random(2, 7))
+                local lowVal = math.max(10, math.min(openVal, closeVal) - math.random(2, 7))
+                lastClose = closeVal
+
+                for i = 1, candleCount - 1 do
+                    candleHistory[i] = candleHistory[i + 1]
+                end
+                candleHistory[candleCount] = {o = openVal, h = highVal, l = lowVal, c = closeVal}
+
+                -- Find min/max scale across visible candles
+                local minScale, maxScale = 999, 0
+                for i = 1, candleCount do
+                    if candleHistory[i].l < minScale then minScale = candleHistory[i].l end
+                    if candleHistory[i].h > maxScale then maxScale = candleHistory[i].h end
+                end
+                local span = math.max(12, maxScale - minScale)
+
+                for g = 1, 4 do
+                    local val = maxScale - ((g - 0.5) / 4) * span
+                    priceAxisLabels[g].Text = string.format("%.0f", val)
                 end
 
-                -- Live Engine Pill Status
-                if running then
-                    liveStatusTxt.Text = "● ʟɪᴠᴇ ᴀᴄᴛɪᴠᴇ"
-                    liveStatusTxt.TextColor3 = Color3.fromRGB(0, 255, 155)
-                    livePillStroke.Color = Color3.fromRGB(0, 255, 155)
-                else
-                    liveStatusTxt.Text = "● ꜱᴛᴀɴᴅʙʏ"
-                    liveStatusTxt.TextColor3 = Color3.fromRGB(0, 235, 255)
-                    livePillStroke.Color = Color3.fromRGB(0, 235, 255)
+                for i = 1, candleCount do
+                    local d = candleHistory[i]
+                    local bullish = d.c >= d.o
+                    local col = bullish and Color3.fromRGB(0, 200, 118) or Color3.fromRGB(246, 70, 93)
+
+                    local topWickY = 1 - ((d.h - minScale) / span)
+                    local botWickY = 1 - ((d.l - minScale) / span)
+                    local wickH = math.max(0.03, botWickY - topWickY)
+
+                    local topBodyY = 1 - ((math.max(d.o, d.c) - minScale) / span)
+                    local botBodyY = 1 - ((math.min(d.o, d.c) - minScale) / span)
+                    local bodyH = math.max(0.035, botBodyY - topBodyY)
+
+                    candles[i].wick.Position = UDim2.new(0.5, 0, topWickY, 0)
+                    candles[i].wick.Size = UDim2.new(0, 1.5, wickH, 0)
+                    candles[i].wick.BackgroundColor3 = col
+
+                    candles[i].body.Position = UDim2.new(0.5, 0, topBodyY, 0)
+                    candles[i].body.Size = UDim2.new(0.68, 0, bodyH, 0)
+                    candles[i].body.BackgroundColor3 = col
                 end
 
-                -- Clean Rate Percentage
+                -- Live Right-Axis Price Tag Position & Color
+                local closeNormY = math.clamp(1 - ((closeVal - minScale) / span), 0.08, 0.92)
+                local lastBullish = closeVal >= openVal
+                liveTagPill.Position = UDim2.new(1, -2, closeNormY, 0)
+                liveTagPill.BackgroundColor3 = lastBullish and Color3.fromRGB(0, 200, 118) or Color3.fromRGB(246, 70, 93)
+                liveTagTxt.Text = string.format("%.1f", closeVal)
+
+                -- Update Top Headers & Hero Readout
+                topStats.Text = string.format("24H VOL: %d PKT  •  HIGH: %.0f FPS", totalSentCount, maxScale)
+                heroPrice.Text = string.format("%.2f FPS  •  %dms", closeVal, pingMs)
+
                 local totalChecked = filterStats.passed + filterStats.rerolled + filterStats.fallbackUsed
-                local cleanPct = totalChecked > 0 and math.floor(((filterStats.passed + filterStats.fallbackUsed) / totalChecked) * 1000) / 10 or 100.0
-                deltaBadge.Text = string.format("+%.1f%% ᴄʟᴇᴀɴ", cleanPct)
+                local cleanPct = totalChecked > 0 and ((filterStats.passed + filterStats.fallbackUsed) / totalChecked) * 100 or 100.0
+                heroDelta.Text = string.format("▲ +%.2f%% CLEAN", cleanPct)
 
-                -- Update 4 Tiles
-                tilePlayersVal.Text = string.format("%d / %d ᴏɴʟɪɴᴇ", plrCount, maxPlrs)
-                tileSentVal.Text = string.format("%d ᴍꜱɢꜱ ᴅᴇʟɪᴠᴇʀᴇᴅ", totalSentCount)
+                ohlcLine.Text = string.format("O:%.0f H:%.0f L:%.0f C:%.0f • SRV: %d/%d PLR", openVal, highVal, lowVal, closeVal, plrCount, maxPlrs)
+                ohlcLine.TextColor3 = lastBullish and Color3.fromRGB(0, 200, 118) or Color3.fromRGB(246, 70, 93)
 
-                local activeDelay = smartAntiMute and computeBalancedSafeDelay(pingMs) or speed
-                local modeShort = smartAntiMute and "ᴀᴜᴛᴏ-ꜱᴀꜰᴇ" or "ᴍᴀɴᴜᴀʟ"
-                tilePacingVal.Text = string.format("%.2fs (%s)", activeDelay, modeShort)
-                tileUptimeVal.Text = string.format("%02dm : %02ds", mins, secs)
-
-                -- Shift Sparkline Graph Bars (Crypto Candlestick/Wave Effect)
-                for i = 1, barCount - 1 do
-                    bars[i].Size = bars[i + 1].Size
-                    bars[i].BackgroundColor3 = bars[i + 1].BackgroundColor3
+                if running then
+                    enginePill.Text = "● LIVE ACTIVE"
+                    enginePill.TextColor3 = Color3.fromRGB(0, 200, 118)
+                    enginePill.BackgroundColor3 = Color3.fromRGB(12, 36, 26)
+                else
+                    enginePill.Text = "● STANDBY"
+                    enginePill.TextColor3 = Color3.fromRGB(0, 210, 255)
+                    enginePill.BackgroundColor3 = Color3.fromRGB(14, 26, 38)
                 end
-                local normHeight = math.clamp((currentFps / 120) * 0.65 + (running and 0.25 or 0.10), 0.15, 0.92)
-                bars[barCount].Size = UDim2.new(1 / barCount, -2, normHeight, 0)
-                bars[barCount].BackgroundColor3 = running and Color3.fromRGB(0, 255, 170) or Color3.fromRGB(0, 210, 255)
 
-                task.wait(0.6)
+                local waitStep = (selectedInterval == "15s" and 1.2) or (selectedInterval == "5s" and 0.8) or 0.55
+                task.wait(waitStep)
             end
         end)
     end
