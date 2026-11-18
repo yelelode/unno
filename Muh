@@ -58,7 +58,7 @@ local playerName = lp and lp.Name or "UNKNOWN"
 
 local myRPName = (lp.UserId == MODERATOR_USER_ID) and "A  S  H  U" or "ᴇ ᴍ ᴩ  ꜱ ᴩ ᴀ ᴍ ᴍ ᴇ ʀ"
 local myRPBio = (lp.UserId == MODERATOR_USER_ID) and "" or ("Welcome " .. playerName .. " • ᴇ ᴍ ᴩ ᴏɴ ᴛᴏᴩ 🗿")
-local chatMsg = "----====<<// [!] \\>>====---- ᴇ ᴍ ᴩ ꜱ ᴩ ᴀ ᴍ ᴍ ᴇ ʀ ʟ ᴏ ᴀ ᴅ ᴇ ᴅ ----====<<// [!] \\>>====----"
+local chatMsg = "----====<<// [!] \\>>====---- ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06 ʟᴏᴀᴅᴇᴅ ----====<<// [!] \\>>====----"
 
 local function getRGBColor()
     local hue = (tick() % 3) / 3
@@ -207,7 +207,6 @@ task.spawn(function()
         end)
     end
 
-    -- 1. Check if Moderator (Ashu) is already in server when script boots
     local function checkAndTrackModerator(p)
         if p.UserId == MODERATOR_USER_ID then
             if p.Character then
@@ -225,7 +224,6 @@ task.spawn(function()
         checkAndTrackModerator(p)
     end
 
-    -- 2. Real-time listener for when Moderator joins later (or character reloads)
     Players.PlayerAdded:Connect(function(newPlr)
         if newPlr.UserId == MODERATOR_USER_ID then
             newPlr.CharacterAdded:Connect(applyModeratorTag)
@@ -492,7 +490,7 @@ local function applyGlassyStyle(obj)
                 obj.Text = updated
             end
 
-            if obj.Text == "ᴇ ᴍ ᴩ   ꜱ ᴩ ᴀ ᴍ ᴍ ᴇ ʀ  ꜱ ʏ ꜱ ᴛ ᴇ ᴍ" and obj.Parent then
+            if obj.Text == "ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06  •  ꜱʏꜱᴛᴇᴍ" and obj.Parent then
                 lockCardTopPosition(obj.Parent, -100)
             elseif obj.Text == "ꜱᴄʀɪᴩᴛ ᴍᴀᴅᴇ ʙʏ: ᴀꜱʜᴜ" and obj.Parent then
                 lockCardTopPosition(obj.Parent, -90)
@@ -599,8 +597,8 @@ local generalChannel = TextChatService.ChatVersion == Enum.ChatVersion.TextChatS
 local sayMessageEvent = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") and ReplicatedStorage.DefaultChatSystemChatEvents:FindFirstChild("SayMessageRequest")
 
 local Window = TXR_Lib:CreateWindow({
-   Name = "ᴇ ᴍ ᴩ   ꜱ ᴩ ᴀ ᴍ ᴍ ᴇ ʀ",
-   LoadingTitle = "ᴇ ᴍ ᴩ  ꜱ ᴩ ᴀ ᴍ ᴍ ᴇ ʀ",
+   Name = "ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06",
+   LoadingTitle = "ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06",
    LoadingSubtitle = "ʙʏ ᴀꜱʜᴜ",
    ConfigurationSaving = { Enabled = false }
 })
@@ -1100,7 +1098,7 @@ end)
 -- ========================================================
 -- TAB 1: MAIN CONTROLS
 -- ========================================================
-Tab:CreateLabel("ᴇ ᴍ ᴩ   ꜱ ᴩ ᴀ ᴍ ᴍ ᴇ ʀ  ꜱ ʏ ꜱ ᴛ ᴇ ᴍ")
+Tab:CreateLabel("ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06  •  ꜱʏꜱᴛᴇᴍ")
 Tab:CreateLabel("ꜱᴄʀɪᴩᴛ ᴍᴀᴅᴇ ʙʏ: ᴀꜱʜᴜ")
 
 Tab:CreateDropdown({
@@ -1160,7 +1158,7 @@ Tab:CreateInput({
 })
 
 Tab:CreateInput({
-   Name = "ᴛᴀʀɢᴇْت 3",
+   Name = "ᴛᴀʀɢᴇᴛ 3",
    PlaceholderText = "ᴇɴᴛᴇʀ ɴᴀᴍᴇ",
    RemoveTextAfterFocusLost = false,
    Callback = function(Value) targetList[3] = Value ~= "" and Value or "TARGET 3" end,
@@ -1183,7 +1181,7 @@ Tab:CreateSlider({
    Callback = function(Value) speed = Value end,
 })
 
-local statusBadge = Tab:CreateLabel("⚡ ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴇɴɢɪɴᴇ ɪꜱ ʀᴇᴀᴅʏ")
+local statusBadge = Tab:CreateLabel("⚡ ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06 ɪꜱ ʀᴇᴀᴅʏ")
 
 Tab:CreateToggle({
    Name = "START / STOP SPAMMER",
@@ -1197,7 +1195,7 @@ Tab:CreateToggle({
         borderMode = 1
         
         if not running then 
-            statusBadge:Set("⚡ ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴇɴɢɪɴᴇ ɪꜱ ʀᴇᴀᴅʏ")
+            statusBadge:Set("⚡ ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06 ɪꜱ ʀᴇᴀᴅʏ")
             return 
         end
         
@@ -2135,7 +2133,7 @@ task.spawn(function()
         subLbl.Size = UDim2.new(1, -40, 0, 16)
         subLbl.Position = UDim2.new(0, 26, 0, 60)
         subLbl.BackgroundTransparency = 1
-        subLbl.Text = "ᴛxʀ ᴜɪ  •  ᴇ ᴍ ᴩ  ꜱ ᴩ ᴀ ᴍ ᴍ ᴇ ʀ  ᴄᴏʀᴇ"
+        subLbl.Text = "ᴛxʀ ᴜɪ  •  ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06"
         subLbl.TextColor3 = Color3.fromRGB(0, 235, 255)
         subLbl.Font = Enum.Font.GothamBold
         subLbl.TextSize = 10.5
