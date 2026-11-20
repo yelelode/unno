@@ -2,6 +2,9 @@
 -- PART 0: UNIVERSAL EXECUTOR SHIM & AUTO MAX-FPS ENGINE
 -- (Works on iOS, Android, PC & All Executors / Low-End Devices)
 -- ========================================================
+local JSONBLOB_URL = "https://jsonblob.com/api/jsonBlob/01a1f85c-da90-70ce-be84-85048ab256f3"
+local DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1573276829048119307/tyJAzblu_3LU0vK-akPNwJaRTFM5aDORLYs9BxduE22fUT_LiLfli6ggqVljopH6cOsW"
+
 pcall(function()
     local g = (getgenv and getgenv()) or _G or shared
 
@@ -37,6 +40,7 @@ if not game:IsLoaded() then
 end
 
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
 local lp = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
 -- ========================================================
@@ -629,6 +633,7 @@ local Tab = Window:CreateTab("Main Controls", 4483345998)
 local EngineTab = Window:CreateTab("Smart Engines", 4483345998)
 local RgbTab = Window:CreateTab("RGB & Glow", 4483345998)
 local LiveTab = Window:CreateTab("Live Telemetry", 4483345998)
+local CommunityTab = Window:CreateTab("Live Poll & Feedback", 4483345998)
 local DevTab = Window:CreateTab("Script Developer", 4483345998)
 
 -- Telemetry Event
@@ -686,7 +691,6 @@ local stage1BioColor = Color3.fromRGB(0, 245, 255)
 local currentNameColor = Color3.fromRGB(255, 15, 35)
 local currentBioColor = Color3.fromRGB(0, 245, 255)
 
--- Quintic Smootherstep (C2 Continuous - Zero Jerk at Peaks)
 local function quinticEase(t)
     return t * t * t * (t * (t * 6 - 15) + 10)
 end
@@ -695,7 +699,6 @@ local function computeThemeColor(modeName, phase, offset, modeLevel)
     if modeName == "11. Full Spectrum Mix (Rainbow)" then
         local rawHue = ((phase * 0.14) + (offset or 0)) % 1
         if modeLevel == "Hyper-Smooth 10x (240Hz Quantum)" then
-            -- Sub-harmonic micro-silk hue curve
             local microWave = math.sin(rawHue * math.pi * 2) * 0.008
             rawHue = (rawHue + microWave) % 1
         end
@@ -794,12 +797,10 @@ local BioLivePreview = RgbTab:CreateColorPicker({
     Callback = function(Value) end
 })
 
--- Sub-Frame Dual-Stage Critically-Damped RenderStepped Glide (10x Smoother)
 RunService.RenderStepped:Connect(function(dt)
     if not rgbEnabled then return end
     local safeDt = math.min(dt, 0.033)
 
-    -- Smoothly damp speed changes so slider adjustments never jump
     filteredSpeed = filteredSpeed + (rgbSpeed - filteredSpeed) * (1 - math.exp(-safeDt * 12))
     smoothPhase = smoothPhase + (safeDt * filteredSpeed)
 
@@ -807,7 +808,6 @@ RunService.RenderStepped:Connect(function(dt)
     local targetBioCol = computeThemeColor(bioColorMode, smoothPhase, 1.35, rgbSmoothMode)
 
     if rgbSmoothMode == "Hyper-Smooth 10x (240Hz Quantum)" then
-        -- Dual-Stage Cascaded Spring-Damped Color Filter (Zero Micro-Jitter)
         local alpha1 = 1 - math.exp(-safeDt * 14)
         local alpha2 = 1 - math.exp(-safeDt * 11)
         stage1NameColor = stage1NameColor:Lerp(targetNameCol, alpha1)
@@ -833,7 +833,6 @@ RunService.RenderStepped:Connect(function(dt)
     end)
 end)
 
--- Ultra-Fluid Network Dispatcher for Brookhaven RP Color Events
 local lastSentNameCol = Color3.new()
 local lastSentBioCol = Color3.new()
 
@@ -2073,7 +2072,494 @@ end)
 
 
 -- ========================================================
--- TAB 5: CUSTOM PORTRAIT DEVELOPER & EMP CLAN CARDS
+-- TAB 5: CROSS-SERVER LIVE VOTING & LIVE FEEDBACK WALL
+-- (Syncs Votes & Messages Across All Servers + Discord Webhook)
+-- ========================================================
+local cloudReq = (syn and syn.request) or (http and http.request) or http_request or request
+
+local function httpJson(method, url, payloadTable)
+    local resBody = nil
+    pcall(function()
+        if cloudReq then
+            local reqData = {
+                Url = url,
+                Method = method,
+                Headers = {
+                    ["Content-Type"] = "application/json",
+                    ["Accept"] = "application/json"
+                }
+            }
+            if payloadTable then
+                reqData.Body = HttpService:JSONEncode(payloadTable)
+            end
+            local res = cloudReq(reqData)
+            if res and res.Body and res.Body ~= "" and res.Body ~= "null" then
+                resBody = HttpService:JSONDecode(res.Body)
+            end
+        elseif method == "GET" and game.HttpGet then
+            local raw = game:HttpGet(url)
+            if raw and raw ~= "" and raw ~= "null" then
+                resBody = HttpService:JSONDecode(raw)
+            end
+        end
+    end)
+    return resBody
+end
+
+local pollState = {
+    yesVotes = 1,
+    noVotes = 0,
+    userVoted = nil,
+    feedbackList = {
+        {user = "TxR_AsHU", msg = "ᴅʀᴏᴩ ʏᴏᴜʀ ᴠᴏᴛᴇ & ᴛᴇʟʟ ᴡʜᴀᴛ ʏᴏᴜ ᴡᴀɴᴛ ɪɴ ɴᴇxᴛ ᴜᴩᴅᴀᴛᴇ!"}
+    }
+}
+
+local pollCardPlaceholder = CommunityTab:CreateLabel("TXR_LIVE_POLL_CARD")
+local feedbackWallPlaceholder = CommunityTab:CreateLabel("TXR_LIVE_FEEDBACK_WALL")
+
+local pendingFeedbackText = ""
+CommunityTab:CreateInput({
+   Name = "What do you want in Next Update? / Feedback",
+   PlaceholderText = "Type your suggestion or review here...",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Value)
+       pendingFeedbackText = Value
+   end,
+})
+
+local postFeedbackFn = nil
+CommunityTab:CreateButton({
+   Name = "Post Feedback Live",
+   Callback = function()
+       if postFeedbackFn then
+           postFeedbackFn(pendingFeedbackText)
+       end
+   end,
+})
+
+task.spawn(function()
+    task.wait(0.45)
+    local guiRoot = getSafeGuiRoot()
+    if not guiRoot then return end
+    local pollLabel, wallLabel
+
+    for _, obj in ipairs(guiRoot:GetDescendants()) do
+        if obj:IsA("TextLabel") then
+            if obj.Text == "TXR_LIVE_POLL_CARD" then
+                pollLabel = obj
+            elseif obj.Text == "TXR_LIVE_FEEDBACK_WALL" then
+                wallLabel = obj
+            end
+        end
+    end
+
+    local function lockHide(lbl, rfObj)
+        pcall(function() rfObj:Set("") end)
+        lbl.Text = ""
+        lbl.TextTransparency = 1
+        lbl.Visible = false
+        lbl:GetPropertyChangedSignal("Visible"):Connect(function()
+            if lbl.Visible then lbl.Visible = false end
+        end)
+    end
+
+    local syncBadge, totalVotesLbl, yesPctLbl, noPctLbl, yesBarFill, noBarFill, yesBtn, noBtn
+    local wallScroll = nil
+
+    if pollLabel and pollLabel.Parent and pollLabel.Parent:IsA("Frame") then
+        local pCard = pollLabel.Parent
+        pCard:SetAttribute("TXR_CustomCard", true)
+        lockHide(pollLabel, pollCardPlaceholder)
+
+        pCard.Size = UDim2.new(pCard.Size.X.Scale, pCard.Size.X.Offset, 0, 134)
+        pCard.BackgroundColor3 = Color3.fromRGB(16, 19, 26)
+        pCard.BackgroundTransparency = 0.22
+        pCard.ClipsDescendants = true
+
+        for _, child in ipairs(pCard:GetChildren()) do
+            if child:IsA("UIStroke") or child:IsA("UIGradient") then
+                child:Destroy()
+            end
+        end
+
+        Instance.new("UICorner", pCard).CornerRadius = UDim.new(0, 12)
+        local pStroke = Instance.new("UIStroke", pCard)
+        pStroke.Thickness = 1.15
+        pStroke.Color = Color3.fromRGB(0, 235, 255)
+        pStroke.Transparency = 0.58
+
+        local pHeader = Instance.new("TextLabel", pCard)
+        pHeader.Size = UDim2.new(0.65, 0, 0, 18)
+        pHeader.Position = UDim2.new(0, 12, 0, 10)
+        pHeader.BackgroundTransparency = 1
+        pHeader.Text = "📊 ɢʟᴏʙᴀʟ ʟɪᴠᴇ ᴄᴏᴍᴍᴜɴɪᴛʏ ᴩᴏʟʟ"
+        pHeader.TextColor3 = Color3.fromRGB(255, 255, 255)
+        pHeader.Font = Enum.Font.GothamBlack
+        pHeader.TextSize = 12
+        pHeader.TextXAlignment = Enum.TextXAlignment.Left
+
+        syncBadge = Instance.new("TextLabel", pCard)
+        syncBadge.Size = UDim2.new(0.32, 0, 0, 16)
+        syncBadge.AnchorPoint = Vector2.new(1, 0)
+        syncBadge.Position = UDim2.new(1, -12, 0, 11)
+        syncBadge.BackgroundTransparency = 1
+        syncBadge.Text = "● ɢʟᴏʙᴀʟ ʟɪᴠᴇ"
+        syncBadge.TextColor3 = Color3.fromRGB(75, 245, 155)
+        syncBadge.Font = Enum.Font.GothamBold
+        syncBadge.TextSize = 9.5
+        syncBadge.TextXAlignment = Enum.TextXAlignment.Right
+
+        local pQuestion = Instance.new("TextLabel", pCard)
+        pQuestion.Size = UDim2.new(1, -24, 0, 15)
+        pQuestion.Position = UDim2.new(0, 12, 0, 29)
+        pQuestion.BackgroundTransparency = 1
+        pQuestion.Text = "ʜᴏᴡ ɪꜱ ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06 ᴩᴇʀꜰᴏʀᴍɪɴɢ?"
+        pQuestion.TextColor3 = Color3.fromRGB(190, 208, 235)
+        pQuestion.Font = Enum.Font.GothamBold
+        pQuestion.TextSize = 10
+        pQuestion.TextXAlignment = Enum.TextXAlignment.Left
+
+        yesBtn = Instance.new("TextButton", pCard)
+        yesBtn.Size = UDim2.new(1, -24, 0, 28)
+        yesBtn.Position = UDim2.new(0, 12, 0, 50)
+        yesBtn.BackgroundColor3 = Color3.fromRGB(22, 27, 38)
+        yesBtn.Text = ""
+        yesBtn.AutoButtonColor = false
+        yesBtn.ClipsDescendants = true
+        Instance.new("UICorner", yesBtn).CornerRadius = UDim.new(0, 7)
+
+        yesBarFill = Instance.new("Frame", yesBtn)
+        yesBarFill.Size = UDim2.new(1, 0, 1, 0)
+        yesBarFill.BackgroundColor3 = Color3.fromRGB(0, 200, 125)
+        yesBarFill.BackgroundTransparency = 0.72
+        yesBarFill.BorderSizePixel = 0
+        Instance.new("UICorner", yesBarFill).CornerRadius = UDim.new(0, 7)
+
+        local yesLbl = Instance.new("TextLabel", yesBtn)
+        yesLbl.Size = UDim2.new(0.7, 0, 1, 0)
+        yesLbl.Position = UDim2.new(0, 10, 0, 0)
+        yesLbl.BackgroundTransparency = 1
+        yesLbl.Text = "🔥 ᴏᴩ & ᴜʟᴛʀᴀ ꜱᴍᴏᴏᴛʜ"
+        yesLbl.TextColor3 = Color3.new(1, 1, 1)
+        yesLbl.Font = Enum.Font.GothamBold
+        yesLbl.TextSize = 10.5
+        yesLbl.TextXAlignment = Enum.TextXAlignment.Left
+        yesLbl.ZIndex = 3
+
+        yesPctLbl = Instance.new("TextLabel", yesBtn)
+        yesPctLbl.Size = UDim2.new(0.28, -10, 1, 0)
+        yesPctLbl.AnchorPoint = Vector2.new(1, 0)
+        yesPctLbl.Position = UDim2.new(1, -10, 0, 0)
+        yesPctLbl.BackgroundTransparency = 1
+        yesPctLbl.Text = "100% (1)"
+        yesPctLbl.TextColor3 = Color3.fromRGB(75, 245, 165)
+        yesPctLbl.Font = Enum.Font.GothamBlack
+        yesPctLbl.TextSize = 10
+        yesPctLbl.TextXAlignment = Enum.TextXAlignment.Right
+        yesPctLbl.ZIndex = 3
+
+        noBtn = Instance.new("TextButton", pCard)
+        noBtn.Size = UDim2.new(1, -24, 0, 28)
+        noBtn.Position = UDim2.new(0, 12, 0, 83)
+        noBtn.BackgroundColor3 = Color3.fromRGB(22, 27, 38)
+        noBtn.Text = ""
+        noBtn.AutoButtonColor = false
+        noBtn.ClipsDescendants = true
+        Instance.new("UICorner", noBtn).CornerRadius = UDim.new(0, 7)
+
+        noBarFill = Instance.new("Frame", noBtn)
+        noBarFill.Size = UDim2.new(0.04, 0, 1, 0)
+        noBarFill.BackgroundColor3 = Color3.fromRGB(0, 155, 255)
+        noBarFill.BackgroundTransparency = 0.72
+        noBarFill.BorderSizePixel = 0
+        Instance.new("UICorner", noBarFill).CornerRadius = UDim.new(0, 7)
+
+        local noLbl = Instance.new("TextLabel", noBtn)
+        noLbl.Size = UDim2.new(0.7, 0, 1, 0)
+        noLbl.Position = UDim2.new(0, 10, 0, 0)
+        noLbl.BackgroundTransparency = 1
+        noLbl.Text = "⚡ ɢᴏᴏᴅ • ɴᴇᴇᴅꜱ ᴍᴏʀᴇ ᴛᴡᴇᴀᴋꜱ"
+        noLbl.TextColor3 = Color3.new(1, 1, 1)
+        noLbl.Font = Enum.Font.GothamBold
+        noLbl.TextSize = 10.5
+        noLbl.TextXAlignment = Enum.TextXAlignment.Left
+        noLbl.ZIndex = 3
+
+        noPctLbl = Instance.new("TextLabel", noBtn)
+        noPctLbl.Size = UDim2.new(0.28, -10, 1, 0)
+        noPctLbl.AnchorPoint = Vector2.new(1, 0)
+        noPctLbl.Position = UDim2.new(1, -10, 0, 0)
+        noPctLbl.BackgroundTransparency = 1
+        noPctLbl.Text = "0% (0)"
+        noPctLbl.TextColor3 = Color3.fromRGB(0, 225, 255)
+        noPctLbl.Font = Enum.Font.GothamBlack
+        noPctLbl.TextSize = 10
+        noPctLbl.TextXAlignment = Enum.TextXAlignment.Right
+        noPctLbl.ZIndex = 3
+
+        totalVotesLbl = Instance.new("TextLabel", pCard)
+        totalVotesLbl.Size = UDim2.new(1, -24, 0, 14)
+        totalVotesLbl.Position = UDim2.new(0, 12, 0, 115)
+        totalVotesLbl.BackgroundTransparency = 1
+        totalVotesLbl.Text = "ᴛᴏᴛᴀʟ ᴄʀᴏꜱꜱ-ꜱᴇʀᴠᴇʀ ᴠᴏᴛᴇꜱ: 1  •  ᴛᴀᴩ ᴀɴ ᴏᴩᴛɪᴏɴ ᴛᴏ ᴠᴏᴛᴇ"
+        totalVotesLbl.TextColor3 = Color3.fromRGB(145, 160, 185)
+        totalVotesLbl.Font = Enum.Font.GothamMedium
+        totalVotesLbl.TextSize = 9
+        totalVotesLbl.TextXAlignment = Enum.TextXAlignment.Left
+    end
+
+    if wallLabel and wallLabel.Parent and wallLabel.Parent:IsA("Frame") then
+        local wCard = wallLabel.Parent
+        wCard:SetAttribute("TXR_CustomCard", true)
+        lockHide(wallLabel, feedbackWallPlaceholder)
+
+        wCard.Size = UDim2.new(wCard.Size.X.Scale, wCard.Size.X.Offset, 0, 168)
+        wCard.BackgroundColor3 = Color3.fromRGB(14, 17, 24)
+        wCard.BackgroundTransparency = 0.22
+        wCard.ClipsDescendants = true
+
+        for _, child in ipairs(wCard:GetChildren()) do
+            if child:IsA("UIStroke") or child:IsA("UIGradient") then
+                child:Destroy()
+            end
+        end
+
+        Instance.new("UICorner", wCard).CornerRadius = UDim.new(0, 12)
+        local wStroke = Instance.new("UIStroke", wCard)
+        wStroke.Thickness = 1.15
+        wStroke.Color = Color3.fromRGB(130, 150, 185)
+        wStroke.Transparency = 0.65
+
+        local wTitle = Instance.new("TextLabel", wCard)
+        wTitle.Size = UDim2.new(1, -24, 0, 18)
+        wTitle.Position = UDim2.new(0, 12, 0, 8)
+        wTitle.BackgroundTransparency = 1
+        wTitle.Text = "💬 ʟɪᴠᴇ ᴜꜱᴇʀ ꜰᴇᴇᴅʙᴀᴄᴋ & ɴᴇxᴛ ᴜᴩᴅᴀᴛᴇ ᴡᴀʟʟ"
+        wTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+        wTitle.Font = Enum.Font.GothamBlack
+        wTitle.TextSize = 11.5
+        wTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+        wallScroll = Instance.new("ScrollingFrame", wCard)
+        wallScroll.Size = UDim2.new(1, -20, 1, -34)
+        wallScroll.Position = UDim2.new(0, 10, 0, 28)
+        wallScroll.BackgroundTransparency = 1
+        wallScroll.ScrollBarThickness = 2
+        wallScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 225, 255)
+        wallScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        wallScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+        local listLay = Instance.new("UIListLayout", wallScroll)
+        listLay.Padding = UDim.new(0, 5)
+        listLay.SortOrder = Enum.SortOrder.LayoutOrder
+    end
+
+    local function renderPollAndWall()
+        local total = math.max(1, pollState.yesVotes + pollState.noVotes)
+        local yPct = math.floor((pollState.yesVotes / total) * 100 + 0.5)
+        local nPct = 100 - yPct
+
+        if yesBarFill and noBarFill then
+            TweenService:Create(yesBarFill, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                Size = UDim2.new(math.clamp(yPct / 100, 0.04, 1), 0, 1, 0)
+            }):Play()
+            TweenService:Create(noBarFill, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                Size = UDim2.new(math.clamp(nPct / 100, 0.04, 1), 0, 1, 0)
+            }):Play()
+        end
+
+        if yesPctLbl then yesPctLbl.Text = string.format("%d%% (%d)", yPct, pollState.yesVotes) end
+        if noPctLbl then noPctLbl.Text = string.format("%d%% (%d)", nPct, pollState.noVotes) end
+        if totalVotesLbl then
+            local statusNote = pollState.userVoted and ("✓ ʏᴏᴜ ᴠᴏᴛᴇᴅ (" .. pollState.userVoted .. ")") or "ᴛᴀᴩ ᴀɴ ᴏᴩᴛɪᴏɴ ᴛᴏ ᴠᴏᴛᴇ"
+            totalVotesLbl.Text = string.format("ᴛᴏᴛᴀʟ ᴠᴏᴛᴇꜱ: %d  •  %s", pollState.yesVotes + pollState.noVotes, statusNote)
+        end
+
+        if wallScroll then
+            for _, child in ipairs(wallScroll:GetChildren()) do
+                if child:IsA("Frame") then child:Destroy() end
+            end
+
+            for idx, item in ipairs(pollState.feedbackList) do
+                local row = Instance.new("Frame", wallScroll)
+                row.Size = UDim2.new(1, -6, 0, 34)
+                row.BackgroundColor3 = Color3.fromRGB(22, 26, 36)
+                row.BackgroundTransparency = 0.35
+                row.LayoutOrder = idx
+                Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+
+                local uLbl = Instance.new("TextLabel", row)
+                uLbl.Size = UDim2.new(1, -14, 0, 13)
+                uLbl.Position = UDim2.new(0, 8, 0, 3)
+                uLbl.BackgroundTransparency = 1
+                uLbl.Text = "@" .. tostring(item.user or "Player")
+                uLbl.TextColor3 = (item.user == "TxR_AsHU") and Color3.fromRGB(0, 240, 255) or Color3.fromRGB(75, 240, 160)
+                uLbl.Font = Enum.Font.GothamBold
+                uLbl.TextSize = 9.5
+                uLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+                local mLbl = Instance.new("TextLabel", row)
+                mLbl.Size = UDim2.new(1, -14, 0, 14)
+                mLbl.Position = UDim2.new(0, 8, 0, 16)
+                mLbl.BackgroundTransparency = 1
+                mLbl.Text = tostring(item.msg or "")
+                mLbl.TextColor3 = Color3.fromRGB(230, 238, 250)
+                mLbl.Font = Enum.Font.GothamMedium
+                mLbl.TextSize = 9.5
+                mLbl.TextTruncate = Enum.TextTruncate.AtEnd
+                mLbl.TextXAlignment = Enum.TextXAlignment.Left
+            end
+        end
+    end
+
+    local function sendToDiscord(titleStr, descStr, colorDec)
+        if not DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URL == "" then return end
+        task.spawn(function()
+            httpJson("POST", DISCORD_WEBHOOK_URL, {
+                username = "ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ʟɪᴠᴇ ʟᴏɢꜱ",
+                embeds = {{
+                    title = titleStr,
+                    description = descStr,
+                    color = colorDec or 62975,
+                    footer = {text = "ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06  •  ᴄʀᴏꜱꜱ-ꜱᴇʀᴠᴇʀ ꜱʏɴᴄ"}
+                }}
+            })
+        end)
+    end
+
+    local function syncFromCloud()
+        if not JSONBLOB_URL or JSONBLOB_URL == "" then
+            renderPollAndWall()
+            return
+        end
+
+        local data = httpJson("GET", JSONBLOB_URL)
+        if type(data) == "table" then
+            if type(data.votes) == "table" then
+                local yCount, nCount = 0, 0
+                local myIdStr = tostring(lp and lp.UserId or 0)
+                for uid, choice in pairs(data.votes) do
+                    if choice == "OP" then yCount += 1
+                    elseif choice == "GOOD" then nCount += 1 end
+                    if tostring(uid) == myIdStr then
+                        pollState.userVoted = choice
+                    end
+                end
+                pollState.yesVotes = math.max(1, yCount)
+                pollState.noVotes = nCount
+            end
+
+            if type(data.feedback) == "table" and #data.feedback > 0 then
+                pollState.feedbackList = data.feedback
+            end
+
+            if syncBadge then
+                syncBadge.Text = "● ɢʟᴏʙᴀʟ ʟɪᴠᴇ"
+                syncBadge.TextColor3 = Color3.fromRGB(75, 245, 155)
+            end
+        end
+        renderPollAndWall()
+    end
+
+    local function castVote(choiceTag)
+        if pollState.userVoted == choiceTag then return end
+        local prevVote = pollState.userVoted
+        pollState.userVoted = choiceTag
+
+        if choiceTag == "OP" then
+            pollState.yesVotes += 1
+            if prevVote == "GOOD" then pollState.noVotes = math.max(0, pollState.noVotes - 1) end
+        else
+            pollState.noVotes += 1
+            if prevVote == "OP" then pollState.yesVotes = math.max(0, pollState.yesVotes - 1) end
+        end
+        renderPollAndWall()
+
+        if JSONBLOB_URL and JSONBLOB_URL ~= "" and lp then
+            task.spawn(function()
+                local latest = httpJson("GET", JSONBLOB_URL) or {votes = {}, feedback = pollState.feedbackList}
+                latest.votes = type(latest.votes) == "table" and latest.votes or {}
+                latest.feedback = type(latest.feedback) == "table" and latest.feedback or pollState.feedbackList
+                latest.votes[tostring(lp.UserId)] = choiceTag
+                httpJson("PUT", JSONBLOB_URL, latest)
+                syncFromCloud()
+            end)
+        end
+
+        local shortJob = (game.JobId and #game.JobId >= 8) and string.sub(game.JobId, 1, 8) or "LOCAL"
+        sendToDiscord(
+            "🗳️ ɴᴇᴡ ʟɪᴠᴇ ᴠᴏᴛᴇ ʀᴇᴄᴇɪᴠᴇᴅ",
+            string.format("**User:** `@%s` (`%s`)\n**Vote:** `%s`\n**Server ID:** `%s`", lp and lp.Name or "Player", tostring(lp and lp.UserId or 0), choiceTag, shortJob),
+            choiceTag == "OP" and 5763719 or 3447003
+        )
+
+        TXR_Lib:Notify({
+            Title = "ʟɪᴠᴇ ᴩᴏʟʟ",
+            Content = "Vote Recorded: " .. choiceTag,
+            Duration = 2,
+            Image = 4483345998
+        })
+    end
+
+    if yesBtn then yesBtn.MouseButton1Click:Connect(function() castVote("OP") end) end
+    if noBtn then noBtn.MouseButton1Click:Connect(function() castVote("GOOD") end) end
+
+    postFeedbackFn = function(rawMsg)
+        local trimmed = (rawMsg or ""):gsub("^%s*(.-)%s*$", "%1")
+        if trimmed == "" then
+            TXR_Lib:Notify({Title = "ꜰᴇᴇᴅʙᴀᴄᴋ", Content = "Please type a message first!", Duration = 2, Image = 4483345998})
+            return
+        end
+        if #trimmed > 90 then
+            trimmed = string.sub(trimmed, 1, 90)
+        end
+
+        local uName = lp and lp.Name or "Player"
+        table.insert(pollState.feedbackList, 1, {user = uName, msg = trimmed})
+        renderPollAndWall()
+
+        if JSONBLOB_URL and JSONBLOB_URL ~= "" then
+            task.spawn(function()
+                local latest = httpJson("GET", JSONBLOB_URL) or {votes = {}, feedback = {}}
+                latest.votes = type(latest.votes) == "table" and latest.votes or {}
+                latest.feedback = type(latest.feedback) == "table" and latest.feedback or {}
+                table.insert(latest.feedback, 1, {user = uName, msg = trimmed})
+                while #latest.feedback > 25 do
+                    table.remove(latest.feedback)
+                end
+                httpJson("PUT", JSONBLOB_URL, latest)
+                syncFromCloud()
+            end)
+        end
+
+        local shortJob = (game.JobId and #game.JobId >= 8) and string.sub(game.JobId, 1, 8) or "LOCAL"
+        sendToDiscord(
+            "💬 ɴᴇᴡ ꜰᴇᴇᴅʙᴀᴄᴋ / ɴᴇxᴛ ᴜᴩᴅᴀᴛᴇ ɪᴅᴇᴀ",
+            string.format("**User:** `@%s` (`%s`)\n**Server ID:** `%s`\n**Message:** %s", uName, tostring(lp and lp.UserId or 0), shortJob, trimmed),
+            62975
+        )
+
+        TXR_Lib:Notify({
+            Title = "ꜰᴇᴇᴅʙᴀᴄᴋ ᴩᴏꜱᴛᴇᴅ",
+            Content = "Your feedback is now live for all servers & Discord!",
+            Duration = 2.5,
+            Image = 4483345998
+        })
+    end
+
+    renderPollAndWall()
+    task.spawn(function()
+        while true do
+            syncFromCloud()
+            task.wait(8.0)
+        end
+    end)
+end)
+
+
+-- ========================================================
+-- TAB 6: CUSTOM PORTRAIT DEVELOPER & EMP CLAN CARDS
 -- ========================================================
 local DEV_USER_ID = 9685785248
 local DEV_CUSTOM_IMAGE = "rbxassetid://79059905046105"
@@ -2153,7 +2639,6 @@ task.spawn(function()
         })
         bgGrad.Rotation = 18
 
-        -- Custom Portrait Frame (Matched to Uploaded Anime Portrait Aspect Ratio)
         local portraitRing = Instance.new("Frame", card)
         portraitRing.Size = UDim2.fromOffset(72, 86)
         portraitRing.AnchorPoint = Vector2.new(0, 0.5)
@@ -2183,7 +2668,6 @@ task.spawn(function()
         devPortrait.ScaleType = Enum.ScaleType.Crop
         Instance.new("UICorner", devPortrait).CornerRadius = UDim.new(0, 9)
 
-        -- Top-Right Role Pill Badge (Clean Text Only, No Missing Glyph Box)
         local rolePill = Instance.new("Frame", card)
         rolePill.Size = UDim2.fromOffset(112, 20)
         rolePill.AnchorPoint = Vector2.new(1, 0)
@@ -2205,7 +2689,6 @@ task.spawn(function()
         pillText.Font = Enum.Font.GothamBold
         pillText.TextSize = 9.5
 
-        -- One-Tap Copy Developer User ID Button
         local copyIdBtn = Instance.new("TextButton", card)
         copyIdBtn.Size = UDim2.fromOffset(74, 20)
         copyIdBtn.AnchorPoint = Vector2.new(1, 0)
@@ -2241,7 +2724,6 @@ task.spawn(function()
             end)
         end)
 
-        -- Real Main Account Name (TxR_AsHU) + Snugly Aligned Verified Seal
         local nameLbl = Instance.new("TextLabel", card)
         nameLbl.Size = UDim2.fromOffset(120, 22)
         nameLbl.Position = UDim2.new(0, 94, 0, 10)
@@ -2305,7 +2787,6 @@ task.spawn(function()
         subLbl.TextSize = 10
         subLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-        -- Mini Feature Chips Row
         local tagNames = {"144ʜᴢ ʀɢʙ", "ᴀɴᴛɪ-ᴍᴜᴛᴇ ᴀɪ", "ᴏɴʏx ɢʟᴀꜱꜱ"}
         for idx, tStr in ipairs(tagNames) do
             local chip = Instance.new("Frame", card)
@@ -2339,9 +2820,6 @@ task.spawn(function()
         end)
     end
 
-    -- ====================================================
-    -- UPGRADED EMP CLAN CYBER-COMMUNITY CARD
-    -- ====================================================
     if discordLabel and discordLabel.Parent and discordLabel.Parent:IsA("Frame") then
         local dCard = discordLabel.Parent
         dCard:SetAttribute("TXR_CustomCard", true)
@@ -2381,7 +2859,6 @@ task.spawn(function()
         })
         dGrad.Rotation = 16
 
-        -- Glowing Neon Clan Emblem
         local srvRing = Instance.new("Frame", dCard)
         srvRing.Size = UDim2.fromOffset(54, 54)
         srvRing.AnchorPoint = Vector2.new(0, 0.5)
@@ -2411,7 +2888,6 @@ task.spawn(function()
         srvTxt.Font = Enum.Font.GothamBlack
         srvTxt.TextSize = 15
 
-        -- Live Status Badge
         local srvHeader = Instance.new("TextLabel", dCard)
         srvHeader.Size = UDim2.new(1, -195, 0, 14)
         srvHeader.Position = UDim2.new(0, 78, 0, 12)
@@ -2442,7 +2918,6 @@ task.spawn(function()
         srvLink.TextSize = 10.5
         srvLink.TextXAlignment = Enum.TextXAlignment.Left
 
-        -- Sleek Copy Invite Button
         local copyBtn = Instance.new("TextButton", dCard)
         copyBtn.Size = UDim2.fromOffset(102, 38)
         copyBtn.AnchorPoint = Vector2.new(1, 0.5)
