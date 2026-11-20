@@ -415,8 +415,8 @@ end
 
 
 -- ========================================================
--- PART 2: TRUE ANDROID 17 / iOS LIQUID FROSTED GLASS ENGINE
--- (High-Translucency Milky Glass + Specular Edge Rim Light)
+-- PART 2: RAZOR-SHARP SMOKED GLASS ENGINE (NOTIFICATION STYLE)
+-- (Dark Smoked Base + Ultra-Thin 0.85px Silver-Grey Hairline Edge)
 -- ========================================================
 local function getSafeGuiRoot()
     local root
@@ -439,9 +439,38 @@ local function cleanOldUI(parent)
             pcall(function() child:Destroy() end)
         end
     end
+    for _, eff in ipairs(Lighting:GetChildren()) do
+        if eff.Name == "TXR_LiquidGlassBlur" then
+            pcall(function() eff:Destroy() end)
+        end
+    end
 end
 pcall(function() cleanOldUI(getSafeGuiRoot()) end)
 pcall(function() cleanOldUI(CoreGui) end)
+
+-- Subtle Background Blur (Active while Main UI is open)
+local glassBlur = Instance.new("BlurEffect")
+glassBlur.Name = "TXR_LiquidGlassBlur"
+glassBlur.Size = 0
+glassBlur.Enabled = true
+glassBlur.Parent = Lighting
+
+local function syncBlurWithWindow(mainFrame)
+    if not mainFrame then return end
+    local function updateBlur()
+        local isOpen = mainFrame.Visible and mainFrame.Parent ~= nil
+        TweenService:Create(glassBlur, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            Size = isOpen and 10 or 0
+        }):Play()
+    end
+    updateBlur()
+    mainFrame:GetPropertyChangedSignal("Visible"):Connect(updateBlur)
+    mainFrame.AncestryChanged:Connect(function(_, parent)
+        if not parent then
+            pcall(function() glassBlur:Destroy() end)
+        end
+    end)
+end
 
 local function isCustomDevCard(obj)
     local curr = obj
@@ -492,40 +521,40 @@ local function enforceModeListOrder(lbl)
     end
 end
 
-local function applyLiquidGlassEffect(frame, isTile)
+local function applySharpSmokedGlass(frame, isTile)
     if not frame or not frame:IsA("Frame") or frame:GetAttribute("TXR_GlassLit") then
         return
     end
     frame:SetAttribute("TXR_GlassLit", true)
 
+    -- Subtle Smoked Glass Gradient (Clean Dark Sheen, No Heavy White Wash)
     local grad = frame:FindFirstChild("TXR_GlassSheen") or Instance.new("UIGradient", frame)
     grad.Name = "TXR_GlassSheen"
-    grad.Rotation = isTile and 32 or 125
+    grad.Rotation = isTile and 25 or 115
     grad.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.45, Color3.fromRGB(215, 230, 250)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(165, 185, 215))
+        ColorSequenceKeypoint.new(0.45, Color3.fromRGB(205, 212, 222)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(165, 172, 182))
     })
     grad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, isTile and 0.08 or 0.14),
-        NumberSequenceKeypoint.new(0.5, isTile and 0.28 or 0.34),
-        NumberSequenceKeypoint.new(1, isTile and 0.48 or 0.52)
+        NumberSequenceKeypoint.new(0, 0.02),
+        NumberSequenceKeypoint.new(1, 0.16)
     })
 
+    -- Razor-Thin 0.85px Silver-Grey Hairline Edge (Matches Notification Card Sharpness)
     local rim = frame:FindFirstChild("TXR_GlassRim") or Instance.new("UIStroke", frame)
     rim.Name = "TXR_GlassRim"
-    rim.Thickness = isTile and 1.15 or 1.35
-    rim.Color = Color3.new(1, 1, 1)
-    rim.Transparency = isTile and 0.42 or 0.48
+    rim.Thickness = 0.85
+    rim.Color = Color3.fromRGB(190, 198, 210)
+    rim.Transparency = isTile and 0.68 or 0.76
 
     local rimGrad = rim:FindFirstChild("TXR_RimLightGrad") or Instance.new("UIGradient", rim)
     rimGrad.Name = "TXR_RimLightGrad"
-    rimGrad.Rotation = 38
+    rimGrad.Rotation = 35
     rimGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.35, Color3.fromRGB(185, 225, 255)),
-        ColorSequenceKeypoint.new(0.75, Color3.fromRGB(110, 140, 180)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(240, 248, 255))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(210, 218, 230)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(120, 128, 140)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(175, 182, 195))
     })
 end
 
@@ -534,8 +563,8 @@ local function applyGlassyStyle(obj)
 
     if obj:IsA("ScrollingFrame") then
         obj.ScrollBarThickness = 2
-        obj.ScrollBarImageColor3 = Color3.fromRGB(220, 245, 255)
-        obj.ScrollBarImageTransparency = 0.35
+        obj.ScrollBarImageColor3 = Color3.fromRGB(180, 195, 215)
+        obj.ScrollBarImageTransparency = 0.45
     end
 
     if obj:IsA("TextLabel") or obj:IsA("TextButton") then
@@ -584,24 +613,33 @@ local function applyGlassyStyle(obj)
     if obj:IsA("Frame") and not obj:GetAttribute("TXR_GlassStyled") then
         obj:SetAttribute("TXR_GlassStyled", true)
         local n = obj.Name
-        if n == "Main" then
-            obj.BackgroundColor3 = Color3.fromRGB(22, 28, 38)
-            obj.BackgroundTransparency = 0.56
-            applyLiquidGlassEffect(obj, false)
+        if n == "Loading" then
+            -- Clean Dark Smoked Intro (No Thick White Outer Border)
+            obj.BackgroundColor3 = Color3.fromRGB(16, 18, 22)
+            obj.BackgroundTransparency = 0.25
+            applySharpSmokedGlass(obj, false)
+        elseif n == "Main" then
+            -- Deep Smoked Glass Main Container
+            obj.BackgroundColor3 = Color3.fromRGB(15, 17, 21)
+            obj.BackgroundTransparency = 0.34
+            applySharpSmokedGlass(obj, false)
+            syncBlurWithWindow(obj)
         elseif n == "Topbar" then
-            obj.BackgroundColor3 = Color3.fromRGB(18, 24, 34)
-            obj.BackgroundTransparency = 0.62
+            obj.BackgroundColor3 = Color3.fromRGB(12, 14, 18)
+            obj.BackgroundTransparency = 0.45
         elseif n == "Elements" or n == "TabBar" or n == "Placeholder" or n == "List" then
             obj.BackgroundTransparency = 1
         elseif obj.Parent and obj.Parent:IsA("ScrollingFrame") and obj.BackgroundTransparency < 0.85 then
-            obj.BackgroundColor3 = Color3.fromRGB(190, 210, 235)
-            obj.BackgroundTransparency = 0.78
-            applyLiquidGlassEffect(obj, true)
+            -- Sharp Smoked-Glass Notification Tiles
+            obj.BackgroundColor3 = Color3.fromRGB(26, 29, 35)
+            obj.BackgroundTransparency = 0.38
+            applySharpSmokedGlass(obj, true)
         elseif obj.Parent and obj.Parent.Parent and obj.Parent.Parent:IsA("ScrollingFrame") and obj.BackgroundTransparency < 0.85 then
             if obj.Size.Y.Offset >= 24 and obj.Size.Y.Offset <= 40 then
-                obj.BackgroundColor3 = Color3.fromRGB(205, 225, 250)
-                obj.BackgroundTransparency = 0.74
-                applyLiquidGlassEffect(obj, true)
+                -- Inner Dark Glass Pills (Dropdown / Input)
+                obj.BackgroundColor3 = Color3.fromRGB(18, 20, 25)
+                obj.BackgroundTransparency = 0.35
+                applySharpSmokedGlass(obj, true)
             end
         end
     end
@@ -1041,7 +1079,7 @@ local function predictMessageTagged(candidateMsg)
                 end
             end
         elseif lp and ChatService and ChatService.FilterStringForBroadcast then
-            local broadcastStr = ChatService.FilterStringForBroadcast(candidateMsg, lp)
+            local broadcastStr = ChatService:FilterStringForBroadcast(candidateMsg, lp)
             if broadcastStr and broadcastStr:find("###", 1, true) then
                 willTag = true
             end
