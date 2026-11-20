@@ -415,8 +415,7 @@ end
 
 
 -- ========================================================
--- PART 2: RAZOR-SHARP SMOKED GLASS ENGINE (NOTIFICATION STYLE)
--- (Dark Smoked Base + Ultra-Thin 0.85px Silver-Grey Hairline Edge)
+-- PART 2: PURE RAYFIELD NATIVE SMOOTHNESS + LIGHTWEIGHT GLASS
 -- ========================================================
 local function getSafeGuiRoot()
     local root
@@ -439,38 +438,9 @@ local function cleanOldUI(parent)
             pcall(function() child:Destroy() end)
         end
     end
-    for _, eff in ipairs(Lighting:GetChildren()) do
-        if eff.Name == "TXR_LiquidGlassBlur" then
-            pcall(function() eff:Destroy() end)
-        end
-    end
 end
 pcall(function() cleanOldUI(getSafeGuiRoot()) end)
 pcall(function() cleanOldUI(CoreGui) end)
-
--- Subtle Background Blur (Active while Main UI is open)
-local glassBlur = Instance.new("BlurEffect")
-glassBlur.Name = "TXR_LiquidGlassBlur"
-glassBlur.Size = 0
-glassBlur.Enabled = true
-glassBlur.Parent = Lighting
-
-local function syncBlurWithWindow(mainFrame)
-    if not mainFrame then return end
-    local function updateBlur()
-        local isOpen = mainFrame.Visible and mainFrame.Parent ~= nil
-        TweenService:Create(glassBlur, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-            Size = isOpen and 10 or 0
-        }):Play()
-    end
-    updateBlur()
-    mainFrame:GetPropertyChangedSignal("Visible"):Connect(updateBlur)
-    mainFrame.AncestryChanged:Connect(function(_, parent)
-        if not parent then
-            pcall(function() glassBlur:Destroy() end)
-        end
-    end)
-end
 
 local function isCustomDevCard(obj)
     local curr = obj
@@ -521,49 +491,12 @@ local function enforceModeListOrder(lbl)
     end
 end
 
-local function applySharpSmokedGlass(frame, isTile)
-    if not frame or not frame:IsA("Frame") or frame:GetAttribute("TXR_GlassLit") then
-        return
-    end
-    frame:SetAttribute("TXR_GlassLit", true)
-
-    -- Subtle Smoked Glass Gradient (Clean Dark Sheen, No Heavy White Wash)
-    local grad = frame:FindFirstChild("TXR_GlassSheen") or Instance.new("UIGradient", frame)
-    grad.Name = "TXR_GlassSheen"
-    grad.Rotation = isTile and 25 or 115
-    grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.45, Color3.fromRGB(205, 212, 222)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(165, 172, 182))
-    })
-    grad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.02),
-        NumberSequenceKeypoint.new(1, 0.16)
-    })
-
-    -- Razor-Thin 0.85px Silver-Grey Hairline Edge (Matches Notification Card Sharpness)
-    local rim = frame:FindFirstChild("TXR_GlassRim") or Instance.new("UIStroke", frame)
-    rim.Name = "TXR_GlassRim"
-    rim.Thickness = 0.85
-    rim.Color = Color3.fromRGB(190, 198, 210)
-    rim.Transparency = isTile and 0.68 or 0.76
-
-    local rimGrad = rim:FindFirstChild("TXR_RimLightGrad") or Instance.new("UIGradient", rim)
-    rimGrad.Name = "TXR_RimLightGrad"
-    rimGrad.Rotation = 35
-    rimGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(210, 218, 230)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(120, 128, 140)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(175, 182, 195))
-    })
-end
-
 local function applyGlassyStyle(obj)
     if not obj or not obj.Parent then return end
 
     if obj:IsA("ScrollingFrame") then
         obj.ScrollBarThickness = 2
-        obj.ScrollBarImageColor3 = Color3.fromRGB(180, 195, 215)
+        obj.ScrollBarImageColor3 = Color3.fromRGB(0, 225, 255)
         obj.ScrollBarImageTransparency = 0.45
     end
 
@@ -596,7 +529,7 @@ local function applyGlassyStyle(obj)
         return
     end
 
-    if obj:IsA("UIStroke") and obj.Name ~= "TXR_GlassRim" then
+    if obj:IsA("UIStroke") then
         if not obj:GetAttribute("TXR_StrokeKilled") then
             obj:SetAttribute("TXR_StrokeKilled", true)
             obj.Enabled = false
@@ -613,33 +546,47 @@ local function applyGlassyStyle(obj)
     if obj:IsA("Frame") and not obj:GetAttribute("TXR_GlassStyled") then
         obj:SetAttribute("TXR_GlassStyled", true)
         local n = obj.Name
-        if n == "Loading" then
-            -- Clean Dark Smoked Intro (No Thick White Outer Border)
-            obj.BackgroundColor3 = Color3.fromRGB(16, 18, 22)
-            obj.BackgroundTransparency = 0.25
-            applySharpSmokedGlass(obj, false)
-        elseif n == "Main" then
-            -- Deep Smoked Glass Main Container
-            obj.BackgroundColor3 = Color3.fromRGB(15, 17, 21)
-            obj.BackgroundTransparency = 0.34
-            applySharpSmokedGlass(obj, false)
-            syncBlurWithWindow(obj)
+        if n == "Main" then
+            obj.BackgroundColor3 = Color3.fromRGB(14, 16, 22)
+            obj.BackgroundTransparency = 0.36
+
+            local grad = obj:FindFirstChild("TXR_AcrylicMain") or Instance.new("UIGradient", obj)
+            grad.Name = "TXR_AcrylicMain"
+            grad.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+                ColorSequenceKeypoint.new(0.4, Color3.fromRGB(205, 215, 230)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(160, 170, 185))
+            })
+            grad.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0.04),
+                NumberSequenceKeypoint.new(1, 0.24)
+            })
+            grad.Rotation = 115
         elseif n == "Topbar" then
-            obj.BackgroundColor3 = Color3.fromRGB(12, 14, 18)
-            obj.BackgroundTransparency = 0.45
+            obj.BackgroundColor3 = Color3.fromRGB(10, 12, 18)
+            obj.BackgroundTransparency = 0.48
         elseif n == "Elements" or n == "TabBar" or n == "Placeholder" or n == "List" then
             obj.BackgroundTransparency = 1
         elseif obj.Parent and obj.Parent:IsA("ScrollingFrame") and obj.BackgroundTransparency < 0.85 then
-            -- Sharp Smoked-Glass Notification Tiles
-            obj.BackgroundColor3 = Color3.fromRGB(26, 29, 35)
-            obj.BackgroundTransparency = 0.38
-            applySharpSmokedGlass(obj, true)
+            obj.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+            obj.BackgroundTransparency = 0.48
+
+            local cardSheen = obj:FindFirstChild("TXR_CardGlassSheen") or Instance.new("UIGradient", obj)
+            cardSheen.Name = "TXR_CardGlassSheen"
+            cardSheen.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(215, 225, 240)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(185, 195, 210))
+            })
+            cardSheen.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0.02),
+                NumberSequenceKeypoint.new(1, 0.18)
+            })
+            cardSheen.Rotation = 25
         elseif obj.Parent and obj.Parent.Parent and obj.Parent.Parent:IsA("ScrollingFrame") and obj.BackgroundTransparency < 0.85 then
             if obj.Size.Y.Offset >= 24 and obj.Size.Y.Offset <= 40 then
-                -- Inner Dark Glass Pills (Dropdown / Input)
-                obj.BackgroundColor3 = Color3.fromRGB(18, 20, 25)
-                obj.BackgroundTransparency = 0.35
-                applySharpSmokedGlass(obj, true)
+                obj.BackgroundColor3 = Color3.fromRGB(14, 17, 24)
+                obj.BackgroundTransparency = 0.45
             end
         end
     end
@@ -697,10 +644,10 @@ pcall(function()
 end)
 
 -- ========================================================
--- RGB CYBER GLOW SYSTEM (144Hz RenderStepped Silky Dot Glide)
+-- RGB CYBER GLOW SYSTEM (10X HYPER-SMOOTH QUANTUM GLIDE ENGINE)
 -- ========================================================
 local rgbEnabled = true
-local ultraSmoothRgb = true
+local rgbSmoothMode = "Hyper-Smooth 10x (240Hz Quantum)"
 local rgbSpeed = 3.0
 local nameColorMode = "1. Cyber Crimson (Red-Dark)"
 local bioColorMode = "11. Full Spectrum Mix (Rainbow)"
@@ -733,17 +680,35 @@ local themeOptions = {
 }
 
 local smoothPhase = 0
+local filteredSpeed = 3.0
+local stage1NameColor = Color3.fromRGB(255, 15, 35)
+local stage1BioColor = Color3.fromRGB(0, 245, 255)
 local currentNameColor = Color3.fromRGB(255, 15, 35)
 local currentBioColor = Color3.fromRGB(0, 245, 255)
 
-local function computeThemeColor(modeName, phase, offset, useCineEase)
+-- Quintic Smootherstep (C2 Continuous - Zero Jerk at Peaks)
+local function quinticEase(t)
+    return t * t * t * (t * (t * 6 - 15) + 10)
+end
+
+local function computeThemeColor(modeName, phase, offset, modeLevel)
     if modeName == "11. Full Spectrum Mix (Rainbow)" then
-        local hue = ((phase * 0.14) + (offset or 0)) % 1
-        return Color3.fromHSV(hue, 0.96, 1)
+        local rawHue = ((phase * 0.14) + (offset or 0)) % 1
+        if modeLevel == "Hyper-Smooth 10x (240Hz Quantum)" then
+            -- Sub-harmonic micro-silk hue curve
+            local microWave = math.sin(rawHue * math.pi * 2) * 0.008
+            rawHue = (rawHue + microWave) % 1
+        end
+        return Color3.fromHSV(rawHue, 0.96, 1)
     end
     local theme = cyberThemes[modeName] or cyberThemes["1. Cyber Crimson (Red-Dark)"]
     local rawWave = (math.sin(phase + (offset or 0)) + 1) / 2
-    local wave = useCineEase and (rawWave * rawWave * (3 - 2 * rawWave)) or rawWave
+    local wave = rawWave
+    if modeLevel == "Hyper-Smooth 10x (240Hz Quantum)" then
+        wave = quinticEase(quinticEase(rawWave))
+    elseif modeLevel == "Ultra-Smooth (144Hz Cine-Blend)" then
+        wave = rawWave * rawWave * (3 - 2 * rawWave)
+    end
     return theme.dark:Lerp(theme.bright, wave)
 end
 
@@ -758,15 +723,21 @@ RgbTab:CreateToggle({
    end,
 })
 
-RgbTab:CreateToggle({
-   Name = "Ultra-Smooth RGB Engine (144Hz Cine-Blend)",
-   CurrentValue = true,
-   Flag = "UltraSmoothRgbToggle",
-   Callback = function(Value)
-       ultraSmoothRgb = Value
+RgbTab:CreateDropdown({
+   Name = "RGB Smoothness Engine",
+   Options = {
+       "Hyper-Smooth 10x (240Hz Quantum)",
+       "Ultra-Smooth (144Hz Cine-Blend)",
+       "Standard RGB"
+   },
+   CurrentOption = {"Hyper-Smooth 10x (240Hz Quantum)"},
+   MultipleOptions = false,
+   Flag = "RgbSmoothnessDropdown",
+   Callback = function(Options)
+       rgbSmoothMode = Options[1]
        TXR_Lib:Notify({
            Title = "ᴛxʀ ᴜɪ",
-           Content = Value and "Ultra-Smooth 144Hz Cine-Blend ON" or "Standard RGB Mode Active",
+           Content = "RGB Engine: " .. rgbSmoothMode,
            Duration = 2,
            Image = 4483345998
        })
@@ -823,20 +794,35 @@ local BioLivePreview = RgbTab:CreateColorPicker({
     Callback = function(Value) end
 })
 
--- 144Hz Frame-by-Frame RenderStepped Update for Silky Preview Dot Movement
+-- Sub-Frame Dual-Stage Critically-Damped RenderStepped Glide (10x Smoother)
 RunService.RenderStepped:Connect(function(dt)
     if not rgbEnabled then return end
-    local safeDt = math.min(dt, 0.05)
-    smoothPhase = smoothPhase + (safeDt * rgbSpeed)
+    local safeDt = math.min(dt, 0.033)
 
-    local targetNameCol = computeThemeColor(nameColorMode, smoothPhase, 0, ultraSmoothRgb)
-    local targetBioCol = computeThemeColor(bioColorMode, smoothPhase, 1.35, ultraSmoothRgb)
+    -- Smoothly damp speed changes so slider adjustments never jump
+    filteredSpeed = filteredSpeed + (rgbSpeed - filteredSpeed) * (1 - math.exp(-safeDt * 12))
+    smoothPhase = smoothPhase + (safeDt * filteredSpeed)
 
-    if ultraSmoothRgb then
+    local targetNameCol = computeThemeColor(nameColorMode, smoothPhase, 0, rgbSmoothMode)
+    local targetBioCol = computeThemeColor(bioColorMode, smoothPhase, 1.35, rgbSmoothMode)
+
+    if rgbSmoothMode == "Hyper-Smooth 10x (240Hz Quantum)" then
+        -- Dual-Stage Cascaded Spring-Damped Color Filter (Zero Micro-Jitter)
+        local alpha1 = 1 - math.exp(-safeDt * 14)
+        local alpha2 = 1 - math.exp(-safeDt * 11)
+        stage1NameColor = stage1NameColor:Lerp(targetNameCol, alpha1)
+        stage1BioColor = stage1BioColor:Lerp(targetBioCol, alpha1)
+        currentNameColor = currentNameColor:Lerp(stage1NameColor, alpha2)
+        currentBioColor = currentBioColor:Lerp(stage1BioColor, alpha2)
+    elseif rgbSmoothMode == "Ultra-Smooth (144Hz Cine-Blend)" then
         local blend = 1 - math.exp(-safeDt * 18)
+        stage1NameColor = targetNameCol
+        stage1BioColor = targetBioCol
         currentNameColor = currentNameColor:Lerp(targetNameCol, blend)
         currentBioColor = currentBioColor:Lerp(targetBioCol, blend)
     else
+        stage1NameColor = targetNameCol
+        stage1BioColor = targetBioCol
         currentNameColor = targetNameCol
         currentBioColor = targetBioCol
     end
@@ -847,16 +833,30 @@ RunService.RenderStepped:Connect(function(dt)
     end)
 end)
 
--- Separate Network Dispatcher for Brookhaven RP Color Events
+-- Ultra-Fluid Network Dispatcher for Brookhaven RP Color Events
+local lastSentNameCol = Color3.new()
+local lastSentBioCol = Color3.new()
+
+local function colorDist(c1, c2)
+    return math.abs(c1.R - c2.R) + math.abs(c1.G - c2.G) + math.abs(c1.B - c2.B)
+end
+
 task.spawn(function()
     while true do
         if rgbEnabled and colorEvent then
-            pcall(function()
-                colorEvent:FireServer("PickingRPNameColor", currentNameColor)
-                colorEvent:FireServer("PickingRPBioColor", currentBioColor)
-            end)
+            local minDelta = (rgbSmoothMode == "Hyper-Smooth 10x (240Hz Quantum)") and 0.002 or 0.008
+            if colorDist(currentNameColor, lastSentNameCol) >= minDelta or colorDist(currentBioColor, lastSentBioCol) >= minDelta then
+                lastSentNameCol = currentNameColor
+                lastSentBioCol = currentBioColor
+                pcall(function()
+                    colorEvent:FireServer("PickingRPNameColor", currentNameColor)
+                    colorEvent:FireServer("PickingRPBioColor", currentBioColor)
+                end)
+            end
         end
-        task.wait(ultraSmoothRgb and 0.05 or 0.15)
+        local waitRate = (rgbSmoothMode == "Hyper-Smooth 10x (240Hz Quantum)") and 0.025
+            or (rgbSmoothMode == "Ultra-Smooth (144Hz Cine-Blend)" and 0.05 or 0.15)
+        task.wait(waitRate)
     end
 end)
 
@@ -2153,6 +2153,7 @@ task.spawn(function()
         })
         bgGrad.Rotation = 18
 
+        -- Custom Portrait Frame (Matched to Uploaded Anime Portrait Aspect Ratio)
         local portraitRing = Instance.new("Frame", card)
         portraitRing.Size = UDim2.fromOffset(72, 86)
         portraitRing.AnchorPoint = Vector2.new(0, 0.5)
@@ -2182,6 +2183,7 @@ task.spawn(function()
         devPortrait.ScaleType = Enum.ScaleType.Crop
         Instance.new("UICorner", devPortrait).CornerRadius = UDim.new(0, 9)
 
+        -- Top-Right Role Pill Badge (Clean Text Only, No Missing Glyph Box)
         local rolePill = Instance.new("Frame", card)
         rolePill.Size = UDim2.fromOffset(112, 20)
         rolePill.AnchorPoint = Vector2.new(1, 0)
@@ -2203,6 +2205,7 @@ task.spawn(function()
         pillText.Font = Enum.Font.GothamBold
         pillText.TextSize = 9.5
 
+        -- One-Tap Copy Developer User ID Button
         local copyIdBtn = Instance.new("TextButton", card)
         copyIdBtn.Size = UDim2.fromOffset(74, 20)
         copyIdBtn.AnchorPoint = Vector2.new(1, 0)
@@ -2238,6 +2241,7 @@ task.spawn(function()
             end)
         end)
 
+        -- Real Main Account Name (TxR_AsHU) + Snugly Aligned Verified Seal
         local nameLbl = Instance.new("TextLabel", card)
         nameLbl.Size = UDim2.fromOffset(120, 22)
         nameLbl.Position = UDim2.new(0, 94, 0, 10)
@@ -2301,6 +2305,7 @@ task.spawn(function()
         subLbl.TextSize = 10
         subLbl.TextXAlignment = Enum.TextXAlignment.Left
 
+        -- Mini Feature Chips Row
         local tagNames = {"144ʜᴢ ʀɢʙ", "ᴀɴᴛɪ-ᴍᴜᴛᴇ ᴀɪ", "ᴏɴʏx ɢʟᴀꜱꜱ"}
         for idx, tStr in ipairs(tagNames) do
             local chip = Instance.new("Frame", card)
@@ -2334,6 +2339,9 @@ task.spawn(function()
         end)
     end
 
+    -- ====================================================
+    -- UPGRADED EMP CLAN CYBER-COMMUNITY CARD
+    -- ====================================================
     if discordLabel and discordLabel.Parent and discordLabel.Parent:IsA("Frame") then
         local dCard = discordLabel.Parent
         dCard:SetAttribute("TXR_CustomCard", true)
@@ -2373,6 +2381,7 @@ task.spawn(function()
         })
         dGrad.Rotation = 16
 
+        -- Glowing Neon Clan Emblem
         local srvRing = Instance.new("Frame", dCard)
         srvRing.Size = UDim2.fromOffset(54, 54)
         srvRing.AnchorPoint = Vector2.new(0, 0.5)
@@ -2402,6 +2411,7 @@ task.spawn(function()
         srvTxt.Font = Enum.Font.GothamBlack
         srvTxt.TextSize = 15
 
+        -- Live Status Badge
         local srvHeader = Instance.new("TextLabel", dCard)
         srvHeader.Size = UDim2.new(1, -195, 0, 14)
         srvHeader.Position = UDim2.new(0, 78, 0, 12)
@@ -2432,6 +2442,7 @@ task.spawn(function()
         srvLink.TextSize = 10.5
         srvLink.TextXAlignment = Enum.TextXAlignment.Left
 
+        -- Sleek Copy Invite Button
         local copyBtn = Instance.new("TextButton", dCard)
         copyBtn.Size = UDim2.fromOffset(102, 38)
         copyBtn.AnchorPoint = Vector2.new(1, 0.5)
