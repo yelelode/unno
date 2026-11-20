@@ -406,7 +406,7 @@ local function setLagFreeMode(enable)
             for obj, origTrans in pairs(savedGraphics.decals) do
                 if lagFreeActive then break end
                 if obj and obj.Parent then
-                    obj.Transparency = origTrans
+                    pcall(function() obj.Transparency = origTrans end)
                 end
             end
         end)
@@ -415,7 +415,8 @@ end
 
 
 -- ========================================================
--- PART 2: PURE RAYFIELD NATIVE SMOOTHNESS + LIGHTWEIGHT GLASS
+-- PART 2: ANDROID-GLASS LIGHTING + PURE RAYFIELD SMOOTHNESS
+-- (Frosted Glass Tiles, Rim Light Sheen & Zero-Lag Gradients)
 -- ========================================================
 local function getSafeGuiRoot()
     local root
@@ -491,6 +492,44 @@ local function enforceModeListOrder(lbl)
     end
 end
 
+local function applyGlassRimLighting(frame, isTile)
+    if not frame or not frame:IsA("Frame") or frame:GetAttribute("TXR_GlassLit") then
+        return
+    end
+    frame:SetAttribute("TXR_GlassLit", true)
+
+    local grad = frame:FindFirstChild("TXR_GlassSheen") or Instance.new("UIGradient", frame)
+    grad.Name = "TXR_GlassSheen"
+    grad.Rotation = isTile and 28 or 120
+    grad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.45, Color3.fromRGB(210, 224, 245)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(145, 162, 190))
+    })
+    grad.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, isTile and 0.03 or 0.05),
+        NumberSequenceKeypoint.new(0.55, isTile and 0.14 or 0.18),
+        NumberSequenceKeypoint.new(1, isTile and 0.28 or 0.34)
+    })
+
+    if isTile then
+        local rim = frame:FindFirstChild("TXR_GlassRim") or Instance.new("UIStroke", frame)
+        rim.Name = "TXR_GlassRim"
+        rim.Thickness = 1
+        rim.Color = Color3.new(1, 1, 1)
+        rim.Transparency = 0.78
+
+        local rimGrad = rim:FindFirstChild("TXR_RimLightGrad") or Instance.new("UIGradient", rim)
+        rimGrad.Name = "TXR_RimLightGrad"
+        rimGrad.Rotation = 35
+        rimGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(220, 242, 255)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(95, 125, 165)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(35, 45, 65))
+        })
+    end
+end
+
 local function applyGlassyStyle(obj)
     if not obj or not obj.Parent then return end
 
@@ -529,7 +568,7 @@ local function applyGlassyStyle(obj)
         return
     end
 
-    if obj:IsA("UIStroke") then
+    if obj:IsA("UIStroke") and obj.Name ~= "TXR_GlassRim" then
         if not obj:GetAttribute("TXR_StrokeKilled") then
             obj:SetAttribute("TXR_StrokeKilled", true)
             obj.Enabled = false
@@ -547,46 +586,23 @@ local function applyGlassyStyle(obj)
         obj:SetAttribute("TXR_GlassStyled", true)
         local n = obj.Name
         if n == "Main" then
-            obj.BackgroundColor3 = Color3.fromRGB(14, 16, 22)
-            obj.BackgroundTransparency = 0.36
-
-            local grad = obj:FindFirstChild("TXR_AcrylicMain") or Instance.new("UIGradient", obj)
-            grad.Name = "TXR_AcrylicMain"
-            grad.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-                ColorSequenceKeypoint.new(0.4, Color3.fromRGB(205, 215, 230)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(160, 170, 185))
-            })
-            grad.Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 0.04),
-                NumberSequenceKeypoint.new(1, 0.24)
-            })
-            grad.Rotation = 115
+            obj.BackgroundColor3 = Color3.fromRGB(16, 19, 27)
+            obj.BackgroundTransparency = 0.34
+            applyGlassRimLighting(obj, false)
         elseif n == "Topbar" then
-            obj.BackgroundColor3 = Color3.fromRGB(10, 12, 18)
-            obj.BackgroundTransparency = 0.48
+            obj.BackgroundColor3 = Color3.fromRGB(12, 15, 22)
+            obj.BackgroundTransparency = 0.44
         elseif n == "Elements" or n == "TabBar" or n == "Placeholder" or n == "List" then
             obj.BackgroundTransparency = 1
         elseif obj.Parent and obj.Parent:IsA("ScrollingFrame") and obj.BackgroundTransparency < 0.85 then
-            obj.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
-            obj.BackgroundTransparency = 0.48
-
-            local cardSheen = obj:FindFirstChild("TXR_CardGlassSheen") or Instance.new("UIGradient", obj)
-            cardSheen.Name = "TXR_CardGlassSheen"
-            cardSheen.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(215, 225, 240)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(185, 195, 210))
-            })
-            cardSheen.Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 0.02),
-                NumberSequenceKeypoint.new(1, 0.18)
-            })
-            cardSheen.Rotation = 25
+            obj.BackgroundColor3 = Color3.fromRGB(28, 34, 46)
+            obj.BackgroundTransparency = 0.44
+            applyGlassRimLighting(obj, true)
         elseif obj.Parent and obj.Parent.Parent and obj.Parent.Parent:IsA("ScrollingFrame") and obj.BackgroundTransparency < 0.85 then
             if obj.Size.Y.Offset >= 24 and obj.Size.Y.Offset <= 40 then
-                obj.BackgroundColor3 = Color3.fromRGB(14, 17, 24)
-                obj.BackgroundTransparency = 0.45
+                obj.BackgroundColor3 = Color3.fromRGB(16, 20, 30)
+                obj.BackgroundTransparency = 0.42
+                applyGlassRimLighting(obj, true)
             end
         end
     end
@@ -1026,7 +1042,7 @@ local function predictMessageTagged(candidateMsg)
                 end
             end
         elseif lp and ChatService and ChatService.FilterStringForBroadcast then
-            local broadcastStr = ChatService:FilterStringForBroadcast(candidateMsg, lp)
+            local broadcastStr = ChatService.FilterStringForBroadcast(candidateMsg, lp)
             if broadcastStr and broadcastStr:find("###", 1, true) then
                 willTag = true
             end
@@ -1243,7 +1259,7 @@ Tab:CreateToggle({
                     statusBadge:Set(string.format("💤 ʀᴇꜱᴛɪɴɢ ꜰᴏʀ %.1f ꜱᴇᴄᴏɴᴅꜱ...", restTime))
                     if smartAntiMute and antiMuteStatusBadge then
                         local p = getServerPingMs()
-                        antiMuteStatusBadge:Set(string.format("🛡️ ᴩɪɴɢ: %dms  •  ʙᴜᴄᴋᴇᴛ ʀᴇꜰʀᴇꜱʜ: %.1fs (ɴᴏ ᴄʜὰᴛ ᴅᴇʟᴀʏ)", p, restTime))
+                        antiMuteStatusBadge:Set(string.format("🛡️ ᴩɪɴɢ: %dms  •  ʙᴜᴄᴋᴇᴛ ʀᴇꜰʀᴇꜱʜ: %.1fs (ɴᴏ ᴄʜᴀᴛ ᴅᴇʟᴀʏ)", p, restTime))
                     end
                     task.wait(restTime)
                     statusBadge:Set("🔥 ꜱᴩᴀᴍᴍɪɴɢ ᴀᴄᴛɪᴠᴇ & ʀᴜɴɴɪɴɢ...")
