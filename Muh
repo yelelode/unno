@@ -2072,9 +2072,10 @@ end)
 
 
 -- ========================================================
--- TAB 5: CROSS-SERVER LIVE VOTING & LIVE FEEDBACK WALL
--- (Syncs Votes & Messages Across All Servers + Discord Webhook)
+-- TAB 5: 1,000 LIKES MILESTONE VOTE & LIVE FEEDBACK WALL
+-- (Cross-Server Sync + Direct Mobile TextBox + Discord Logs)
 -- ========================================================
+local LIKE_TARGET_GOAL = 1000
 local cloudReq = (syn and syn.request) or (http and http.request) or http_request or request
 
 local function httpJson(method, url, payloadTable)
@@ -2107,33 +2108,35 @@ local function httpJson(method, url, payloadTable)
 end
 
 local pollState = {
-    yesVotes = 1,
-    noVotes = 0,
-    userVoted = nil,
+    totalLikes = 1,
+    hasLiked = false,
     feedbackList = {
-        {user = "TxR_AsHU", msg = "ᴅʀᴏᴩ ʏᴏᴜʀ ᴠᴏᴛᴇ & ᴛᴇʟʟ ᴡʜᴀᴛ ʏᴏᴜ ᴡᴀɴᴛ ɪɴ ɴᴇxᴛ ᴜᴩᴅᴀᴛᴇ!"}
+        {user = "TxR_AsHU", msg = "ʜɪᴛ ʟɪᴋᴇ ᴛᴏ ʀᴇᴀᴄʜ 1,000 ʟɪᴋᴇꜱ & ᴅʀᴏᴩ ʏᴏᴜʀ ꜰᴇᴇᴅʙᴀᴄᴋ ʙᴇʟᴏᴡ!"}
     }
 }
 
-local pollCardPlaceholder = CommunityTab:CreateLabel("TXR_LIVE_POLL_CARD")
+local pollCardPlaceholder = CommunityTab:CreateLabel("TXR_1000_LIKES_CARD")
 local feedbackWallPlaceholder = CommunityTab:CreateLabel("TXR_LIVE_FEEDBACK_WALL")
 
 local pendingFeedbackText = ""
+local liveFeedbackTextBox = nil
+
 CommunityTab:CreateInput({
-   Name = "What do you want in Next Update? / Feedback",
-   PlaceholderText = "Type your suggestion or review here...",
+   Name = "Write Feedback / Next Update Idea",
+   PlaceholderText = "Type here & tap Post Feedback...",
    RemoveTextAfterFocusLost = false,
    Callback = function(Value)
-       pendingFeedbackText = Value
+       pendingFeedbackText = tostring(Value or "")
    end,
 })
 
 local postFeedbackFn = nil
 CommunityTab:CreateButton({
-   Name = "Post Feedback Live",
+   Name = "🚀 Post Feedback Live",
    Callback = function()
+       local boxText = (liveFeedbackTextBox and liveFeedbackTextBox.Text) or pendingFeedbackText
        if postFeedbackFn then
-           postFeedbackFn(pendingFeedbackText)
+           postFeedbackFn(boxText)
        end
    end,
 })
@@ -2146,10 +2149,18 @@ task.spawn(function()
 
     for _, obj in ipairs(guiRoot:GetDescendants()) do
         if obj:IsA("TextLabel") then
-            if obj.Text == "TXR_LIVE_POLL_CARD" then
+            if obj.Text == "TXR_1000_LIKES_CARD" then
                 pollLabel = obj
             elseif obj.Text == "TXR_LIVE_FEEDBACK_WALL" then
                 wallLabel = obj
+            elseif obj.Text == "Write Feedback / Next Update Idea" and obj.Parent then
+                local tb = obj.Parent:FindFirstChildWhichIsA("TextBox", true)
+                if tb then
+                    liveFeedbackTextBox = tb
+                    tb:GetPropertyChangedSignal("Text"):Connect(function()
+                        pendingFeedbackText = tb.Text
+                    end)
+                end
             end
         end
     end
@@ -2164,7 +2175,7 @@ task.spawn(function()
         end)
     end
 
-    local syncBadge, totalVotesLbl, yesPctLbl, noPctLbl, yesBarFill, noBarFill, yesBtn, noBtn
+    local syncBadge, counterTitleLbl, pctBadgeLbl, likeBarFill, likeBtn, likeBtnText, pStrokeGrad
     local wallScroll = nil
 
     if pollLabel and pollLabel.Parent and pollLabel.Parent:IsA("Frame") then
@@ -2173,8 +2184,8 @@ task.spawn(function()
         lockHide(pollLabel, pollCardPlaceholder)
 
         pCard.Size = UDim2.new(pCard.Size.X.Scale, pCard.Size.X.Offset, 0, 134)
-        pCard.BackgroundColor3 = Color3.fromRGB(16, 19, 26)
-        pCard.BackgroundTransparency = 0.22
+        pCard.BackgroundColor3 = Color3.fromRGB(16, 19, 28)
+        pCard.BackgroundTransparency = 0.20
         pCard.ClipsDescendants = true
 
         for _, child in ipairs(pCard:GetChildren()) do
@@ -2185,22 +2196,29 @@ task.spawn(function()
 
         Instance.new("UICorner", pCard).CornerRadius = UDim.new(0, 12)
         local pStroke = Instance.new("UIStroke", pCard)
-        pStroke.Thickness = 1.15
-        pStroke.Color = Color3.fromRGB(0, 235, 255)
-        pStroke.Transparency = 0.58
+        pStroke.Thickness = 1.35
+        pStroke.Color = Color3.new(1, 1, 1)
+        pStroke.Transparency = 0.42
+
+        pStrokeGrad = Instance.new("UIGradient", pStroke)
+        pStrokeGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 45, 115)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 240, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(165, 75, 255))
+        })
 
         local pHeader = Instance.new("TextLabel", pCard)
-        pHeader.Size = UDim2.new(0.65, 0, 0, 18)
+        pHeader.Size = UDim2.new(0.68, 0, 0, 18)
         pHeader.Position = UDim2.new(0, 12, 0, 10)
         pHeader.BackgroundTransparency = 1
-        pHeader.Text = "📊 ɢʟᴏʙᴀʟ ʟɪᴠᴇ ᴄᴏᴍᴍᴜɴɪᴛʏ ᴩᴏʟʟ"
+        pHeader.Text = "🔥 1,000 ʟɪᴋᴇꜱ ᴄᴏᴍᴍᴜɴɪᴛʏ ɢᴏᴀʟ"
         pHeader.TextColor3 = Color3.fromRGB(255, 255, 255)
         pHeader.Font = Enum.Font.GothamBlack
         pHeader.TextSize = 12
         pHeader.TextXAlignment = Enum.TextXAlignment.Left
 
         syncBadge = Instance.new("TextLabel", pCard)
-        syncBadge.Size = UDim2.new(0.32, 0, 0, 16)
+        syncBadge.Size = UDim2.new(0.30, 0, 0, 16)
         syncBadge.AnchorPoint = Vector2.new(1, 0)
         syncBadge.Position = UDim2.new(1, -12, 0, 11)
         syncBadge.BackgroundTransparency = 1
@@ -2210,111 +2228,89 @@ task.spawn(function()
         syncBadge.TextSize = 9.5
         syncBadge.TextXAlignment = Enum.TextXAlignment.Right
 
-        local pQuestion = Instance.new("TextLabel", pCard)
-        pQuestion.Size = UDim2.new(1, -24, 0, 15)
-        pQuestion.Position = UDim2.new(0, 12, 0, 29)
-        pQuestion.BackgroundTransparency = 1
-        pQuestion.Text = "ʜᴏᴡ ɪꜱ ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06 ᴩᴇʀꜰᴏʀᴍɪɴɢ?"
-        pQuestion.TextColor3 = Color3.fromRGB(190, 208, 235)
-        pQuestion.Font = Enum.Font.GothamBold
-        pQuestion.TextSize = 10
-        pQuestion.TextXAlignment = Enum.TextXAlignment.Left
+        counterTitleLbl = Instance.new("TextLabel", pCard)
+        counterTitleLbl.Size = UDim2.new(0.72, 0, 0, 15)
+        counterTitleLbl.Position = UDim2.new(0, 12, 0, 31)
+        counterTitleLbl.BackgroundTransparency = 1
+        counterTitleLbl.Text = "1 / 1,000 ʟɪᴋᴇꜱ  •  ꜱᴜᴩᴩᴏʀᴛ ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ"
+        counterTitleLbl.TextColor3 = Color3.fromRGB(0, 235, 255)
+        counterTitleLbl.Font = Enum.Font.GothamBold
+        counterTitleLbl.TextSize = 10
+        counterTitleLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-        yesBtn = Instance.new("TextButton", pCard)
-        yesBtn.Size = UDim2.new(1, -24, 0, 28)
-        yesBtn.Position = UDim2.new(0, 12, 0, 50)
-        yesBtn.BackgroundColor3 = Color3.fromRGB(22, 27, 38)
-        yesBtn.Text = ""
-        yesBtn.AutoButtonColor = false
-        yesBtn.ClipsDescendants = true
-        Instance.new("UICorner", yesBtn).CornerRadius = UDim.new(0, 7)
+        pctBadgeLbl = Instance.new("TextLabel", pCard)
+        pctBadgeLbl.Size = UDim2.new(0.25, 0, 0, 15)
+        pctBadgeLbl.AnchorPoint = Vector2.new(1, 0)
+        pctBadgeLbl.Position = UDim2.new(1, -12, 0, 31)
+        pctBadgeLbl.BackgroundTransparency = 1
+        pctBadgeLbl.Text = "0.1%"
+        pctBadgeLbl.TextColor3 = Color3.fromRGB(255, 95, 145)
+        pctBadgeLbl.Font = Enum.Font.GothamBlack
+        pctBadgeLbl.TextSize = 10.5
+        pctBadgeLbl.TextXAlignment = Enum.TextXAlignment.Right
 
-        yesBarFill = Instance.new("Frame", yesBtn)
-        yesBarFill.Size = UDim2.new(1, 0, 1, 0)
-        yesBarFill.BackgroundColor3 = Color3.fromRGB(0, 200, 125)
-        yesBarFill.BackgroundTransparency = 0.72
-        yesBarFill.BorderSizePixel = 0
-        Instance.new("UICorner", yesBarFill).CornerRadius = UDim.new(0, 7)
+        -- Progress Track
+        local barTrack = Instance.new("Frame", pCard)
+        barTrack.Size = UDim2.new(1, -24, 0, 12)
+        barTrack.Position = UDim2.new(0, 12, 0, 52)
+        barTrack.BackgroundColor3 = Color3.fromRGB(10, 13, 20)
+        barTrack.ClipsDescendants = true
+        Instance.new("UICorner", barTrack).CornerRadius = UDim.new(1, 0)
 
-        local yesLbl = Instance.new("TextLabel", yesBtn)
-        yesLbl.Size = UDim2.new(0.7, 0, 1, 0)
-        yesLbl.Position = UDim2.new(0, 10, 0, 0)
-        yesLbl.BackgroundTransparency = 1
-        yesLbl.Text = "🔥 ᴏᴩ & ᴜʟᴛʀᴀ ꜱᴍᴏᴏᴛʜ"
-        yesLbl.TextColor3 = Color3.new(1, 1, 1)
-        yesLbl.Font = Enum.Font.GothamBold
-        yesLbl.TextSize = 10.5
-        yesLbl.TextXAlignment = Enum.TextXAlignment.Left
-        yesLbl.ZIndex = 3
+        likeBarFill = Instance.new("Frame", barTrack)
+        likeBarFill.Size = UDim2.new(0.03, 0, 1, 0)
+        likeBarFill.BackgroundColor3 = Color3.new(1, 1, 1)
+        likeBarFill.BorderSizePixel = 0
+        Instance.new("UICorner", likeBarFill).CornerRadius = UDim.new(1, 0)
 
-        yesPctLbl = Instance.new("TextLabel", yesBtn)
-        yesPctLbl.Size = UDim2.new(0.28, -10, 1, 0)
-        yesPctLbl.AnchorPoint = Vector2.new(1, 0)
-        yesPctLbl.Position = UDim2.new(1, -10, 0, 0)
-        yesPctLbl.BackgroundTransparency = 1
-        yesPctLbl.Text = "100% (1)"
-        yesPctLbl.TextColor3 = Color3.fromRGB(75, 245, 165)
-        yesPctLbl.Font = Enum.Font.GothamBlack
-        yesPctLbl.TextSize = 10
-        yesPctLbl.TextXAlignment = Enum.TextXAlignment.Right
-        yesPctLbl.ZIndex = 3
+        local fillGrad = Instance.new("UIGradient", likeBarFill)
+        fillGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 40, 110)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 235, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(45, 240, 145))
+        })
 
-        noBtn = Instance.new("TextButton", pCard)
-        noBtn.Size = UDim2.new(1, -24, 0, 28)
-        noBtn.Position = UDim2.new(0, 12, 0, 83)
-        noBtn.BackgroundColor3 = Color3.fromRGB(22, 27, 38)
-        noBtn.Text = ""
-        noBtn.AutoButtonColor = false
-        noBtn.ClipsDescendants = true
-        Instance.new("UICorner", noBtn).CornerRadius = UDim.new(0, 7)
+        -- Interactive Like Vote Button
+        likeBtn = Instance.new("TextButton", pCard)
+        likeBtn.Size = UDim2.new(1, -24, 0, 36)
+        likeBtn.Position = UDim2.new(0, 12, 0, 72)
+        likeBtn.BackgroundColor3 = Color3.fromRGB(255, 38, 105)
+        likeBtn.Text = ""
+        likeBtn.AutoButtonColor = false
+        Instance.new("UICorner", likeBtn).CornerRadius = UDim.new(0, 9)
 
-        noBarFill = Instance.new("Frame", noBtn)
-        noBarFill.Size = UDim2.new(0.04, 0, 1, 0)
-        noBarFill.BackgroundColor3 = Color3.fromRGB(0, 155, 255)
-        noBarFill.BackgroundTransparency = 0.72
-        noBarFill.BorderSizePixel = 0
-        Instance.new("UICorner", noBarFill).CornerRadius = UDim.new(0, 7)
+        local btnGrad = Instance.new("UIGradient", likeBtn)
+        btnGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 45, 115)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(185, 35, 255))
+        })
 
-        local noLbl = Instance.new("TextLabel", noBtn)
-        noLbl.Size = UDim2.new(0.7, 0, 1, 0)
-        noLbl.Position = UDim2.new(0, 10, 0, 0)
-        noLbl.BackgroundTransparency = 1
-        noLbl.Text = "⚡ ɢᴏᴏᴅ • ɴᴇᴇᴅꜱ ᴍᴏʀᴇ ᴛᴡᴇᴀᴋꜱ"
-        noLbl.TextColor3 = Color3.new(1, 1, 1)
-        noLbl.Font = Enum.Font.GothamBold
-        noLbl.TextSize = 10.5
-        noLbl.TextXAlignment = Enum.TextXAlignment.Left
-        noLbl.ZIndex = 3
+        likeBtnText = Instance.new("TextLabel", likeBtn)
+        likeBtnText.Size = UDim2.fromScale(1, 1)
+        likeBtnText.BackgroundTransparency = 1
+        likeBtnText.Text = "❤️  ᴛᴀᴩ ᴛᴏ ʟɪᴋᴇ & ᴠᴏᴛᴇ (+1 ꜱᴜᴩᴩᴏʀᴛ)"
+        likeBtnText.TextColor3 = Color3.new(1, 1, 1)
+        likeBtnText.Font = Enum.Font.GothamBlack
+        likeBtnText.TextSize = 11.5
 
-        noPctLbl = Instance.new("TextLabel", noBtn)
-        noPctLbl.Size = UDim2.new(0.28, -10, 1, 0)
-        noPctLbl.AnchorPoint = Vector2.new(1, 0)
-        noPctLbl.Position = UDim2.new(1, -10, 0, 0)
-        noPctLbl.BackgroundTransparency = 1
-        noPctLbl.Text = "0% (0)"
-        noPctLbl.TextColor3 = Color3.fromRGB(0, 225, 255)
-        noPctLbl.Font = Enum.Font.GothamBlack
-        noPctLbl.TextSize = 10
-        noPctLbl.TextXAlignment = Enum.TextXAlignment.Right
-        noPctLbl.ZIndex = 3
-
-        totalVotesLbl = Instance.new("TextLabel", pCard)
-        totalVotesLbl.Size = UDim2.new(1, -24, 0, 14)
-        totalVotesLbl.Position = UDim2.new(0, 12, 0, 115)
-        totalVotesLbl.BackgroundTransparency = 1
-        totalVotesLbl.Text = "ᴛᴏᴛᴀʟ ᴄʀᴏꜱꜱ-ꜱᴇʀᴠᴇʀ ᴠᴏᴛᴇꜱ: 1  •  ᴛᴀᴩ ᴀɴ ᴏᴩᴛɪᴏɴ ᴛᴏ ᴠᴏᴛᴇ"
-        totalVotesLbl.TextColor3 = Color3.fromRGB(145, 160, 185)
-        totalVotesLbl.Font = Enum.Font.GothamMedium
-        totalVotesLbl.TextSize = 9
-        totalVotesLbl.TextXAlignment = Enum.TextXAlignment.Left
+        local footHint = Instance.new("TextLabel", pCard)
+        footHint.Size = UDim2.new(1, -24, 0, 14)
+        footHint.Position = UDim2.new(0, 12, 0, 113)
+        footHint.BackgroundTransparency = 1
+        footHint.Text = "⚡ ʟɪᴠᴇ ꜱʏɴᴄᴇᴅ ᴀᴄʀᴏꜱꜱ ᴀʟʟ ʙʀᴏᴏᴋʜᴀᴠᴇɴ ꜱᴇʀᴠᴇʀꜱ"
+        footHint.TextColor3 = Color3.fromRGB(145, 162, 190)
+        footHint.Font = Enum.Font.GothamMedium
+        footHint.TextSize = 9
+        footHint.TextXAlignment = Enum.TextXAlignment.Left
     end
 
+    -- LIVE FEEDBACK WALL CARD
     if wallLabel and wallLabel.Parent and wallLabel.Parent:IsA("Frame") then
         local wCard = wallLabel.Parent
         wCard:SetAttribute("TXR_CustomCard", true)
         lockHide(wallLabel, feedbackWallPlaceholder)
 
-        wCard.Size = UDim2.new(wCard.Size.X.Scale, wCard.Size.X.Offset, 0, 168)
+        wCard.Size = UDim2.new(wCard.Size.X.Scale, wCard.Size.X.Offset, 0, 172)
         wCard.BackgroundColor3 = Color3.fromRGB(14, 17, 24)
         wCard.BackgroundTransparency = 0.22
         wCard.ClipsDescendants = true
@@ -2328,14 +2324,14 @@ task.spawn(function()
         Instance.new("UICorner", wCard).CornerRadius = UDim.new(0, 12)
         local wStroke = Instance.new("UIStroke", wCard)
         wStroke.Thickness = 1.15
-        wStroke.Color = Color3.fromRGB(130, 150, 185)
-        wStroke.Transparency = 0.65
+        wStroke.Color = Color3.fromRGB(0, 225, 255)
+        wStroke.Transparency = 0.62
 
         local wTitle = Instance.new("TextLabel", wCard)
         wTitle.Size = UDim2.new(1, -24, 0, 18)
         wTitle.Position = UDim2.new(0, 12, 0, 8)
         wTitle.BackgroundTransparency = 1
-        wTitle.Text = "💬 ʟɪᴠᴇ ᴜꜱᴇʀ ꜰᴇᴇᴅʙᴀᴄᴋ & ɴᴇxᴛ ᴜᴩᴅᴀᴛᴇ ᴡᴀʟʟ"
+        wTitle.Text = "💬 ʟɪᴠᴇ ᴄᴏᴍᴍᴜɴɪᴛʏ ꜰᴇᴇᴅʙᴀᴄᴋ ᴡᴀʟʟ"
         wTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
         wTitle.Font = Enum.Font.GothamBlack
         wTitle.TextSize = 11.5
@@ -2356,24 +2352,29 @@ task.spawn(function()
     end
 
     local function renderPollAndWall()
-        local total = math.max(1, pollState.yesVotes + pollState.noVotes)
-        local yPct = math.floor((pollState.yesVotes / total) * 100 + 0.5)
-        local nPct = 100 - yPct
+        local count = math.max(1, pollState.totalLikes)
+        local ratio = math.clamp(count / LIKE_TARGET_GOAL, 0.03, 1)
+        local pctVal = math.min(100, (count / LIKE_TARGET_GOAL) * 100)
 
-        if yesBarFill and noBarFill then
-            TweenService:Create(yesBarFill, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                Size = UDim2.new(math.clamp(yPct / 100, 0.04, 1), 0, 1, 0)
-            }):Play()
-            TweenService:Create(noBarFill, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                Size = UDim2.new(math.clamp(nPct / 100, 0.04, 1), 0, 1, 0)
+        if counterTitleLbl then
+            counterTitleLbl.Text = string.format("%d / %d ʟɪᴋᴇꜱ  •  ꜱᴜᴩᴩᴏʀᴛ ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ", count, LIKE_TARGET_GOAL)
+        end
+        if pctBadgeLbl then
+            pctBadgeLbl.Text = string.format("%.1f%%", pctVal)
+        end
+        if likeBarFill then
+            TweenService:Create(likeBarFill, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                Size = UDim2.new(ratio, 0, 1, 0)
             }):Play()
         end
-
-        if yesPctLbl then yesPctLbl.Text = string.format("%d%% (%d)", yPct, pollState.yesVotes) end
-        if noPctLbl then noPctLbl.Text = string.format("%d%% (%d)", nPct, pollState.noVotes) end
-        if totalVotesLbl then
-            local statusNote = pollState.userVoted and ("✓ ʏᴏᴜ ᴠᴏᴛᴇᴅ (" .. pollState.userVoted .. ")") or "ᴛᴀᴩ ᴀɴ ᴏᴩᴛɪᴏɴ ᴛᴏ ᴠᴏᴛᴇ"
-            totalVotesLbl.Text = string.format("ᴛᴏᴛᴀʟ ᴠᴏᴛᴇꜱ: %d  •  %s", pollState.yesVotes + pollState.noVotes, statusNote)
+        if likeBtn and likeBtnText then
+            if pollState.hasLiked then
+                likeBtn.BackgroundColor3 = Color3.fromRGB(22, 175, 105)
+                likeBtnText.Text = "✓  ʟɪᴋᴇᴅ & ꜱᴜᴩᴩᴏʀᴛᴇᴅ  •  ᴛʜᴀɴᴋ ʏᴏᴜ!"
+            else
+                likeBtn.BackgroundColor3 = Color3.fromRGB(255, 38, 105)
+                likeBtnText.Text = "❤️  ᴛᴀᴩ ᴛᴏ ʟɪᴋᴇ & ᴠᴏᴛᴇ (+1 ꜱᴜᴩᴩᴏʀᴛ)"
+            end
         end
 
         if wallScroll then
@@ -2383,15 +2384,15 @@ task.spawn(function()
 
             for idx, item in ipairs(pollState.feedbackList) do
                 local row = Instance.new("Frame", wallScroll)
-                row.Size = UDim2.new(1, -6, 0, 34)
+                row.Size = UDim2.new(1, -6, 0, 36)
                 row.BackgroundColor3 = Color3.fromRGB(22, 26, 36)
-                row.BackgroundTransparency = 0.35
+                row.BackgroundTransparency = 0.30
                 row.LayoutOrder = idx
                 Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
 
                 local uLbl = Instance.new("TextLabel", row)
                 uLbl.Size = UDim2.new(1, -14, 0, 13)
-                uLbl.Position = UDim2.new(0, 8, 0, 3)
+                uLbl.Position = UDim2.new(0, 8, 0, 4)
                 uLbl.BackgroundTransparency = 1
                 uLbl.Text = "@" .. tostring(item.user or "Player")
                 uLbl.TextColor3 = (item.user == "TxR_AsHU") and Color3.fromRGB(0, 240, 255) or Color3.fromRGB(75, 240, 160)
@@ -2400,11 +2401,11 @@ task.spawn(function()
                 uLbl.TextXAlignment = Enum.TextXAlignment.Left
 
                 local mLbl = Instance.new("TextLabel", row)
-                mLbl.Size = UDim2.new(1, -14, 0, 14)
-                mLbl.Position = UDim2.new(0, 8, 0, 16)
+                mLbl.Size = UDim2.new(1, -14, 0, 15)
+                mLbl.Position = UDim2.new(0, 8, 0, 17)
                 mLbl.BackgroundTransparency = 1
                 mLbl.Text = tostring(item.msg or "")
-                mLbl.TextColor3 = Color3.fromRGB(230, 238, 250)
+                mLbl.TextColor3 = Color3.fromRGB(235, 242, 255)
                 mLbl.Font = Enum.Font.GothamMedium
                 mLbl.TextSize = 9.5
                 mLbl.TextTruncate = Enum.TextTruncate.AtEnd
@@ -2422,7 +2423,7 @@ task.spawn(function()
                     title = titleStr,
                     description = descStr,
                     color = colorDec or 62975,
-                    footer = {text = "ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06  •  ᴄʀᴏꜱꜱ-ꜱᴇʀᴠᴇʀ ꜱʏɴᴄ"}
+                    footer = {text = "ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06  •  1,000 ʟɪᴋᴇꜱ ɢᴏᴀʟ"}
                 }}
             })
         end)
@@ -2437,17 +2438,17 @@ task.spawn(function()
         local data = httpJson("GET", JSONBLOB_URL)
         if type(data) == "table" then
             if type(data.votes) == "table" then
-                local yCount, nCount = 0, 0
+                local likeCount = 0
                 local myIdStr = tostring(lp and lp.UserId or 0)
-                for uid, choice in pairs(data.votes) do
-                    if choice == "OP" then yCount += 1
-                    elseif choice == "GOOD" then nCount += 1 end
-                    if tostring(uid) == myIdStr then
-                        pollState.userVoted = choice
+                for uid, val in pairs(data.votes) do
+                    if val then
+                        likeCount += 1
+                    end
+                    if tostring(uid) == myIdStr and val then
+                        pollState.hasLiked = true
                     end
                 end
-                pollState.yesVotes = math.max(1, yCount)
-                pollState.noVotes = nCount
+                pollState.totalLikes = math.max(1, likeCount)
             end
 
             if type(data.feedback) == "table" and #data.feedback > 0 then
@@ -2462,18 +2463,19 @@ task.spawn(function()
         renderPollAndWall()
     end
 
-    local function castVote(choiceTag)
-        if pollState.userVoted == choiceTag then return end
-        local prevVote = pollState.userVoted
-        pollState.userVoted = choiceTag
-
-        if choiceTag == "OP" then
-            pollState.yesVotes += 1
-            if prevVote == "GOOD" then pollState.noVotes = math.max(0, pollState.noVotes - 1) end
-        else
-            pollState.noVotes += 1
-            if prevVote == "OP" then pollState.yesVotes = math.max(0, pollState.yesVotes - 1) end
+    local function castLikeVote()
+        if pollState.hasLiked then
+            TXR_Lib:Notify({
+                Title = "ᴀʟʀᴇᴀᴅʏ ʟɪᴋᴇᴅ  ❤️",
+                Content = "You already supported the 1,000 Likes goal!",
+                Duration = 2,
+                Image = 4483345998
+            })
+            return
         end
+
+        pollState.hasLiked = true
+        pollState.totalLikes += 1
         renderPollAndWall()
 
         if JSONBLOB_URL and JSONBLOB_URL ~= "" and lp then
@@ -2481,7 +2483,7 @@ task.spawn(function()
                 local latest = httpJson("GET", JSONBLOB_URL) or {votes = {}, feedback = pollState.feedbackList}
                 latest.votes = type(latest.votes) == "table" and latest.votes or {}
                 latest.feedback = type(latest.feedback) == "table" and latest.feedback or pollState.feedbackList
-                latest.votes[tostring(lp.UserId)] = choiceTag
+                latest.votes[tostring(lp.UserId)] = "LIKE"
                 httpJson("PUT", JSONBLOB_URL, latest)
                 syncFromCloud()
             end)
@@ -2489,34 +2491,48 @@ task.spawn(function()
 
         local shortJob = (game.JobId and #game.JobId >= 8) and string.sub(game.JobId, 1, 8) or "LOCAL"
         sendToDiscord(
-            "🗳️ ɴᴇᴡ ʟɪᴠᴇ ᴠᴏᴛᴇ ʀᴇᴄᴇɪᴠᴇᴅ",
-            string.format("**User:** `@%s` (`%s`)\n**Vote:** `%s`\n**Server ID:** `%s`", lp and lp.Name or "Player", tostring(lp and lp.UserId or 0), choiceTag, shortJob),
-            choiceTag == "OP" and 5763719 or 3447003
+            "❤️ ɴᴇᴡ ʟɪᴋᴇ ᴠᴏᴛᴇ (+1 ꜱᴜᴩᴩᴏʀᴛ)",
+            string.format("**User:** `@%s` (`%s`)\n**Total Likes:** `%d / %d`\n**Server ID:** `%s`", lp and lp.Name or "Player", tostring(lp and lp.UserId or 0), pollState.totalLikes, LIKE_TARGET_GOAL, shortJob),
+            16725605
         )
 
         TXR_Lib:Notify({
-            Title = "ʟɪᴠᴇ ᴩᴏʟʟ",
-            Content = "Vote Recorded: " .. choiceTag,
-            Duration = 2,
+            Title = "❤️ ʟɪᴋᴇ ᴄᴏᴜɴᴛᴇᴅ!",
+            Content = string.format("Goal Progress: %d / %d Likes!", pollState.totalLikes, LIKE_TARGET_GOAL),
+            Duration = 2.5,
             Image = 4483345998
         })
     end
 
-    if yesBtn then yesBtn.MouseButton1Click:Connect(function() castVote("OP") end) end
-    if noBtn then noBtn.MouseButton1Click:Connect(function() castVote("GOOD") end) end
+    if likeBtn then
+        likeBtn.MouseButton1Click:Connect(castLikeVote)
+    end
 
     postFeedbackFn = function(rawMsg)
-        local trimmed = (rawMsg or ""):gsub("^%s*(.-)%s*$", "%1")
+        local activeStr = tostring(rawMsg or "")
+        if activeStr == "" and liveFeedbackTextBox then
+            activeStr = tostring(liveFeedbackTextBox.Text or "")
+        end
+        local trimmed = activeStr:gsub("^%s*(.-)%s*$", "%1")
         if trimmed == "" then
-            TXR_Lib:Notify({Title = "ꜰᴇᴇᴅʙᴀᴄᴋ", Content = "Please type a message first!", Duration = 2, Image = 4483345998})
+            TXR_Lib:Notify({
+                Title = "ꜰᴇᴇᴅʙᴀᴄᴋ",
+                Content = "Type your message in the box above first!",
+                Duration = 2,
+                Image = 4483345998
+            })
             return
         end
-        if #trimmed > 90 then
-            trimmed = string.sub(trimmed, 1, 90)
+        if #trimmed > 95 then
+            trimmed = string.sub(trimmed, 1, 95)
         end
 
         local uName = lp and lp.Name or "Player"
         table.insert(pollState.feedbackList, 1, {user = uName, msg = trimmed})
+        pendingFeedbackText = ""
+        if liveFeedbackTextBox then
+            pcall(function() liveFeedbackTextBox.Text = "" end)
+        end
         renderPollAndWall()
 
         if JSONBLOB_URL and JSONBLOB_URL ~= "" then
@@ -2535,18 +2551,24 @@ task.spawn(function()
 
         local shortJob = (game.JobId and #game.JobId >= 8) and string.sub(game.JobId, 1, 8) or "LOCAL"
         sendToDiscord(
-            "💬 ɴᴇᴡ ꜰᴇᴇᴅʙᴀᴄᴋ / ɴᴇxᴛ ᴜᴩᴅᴀᴛᴇ ɪᴅᴇᴀ",
-            string.format("**User:** `@%s` (`%s`)\n**Server ID:** `%s`\n**Message:** %s", uName, tostring(lp and lp.UserId or 0), shortJob, trimmed),
+            "💬 ɴᴇᴡ ʟɪᴠᴇ ꜰᴇᴇᴅʙᴀᴄᴋ ʀᴇᴄᴇɪᴠᴇᴅ",
+            string.format("**User:** `@%s` (`%s`)\n**Server ID:** `%s`\n**Feedback:** %s", uName, tostring(lp and lp.UserId or 0), shortJob, trimmed),
             62975
         )
 
         TXR_Lib:Notify({
-            Title = "ꜰᴇᴇᴅʙᴀᴄᴋ ᴩᴏꜱᴛᴇᴅ",
-            Content = "Your feedback is now live for all servers & Discord!",
+            Title = "✓ ꜰᴇᴇᴅʙᴀᴄᴋ ᴩᴏꜱᴛᴇᴅ",
+            Content = "Live on script wall & sent to Discord!",
             Duration = 2.5,
             Image = 4483345998
         })
     end
+
+    RunService.Heartbeat:Connect(function(dt)
+        if pStrokeGrad and pStrokeGrad.Parent then
+            pStrokeGrad.Rotation = (pStrokeGrad.Rotation + dt * 70) % 360
+        end
+    end)
 
     renderPollAndWall()
     task.spawn(function()
