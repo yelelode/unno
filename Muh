@@ -415,8 +415,8 @@ end
 
 
 -- ========================================================
--- PART 2: ANDROID-GLASS LIGHTING + PURE RAYFIELD SMOOTHNESS
--- (Frosted Glass Tiles, Rim Light Sheen & Zero-Lag Gradients)
+-- PART 2: TRUE ANDROID 17 / iOS LIQUID FROSTED GLASS ENGINE
+-- (High-Translucency Milky Glass + Specular Edge Rim Light)
 -- ========================================================
 local function getSafeGuiRoot()
     local root
@@ -492,7 +492,7 @@ local function enforceModeListOrder(lbl)
     end
 end
 
-local function applyGlassRimLighting(frame, isTile)
+local function applyLiquidGlassEffect(frame, isTile)
     if not frame or not frame:IsA("Frame") or frame:GetAttribute("TXR_GlassLit") then
         return
     end
@@ -500,34 +500,33 @@ local function applyGlassRimLighting(frame, isTile)
 
     local grad = frame:FindFirstChild("TXR_GlassSheen") or Instance.new("UIGradient", frame)
     grad.Name = "TXR_GlassSheen"
-    grad.Rotation = isTile and 28 or 120
+    grad.Rotation = isTile and 32 or 125
     grad.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.45, Color3.fromRGB(210, 224, 245)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(145, 162, 190))
+        ColorSequenceKeypoint.new(0.45, Color3.fromRGB(215, 230, 250)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(165, 185, 215))
     })
     grad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, isTile and 0.03 or 0.05),
-        NumberSequenceKeypoint.new(0.55, isTile and 0.14 or 0.18),
-        NumberSequenceKeypoint.new(1, isTile and 0.28 or 0.34)
+        NumberSequenceKeypoint.new(0, isTile and 0.08 or 0.14),
+        NumberSequenceKeypoint.new(0.5, isTile and 0.28 or 0.34),
+        NumberSequenceKeypoint.new(1, isTile and 0.48 or 0.52)
     })
 
-    if isTile then
-        local rim = frame:FindFirstChild("TXR_GlassRim") or Instance.new("UIStroke", frame)
-        rim.Name = "TXR_GlassRim"
-        rim.Thickness = 1
-        rim.Color = Color3.new(1, 1, 1)
-        rim.Transparency = 0.78
+    local rim = frame:FindFirstChild("TXR_GlassRim") or Instance.new("UIStroke", frame)
+    rim.Name = "TXR_GlassRim"
+    rim.Thickness = isTile and 1.15 or 1.35
+    rim.Color = Color3.new(1, 1, 1)
+    rim.Transparency = isTile and 0.42 or 0.48
 
-        local rimGrad = rim:FindFirstChild("TXR_RimLightGrad") or Instance.new("UIGradient", rim)
-        rimGrad.Name = "TXR_RimLightGrad"
-        rimGrad.Rotation = 35
-        rimGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(220, 242, 255)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(95, 125, 165)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(35, 45, 65))
-        })
-    end
+    local rimGrad = rim:FindFirstChild("TXR_RimLightGrad") or Instance.new("UIGradient", rim)
+    rimGrad.Name = "TXR_RimLightGrad"
+    rimGrad.Rotation = 38
+    rimGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.35, Color3.fromRGB(185, 225, 255)),
+        ColorSequenceKeypoint.new(0.75, Color3.fromRGB(110, 140, 180)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(240, 248, 255))
+    })
 end
 
 local function applyGlassyStyle(obj)
@@ -535,8 +534,8 @@ local function applyGlassyStyle(obj)
 
     if obj:IsA("ScrollingFrame") then
         obj.ScrollBarThickness = 2
-        obj.ScrollBarImageColor3 = Color3.fromRGB(0, 225, 255)
-        obj.ScrollBarImageTransparency = 0.45
+        obj.ScrollBarImageColor3 = Color3.fromRGB(220, 245, 255)
+        obj.ScrollBarImageTransparency = 0.35
     end
 
     if obj:IsA("TextLabel") or obj:IsA("TextButton") then
@@ -586,23 +585,23 @@ local function applyGlassyStyle(obj)
         obj:SetAttribute("TXR_GlassStyled", true)
         local n = obj.Name
         if n == "Main" then
-            obj.BackgroundColor3 = Color3.fromRGB(16, 19, 27)
-            obj.BackgroundTransparency = 0.34
-            applyGlassRimLighting(obj, false)
+            obj.BackgroundColor3 = Color3.fromRGB(22, 28, 38)
+            obj.BackgroundTransparency = 0.56
+            applyLiquidGlassEffect(obj, false)
         elseif n == "Topbar" then
-            obj.BackgroundColor3 = Color3.fromRGB(12, 15, 22)
-            obj.BackgroundTransparency = 0.44
+            obj.BackgroundColor3 = Color3.fromRGB(18, 24, 34)
+            obj.BackgroundTransparency = 0.62
         elseif n == "Elements" or n == "TabBar" or n == "Placeholder" or n == "List" then
             obj.BackgroundTransparency = 1
         elseif obj.Parent and obj.Parent:IsA("ScrollingFrame") and obj.BackgroundTransparency < 0.85 then
-            obj.BackgroundColor3 = Color3.fromRGB(28, 34, 46)
-            obj.BackgroundTransparency = 0.44
-            applyGlassRimLighting(obj, true)
+            obj.BackgroundColor3 = Color3.fromRGB(190, 210, 235)
+            obj.BackgroundTransparency = 0.78
+            applyLiquidGlassEffect(obj, true)
         elseif obj.Parent and obj.Parent.Parent and obj.Parent.Parent:IsA("ScrollingFrame") and obj.BackgroundTransparency < 0.85 then
             if obj.Size.Y.Offset >= 24 and obj.Size.Y.Offset <= 40 then
-                obj.BackgroundColor3 = Color3.fromRGB(16, 20, 30)
-                obj.BackgroundTransparency = 0.42
-                applyGlassRimLighting(obj, true)
+                obj.BackgroundColor3 = Color3.fromRGB(205, 225, 250)
+                obj.BackgroundTransparency = 0.74
+                applyLiquidGlassEffect(obj, true)
             end
         end
     end
@@ -2116,7 +2115,6 @@ task.spawn(function()
         })
         bgGrad.Rotation = 18
 
-        -- Custom Portrait Frame (Matched to Uploaded Anime Portrait Aspect Ratio)
         local portraitRing = Instance.new("Frame", card)
         portraitRing.Size = UDim2.fromOffset(72, 86)
         portraitRing.AnchorPoint = Vector2.new(0, 0.5)
@@ -2146,7 +2144,6 @@ task.spawn(function()
         devPortrait.ScaleType = Enum.ScaleType.Crop
         Instance.new("UICorner", devPortrait).CornerRadius = UDim.new(0, 9)
 
-        -- Top-Right Role Pill Badge (Clean Text Only, No Missing Glyph Box)
         local rolePill = Instance.new("Frame", card)
         rolePill.Size = UDim2.fromOffset(112, 20)
         rolePill.AnchorPoint = Vector2.new(1, 0)
@@ -2168,7 +2165,6 @@ task.spawn(function()
         pillText.Font = Enum.Font.GothamBold
         pillText.TextSize = 9.5
 
-        -- One-Tap Copy Developer User ID Button
         local copyIdBtn = Instance.new("TextButton", card)
         copyIdBtn.Size = UDim2.fromOffset(74, 20)
         copyIdBtn.AnchorPoint = Vector2.new(1, 0)
@@ -2204,7 +2200,6 @@ task.spawn(function()
             end)
         end)
 
-        -- Real Main Account Name (TxR_AsHU) + Snugly Aligned Verified Seal
         local nameLbl = Instance.new("TextLabel", card)
         nameLbl.Size = UDim2.fromOffset(120, 22)
         nameLbl.Position = UDim2.new(0, 94, 0, 10)
@@ -2268,7 +2263,6 @@ task.spawn(function()
         subLbl.TextSize = 10
         subLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-        -- Mini Feature Chips Row
         local tagNames = {"144ʜᴢ ʀɢʙ", "ᴀɴᴛɪ-ᴍᴜᴛᴇ ᴀɪ", "ᴏɴʏx ɢʟᴀꜱꜱ"}
         for idx, tStr in ipairs(tagNames) do
             local chip = Instance.new("Frame", card)
@@ -2302,9 +2296,6 @@ task.spawn(function()
         end)
     end
 
-    -- ====================================================
-    -- UPGRADED EMP CLAN CYBER-COMMUNITY CARD
-    -- ====================================================
     if discordLabel and discordLabel.Parent and discordLabel.Parent:IsA("Frame") then
         local dCard = discordLabel.Parent
         dCard:SetAttribute("TXR_CustomCard", true)
@@ -2344,7 +2335,6 @@ task.spawn(function()
         })
         dGrad.Rotation = 16
 
-        -- Glowing Neon Clan Emblem
         local srvRing = Instance.new("Frame", dCard)
         srvRing.Size = UDim2.fromOffset(54, 54)
         srvRing.AnchorPoint = Vector2.new(0, 0.5)
@@ -2374,7 +2364,6 @@ task.spawn(function()
         srvTxt.Font = Enum.Font.GothamBlack
         srvTxt.TextSize = 15
 
-        -- Live Status Badge
         local srvHeader = Instance.new("TextLabel", dCard)
         srvHeader.Size = UDim2.new(1, -195, 0, 14)
         srvHeader.Position = UDim2.new(0, 78, 0, 12)
@@ -2405,7 +2394,6 @@ task.spawn(function()
         srvLink.TextSize = 10.5
         srvLink.TextXAlignment = Enum.TextXAlignment.Left
 
-        -- Sleek Copy Invite Button
         local copyBtn = Instance.new("TextButton", dCard)
         copyBtn.Size = UDim2.fromOffset(102, 38)
         copyBtn.AnchorPoint = Vector2.new(1, 0.5)
