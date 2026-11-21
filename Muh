@@ -758,7 +758,7 @@ local function setLagFreeMode(enable)
 end
 
 -- ========================================================
--- PART 2: RAYFIELD GLASS + NATIVE SETTINGS UI SCALE + TOPBAR TAG SELECTOR + MINIMIZE GUARD
+-- PART 2: RAYFIELD GLASS + NATIVE SETTINGS UI SCALE + TOPBAR TAG SELECTOR + REOPEN FIX
 -- ========================================================
 local scalePresets = {1.00, 0.85, 0.75, 1.15}
 local scalePresetIdx = 1
@@ -766,7 +766,6 @@ local currentUiScaleValue = 1.00
 
 local pushTagSelectionToServer = nil
 local updateAllTagPillDisplays = nil
-local customCardsRegistry = {}
 
 local function getSafeGuiRoot()
     local root
@@ -946,13 +945,18 @@ local function applyGlassyStyle(obj)
 end
 
 -- ========================================================
--- TOPBAR CUSTOM TAG SELECTOR + MATCHING SETTINGS UI SCALE + WINDOW MINIMIZE GUARD
+-- TOPBAR CUSTOM TAG SELECTOR + MATCHING SETTINGS UI SCALE + ROCK-SOLID REOPEN GUARD
 -- ========================================================
 local function installTopbarAndSettingsControls(gui)
     task.spawn(function()
         local mainWin = gui:WaitForChild("Main", 5)
         if not mainWin or not mainWin:IsA("Frame") then return end
         mainWin.ClipsDescendants = true
+
+        local elementsFolder = mainWin:FindFirstChild("Elements")
+        if elementsFolder and elementsFolder:IsA("GuiObject") then
+            elementsFolder.ClipsDescendants = true
+        end
 
         local uiScale = mainWin:FindFirstChild("TXR_CustomScaler")
         if not uiScale then
@@ -966,7 +970,7 @@ local function installTopbarAndSettingsControls(gui)
         if not topbar then return end
         topbar.ClipsDescendants = true
 
-        -- 1) TOPBAR CUSTOM TAG BUTTON (LEFT OF SEARCH ICON, NO BOX UNICODE SYMBOLS!)
+        -- 1) TOPBAR CUSTOM TAG BUTTON (LEFT OF SEARCH ICON)
         local tagBtn, tagMenu
         if not topbar:FindFirstChild("TXR_TopbarTagSelector") then
             tagBtn = Instance.new("TextButton")
@@ -1159,24 +1163,52 @@ local function installTopbarAndSettingsControls(gui)
             updateAllTagPillDisplays()
         end
 
-        -- 2) SYNC CUSTOM CARDS & TOPBAR WHEN WINDOW CLOSES / MINIMIZES ("Show TXR")
-        RunService.Heartbeat:Connect(function()
-            if not mainWin or not mainWin.Parent then return end
-            local isWindowOpen = mainWin.Visible and (mainWin.AbsoluteSize.Y > 90)
-            if tagBtn and tagBtn.Parent then
-                tagBtn.Visible = isWindowOpen
+        -- 2) GUARANTEE "Show TXR" REOPEN PILL IS ALWAYS CLICKABLE & NEVER BLOCKED
+        local function ensureReopenPillWorks(pillObj)
+            if not pillObj or pillObj:GetAttribute("TXR_ReopenHooked") then return end
+            pillObj:SetAttribute("TXR_ReopenHooked", true)
+            pillObj.ZIndex = 999
+            local btn = pillObj:IsA("GuiButton") and pillObj or pillObj:FindFirstChildWhichIsA("GuiButton", true)
+            if btn then
+                btn.ZIndex = 1000
+                btn.Active = true
+                btn.MouseButton1Click:Connect(function()
+                    if mainWin and mainWin.Parent then
+                        mainWin.Visible = true
+                        mainWin.ClipsDescendants = true
+                        if elementsFolder then
+                            elementsFolder.Visible = true
+                            elementsFolder.ClipsDescendants = true
+                        end
+                    end
+                end)
             end
-            if not isWindowOpen and tagMenu and tagMenu.Parent then
-                tagMenu.Visible = false
+        end
+
+        for _, child in ipairs(gui:GetDescendants()) do
+            if child:IsA("TextLabel") and child.Text and child.Text:find("Show", 1, true) then
+                ensureReopenPillWorks(child.Parent)
             end
-            for _, cObj in ipairs(customCardsRegistry) do
-                if cObj and cObj.Parent then
-                    cObj.Visible = isWindowOpen
-                end
+        end
+        gui.DescendantAdded:Connect(function(desc)
+            if desc:IsA("TextLabel") and desc.Text and desc.Text:find("Show", 1, true) then
+                ensureReopenPillWorks(desc.Parent)
             end
         end)
 
-        -- 3) NATIVE-MATCHING "UI Size / Scale" BUTTON INSIDE RAYFIELD SETTINGS (MATCHES "K" KEYBIND BUTTON)
+        -- 3) CLEAN DROPDOWN AUTO-HIDE WHEN WINDOW COLLAPSES (WITHOUT BREAKING REOPEN!)
+        mainWin:GetPropertyChangedSignal("Visible"):Connect(function()
+            if not mainWin.Visible and tagMenu and tagMenu.Parent then
+                tagMenu.Visible = false
+            end
+        end)
+        mainWin:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+            if mainWin.AbsoluteSize.Y < 90 and tagMenu and tagMenu.Parent then
+                tagMenu.Visible = false
+            end
+        end)
+
+        -- 4) NATIVE-MATCHING "UI Size / Scale" BUTTON INSIDE RAYFIELD SETTINGS
         task.spawn(function()
             while mainWin and mainWin.Parent do
                 for _, desc in ipairs(mainWin:GetDescendants()) do
@@ -1205,7 +1237,6 @@ local function installTopbarAndSettingsControls(gui)
                             titleLbl.TextSize = 13
                             titleLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-                            -- Exact same muted dark-slate style & typography as the "K" Keybind button above it
                             local scaleCycleBtn = Instance.new("TextButton", scaleCard)
                             scaleCycleBtn.Size = UDim2.fromOffset(58, 28)
                             scaleCycleBtn.AnchorPoint = Vector2.new(1, 0.5)
@@ -2134,7 +2165,6 @@ task.spawn(function()
     if termLabel and termLabel.Parent and termLabel.Parent:IsA("Frame") then
         local card = termLabel.Parent
         card:SetAttribute("TXR_CustomCard", true)
-        table.insert(customCardsRegistry, card)
         pcall(function() terminalPlaceholder:Set("") end)
         termLabel.Text = ""
         termLabel.TextTransparency = 1
@@ -2899,7 +2929,6 @@ task.spawn(function()
     if rkLabel and rkLabel.Parent and rkLabel.Parent:IsA("Frame") then
         local card = rkLabel.Parent
         card:SetAttribute("TXR_CustomCard", true)
-        table.insert(customCardsRegistry, card)
         pcall(function() rankingPlaceholder:Set("") end)
         rkLabel.Text = ""
         rkLabel.TextTransparency = 1
@@ -3089,7 +3118,6 @@ task.spawn(function()
 
         local locScale = Instance.new("UIScale", locateMeBtn)
 
-        -- Clean "R" Refresh Button (No Box Unicode Symbol!)
         local refreshRankBtn = Instance.new("TextButton", topBar)
         refreshRankBtn.Size = UDim2.fromOffset(26, 24)
         refreshRankBtn.AnchorPoint = Vector2.new(1, 0.5)
@@ -3111,7 +3139,7 @@ task.spawn(function()
         local refScale = Instance.new("UIScale", refreshRankBtn)
 
         -- ====================================================
-        -- IN-CARD GLASSY PLAYER INSPECTOR OVERLAY (CLEAN "X" CLOSE BUTTON)
+        -- IN-CARD GLASSY PLAYER INSPECTOR OVERLAY
         -- ====================================================
         local inspectorOverlay = Instance.new("Frame", card)
         inspectorOverlay.Size = UDim2.fromScale(1, 1)
@@ -4169,7 +4197,6 @@ task.spawn(function()
     if hubLabel and hubLabel.Parent and hubLabel.Parent:IsA("Frame") then
         local card = hubLabel.Parent
         card:SetAttribute("TXR_CustomCard", true)
-        table.insert(customCardsRegistry, card)
         pcall(function() nextGenHubPlaceholder:Set("") end)
         hubLabel.Text = ""
         hubLabel.TextTransparency = 1
@@ -5107,7 +5134,6 @@ task.spawn(function()
     if profileLabel and profileLabel.Parent and profileLabel.Parent:IsA("Frame") then
         local card = profileLabel.Parent
         card:SetAttribute("TXR_CustomCard", true)
-        table.insert(customCardsRegistry, card)
         lockHideLabel(profileLabel, devCardPlaceholder)
 
         card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 114)
@@ -5328,7 +5354,6 @@ task.spawn(function()
     if discordLabel and discordLabel.Parent and discordLabel.Parent:IsA("Frame") then
         local dCard = discordLabel.Parent
         dCard:SetAttribute("TXR_CustomCard", true)
-        table.insert(customCardsRegistry, dCard)
         lockHideLabel(discordLabel, discordCardPlaceholder)
 
         dCard.Size = UDim2.new(dCard.Size.X.Scale, dCard.Size.X.Offset, 0, 86)
