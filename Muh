@@ -2058,8 +2058,8 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- TAB 5: CREATOR MILESTONE (1000 LIKES FOR NEXT UPDATE)
---        + DUAL CONSOLE: CHAT || Report Bugs & Next Update Features
+-- TAB 5: ULTRA-SMOOTH TACTILE COMMUNITY & MILESTONE HUB
+-- (1000 LIKES FOR NEXT UPDATE + CHAT || Report Bugs & Next Update Features)
 -- ========================================================
 local LIKE_TARGET_GOAL = 1000
 local LOCAL_LOCK_FILE = "txr_emp_v206_like_" .. tostring(lp and lp.UserId or 0) .. ".txt"
@@ -2118,10 +2118,10 @@ local pollState = {
     hasLiked = isLocallyLiked(),
     activePanel = "CHAT", -- "CHAT" or "REPORTS"
     likersMap = {},
-    seenChatKeys = {},
-    seenReportKeys = {},
-    chatItems = {},
-    reportItems = {}
+    renderedChatKeys = {},
+    renderedReportKeys = {},
+    chatOrderCounter = 0,
+    reportOrderCounter = 0
 }
 
 local nextGenHubPlaceholder = CommunityTab:CreateLabel("TXR_NEXTGEN_COMMUNITY_HUB")
@@ -2150,9 +2150,9 @@ task.spawn(function()
             if hubLabel.Visible then hubLabel.Visible = false end
         end)
 
-        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 442)
-        card.BackgroundColor3 = Color3.fromRGB(8, 10, 15)
-        card.BackgroundTransparency = 0.05
+        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 456)
+        card.BackgroundColor3 = Color3.fromRGB(7, 9, 14)
+        card.BackgroundTransparency = 0.04
         card.ClipsDescendants = true
 
         for _, child in ipairs(card:GetChildren()) do
@@ -2166,7 +2166,7 @@ task.spawn(function()
         local masterStroke = Instance.new("UIStroke", card)
         masterStroke.Thickness = 1.4
         masterStroke.Color = Color3.new(1, 1, 1)
-        masterStroke.Transparency = 0.35
+        masterStroke.Transparency = 0.30
 
         local masterStrokeGrad = Instance.new("UIGradient", masterStroke)
         masterStrokeGrad.Color = ColorSequence.new({
@@ -2175,24 +2175,59 @@ task.spawn(function()
             ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 45, 115))
         })
 
+        local function spawnJuiceParticles(parentObj, posUDim, count)
+            local palette = {
+                Color3.fromRGB(0, 245, 255),
+                Color3.fromRGB(255, 65, 145),
+                Color3.fromRGB(175, 85, 255),
+                Color3.fromRGB(75, 255, 165)
+            }
+            for i = 1, (count or 18) do
+                local dot = Instance.new("Frame", parentObj)
+                local sz = math.random(4, 7)
+                dot.Size = UDim2.fromOffset(sz, sz)
+                dot.AnchorPoint = Vector2.new(0.5, 0.5)
+                dot.Position = posUDim
+                dot.BackgroundColor3 = palette[math.random(1, #palette)]
+                dot.BorderSizePixel = 0
+                dot.ZIndex = 50
+                Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+
+                local angle = math.rad(math.random(0, 360))
+                local dist = math.random(35, 115)
+                local dx = math.cos(angle) * dist
+                local dy = math.sin(angle) * dist * 0.65
+
+                TweenService:Create(dot, TweenInfo.new(0.55 + math.random() * 0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                    Position = UDim2.new(posUDim.X.Scale, posUDim.X.Offset + dx, posUDim.Y.Scale, posUDim.Y.Offset + dy),
+                    Size = UDim2.fromOffset(0, 0),
+                    BackgroundTransparency = 1
+                }):Play()
+
+                task.delay(0.85, function()
+                    if dot and dot.Parent then dot:Destroy() end
+                end)
+            end
+        end
+
         -- ====================================================
         -- 1. YOUTUBER STYLE MILESTONE: 1000 LIKES FOR NEXT UPDATE
         -- ====================================================
         local goalBox = Instance.new("Frame", card)
-        goalBox.Size = UDim2.new(1, -20, 0, 134)
+        goalBox.Size = UDim2.new(1, -20, 0, 138)
         goalBox.Position = UDim2.new(0, 10, 0, 10)
-        goalBox.BackgroundColor3 = Color3.fromRGB(14, 18, 28)
-        goalBox.BackgroundTransparency = 0.08
+        goalBox.BackgroundColor3 = Color3.fromRGB(13, 17, 27)
+        goalBox.BackgroundTransparency = 0.06
         goalBox.ClipsDescendants = true
-        Instance.new("UICorner", goalBox).CornerRadius = UDim.new(0, 11)
+        Instance.new("UICorner", goalBox).CornerRadius = UDim.new(0, 12)
 
         local goalStroke = Instance.new("UIStroke", goalBox)
         goalStroke.Thickness = 1.15
         goalStroke.Color = Color3.fromRGB(0, 235, 255)
-        goalStroke.Transparency = 0.50
+        goalStroke.Transparency = 0.45
 
         local goalTopBadge = Instance.new("TextLabel", goalBox)
-        goalTopBadge.Size = UDim2.new(0.66, 0, 0, 16)
+        goalTopBadge.Size = UDim2.new(0.66, 0, 0, 15)
         goalTopBadge.Position = UDim2.new(0, 12, 0, 8)
         goalTopBadge.BackgroundTransparency = 1
         goalTopBadge.Text = "🎬 NEXT UPDATE MILESTONE"
@@ -2223,12 +2258,12 @@ task.spawn(function()
         goalTitle.Text = "1000 LIKES FOR NEXT UPDATE"
         goalTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
         goalTitle.Font = Enum.Font.GothamBlack
-        goalTitle.TextSize = 14
+        goalTitle.TextSize = 14.5
         goalTitle.TextXAlignment = Enum.TextXAlignment.Left
 
         local counterRow = Instance.new("TextLabel", goalBox)
         counterRow.Size = UDim2.new(0.68, 0, 0, 16)
-        counterRow.Position = UDim2.new(0, 12, 0, 44)
+        counterRow.Position = UDim2.new(0, 12, 0, 45)
         counterRow.BackgroundTransparency = 1
         counterRow.Text = "0 / 1000 LIKES"
         counterRow.TextColor3 = Color3.fromRGB(0, 240, 255)
@@ -2239,7 +2274,7 @@ task.spawn(function()
         local pctText = Instance.new("TextLabel", goalBox)
         pctText.Size = UDim2.new(0.28, 0, 0, 16)
         pctText.AnchorPoint = Vector2.new(1, 0)
-        pctText.Position = UDim2.new(1, -12, 0, 44)
+        pctText.Position = UDim2.new(1, -12, 0, 45)
         pctText.BackgroundTransparency = 1
         pctText.Text = "0.0%"
         pctText.TextColor3 = Color3.fromRGB(175, 195, 225)
@@ -2249,7 +2284,7 @@ task.spawn(function()
 
         local barTrack = Instance.new("Frame", goalBox)
         barTrack.Size = UDim2.new(1, -24, 0, 11)
-        barTrack.Position = UDim2.new(0, 12, 0, 64)
+        barTrack.Position = UDim2.new(0, 12, 0, 65)
         barTrack.BackgroundColor3 = Color3.fromRGB(8, 11, 17)
         barTrack.ClipsDescendants = true
         Instance.new("UICorner", barTrack).CornerRadius = UDim.new(1, 0)
@@ -2268,17 +2303,20 @@ task.spawn(function()
         })
 
         local likeBtn = Instance.new("TextButton", goalBox)
-        likeBtn.Size = UDim2.new(1, -24, 0, 40)
-        likeBtn.Position = UDim2.new(0, 12, 0, 83)
+        likeBtn.Size = UDim2.new(1, -24, 0, 42)
+        likeBtn.Position = UDim2.new(0, 12, 0, 84)
         likeBtn.BackgroundColor3 = Color3.fromRGB(0, 145, 255)
         likeBtn.Text = ""
         likeBtn.AutoButtonColor = false
-        Instance.new("UICorner", likeBtn).CornerRadius = UDim.new(0, 9)
+        likeBtn.ClipsDescendants = true
+        Instance.new("UICorner", likeBtn).CornerRadius = UDim.new(0, 10)
+
+        local likeBtnScale = Instance.new("UIScale", likeBtn)
 
         local btnStroke = Instance.new("UIStroke", likeBtn)
-        btnStroke.Thickness = 1.15
+        btnStroke.Thickness = 1.2
         btnStroke.Color = Color3.fromRGB(140, 235, 255)
-        btnStroke.Transparency = 0.40
+        btnStroke.Transparency = 0.35
 
         local btnGrad = Instance.new("UIGradient", likeBtn)
         btnGrad.Color = ColorSequence.new({
@@ -2286,62 +2324,77 @@ task.spawn(function()
             ColorSequenceKeypoint.new(1, Color3.fromRGB(145, 55, 255))
         })
 
+        -- Live Shimmer Sweep across Vote Button
+        local shimmerBar = Instance.new("Frame", likeBtn)
+        shimmerBar.Size = UDim2.new(0.28, 0, 1.6, 0)
+        shimmerBar.AnchorPoint = Vector2.new(0.5, 0.5)
+        shimmerBar.Position = UDim2.new(-0.3, 0, 0.5, 0)
+        shimmerBar.Rotation = 18
+        shimmerBar.BackgroundColor3 = Color3.new(1, 1, 1)
+        shimmerBar.BackgroundTransparency = 0.82
+        shimmerBar.BorderSizePixel = 0
+
         local likeBtnText = Instance.new("TextLabel", likeBtn)
         likeBtnText.Size = UDim2.fromScale(1, 1)
         likeBtnText.BackgroundTransparency = 1
         likeBtnText.Text = "👍  LIKE FOR NEXT UPDATE"
         likeBtnText.TextColor3 = Color3.new(1, 1, 1)
         likeBtnText.Font = Enum.Font.GothamBlack
-        likeBtnText.TextSize = 11.5
+        likeBtnText.TextSize = 12
+        likeBtnText.ZIndex = 3
 
         -- ====================================================
-        -- 2. CONSOLE: CHAT || Report Bugs & Next Update Features
+        -- 2. SMOOTH CONSOLE: CHAT || Report Bugs & Next Update Features
         -- ====================================================
         local monitorBox = Instance.new("Frame", card)
-        monitorBox.Size = UDim2.new(1, -20, 0, 282)
-        monitorBox.Position = UDim2.new(0, 10, 0, 150)
+        monitorBox.Size = UDim2.new(1, -20, 0, 292)
+        monitorBox.Position = UDim2.new(0, 10, 0, 154)
         monitorBox.BackgroundColor3 = Color3.fromRGB(11, 14, 21)
-        monitorBox.BackgroundTransparency = 0.08
+        monitorBox.BackgroundTransparency = 0.06
         monitorBox.ClipsDescendants = true
-        Instance.new("UICorner", monitorBox).CornerRadius = UDim.new(0, 11)
+        Instance.new("UICorner", monitorBox).CornerRadius = UDim.new(0, 12)
 
         local monStroke = Instance.new("UIStroke", monitorBox)
         monStroke.Thickness = 1.15
         monStroke.Color = Color3.fromRGB(38, 48, 72)
 
-        -- Top Switcher Bar: CHAT || Report Bugs & Next Update Features
+        -- Sliding Pill Switcher
         local switchBar = Instance.new("Frame", monitorBox)
-        switchBar.Size = UDim2.new(1, -12, 0, 28)
+        switchBar.Size = UDim2.new(1, -12, 0, 30)
         switchBar.Position = UDim2.new(0, 6, 0, 6)
-        switchBar.BackgroundColor3 = Color3.fromRGB(17, 22, 34)
+        switchBar.BackgroundColor3 = Color3.fromRGB(16, 20, 31)
         Instance.new("UICorner", switchBar).CornerRadius = UDim.new(0, 8)
 
+        local activePillSlider = Instance.new("Frame", switchBar)
+        activePillSlider.Size = UDim2.new(0.40, -4, 1, -4)
+        activePillSlider.Position = UDim2.new(0, 2, 0, 2)
+        activePillSlider.BackgroundColor3 = Color3.fromRGB(0, 155, 255)
+        Instance.new("UICorner", activePillSlider).CornerRadius = UDim.new(0, 6)
+
         local chatTabBtn = Instance.new("TextButton", switchBar)
-        chatTabBtn.Size = UDim2.new(0.42, -3, 1, -4)
-        chatTabBtn.Position = UDim2.new(0, 2, 0, 2)
-        chatTabBtn.BackgroundColor3 = Color3.fromRGB(0, 155, 255)
+        chatTabBtn.Size = UDim2.new(0.40, 0, 1, 0)
+        chatTabBtn.Position = UDim2.new(0, 0, 0, 0)
+        chatTabBtn.BackgroundTransparency = 1
         chatTabBtn.Text = "💬 CHAT"
         chatTabBtn.TextColor3 = Color3.new(1, 1, 1)
         chatTabBtn.Font = Enum.Font.GothamBlack
         chatTabBtn.TextSize = 9.5
-        chatTabBtn.AutoButtonColor = false
-        Instance.new("UICorner", chatTabBtn).CornerRadius = UDim.new(0, 6)
+        chatTabBtn.ZIndex = 3
 
         local reportsTabBtn = Instance.new("TextButton", switchBar)
-        reportsTabBtn.Size = UDim2.new(0.58, -3, 1, -4)
-        reportsTabBtn.Position = UDim2.new(0.42, 1, 0, 2)
-        reportsTabBtn.BackgroundColor3 = Color3.fromRGB(23, 29, 44)
+        reportsTabBtn.Size = UDim2.new(0.60, 0, 1, 0)
+        reportsTabBtn.Position = UDim2.new(0.40, 0, 0, 0)
+        reportsTabBtn.BackgroundTransparency = 1
         reportsTabBtn.Text = "🛠️ Report Bugs & Next Update Features"
         reportsTabBtn.TextColor3 = Color3.fromRGB(175, 195, 225)
         reportsTabBtn.Font = Enum.Font.GothamBlack
         reportsTabBtn.TextSize = 8.5
-        reportsTabBtn.AutoButtonColor = false
-        Instance.new("UICorner", reportsTabBtn).CornerRadius = UDim.new(0, 6)
+        reportsTabBtn.ZIndex = 3
 
-        -- Live Monitor Sub-Bar
+        -- Live Status Sub-Bar
         local liveStatusRow = Instance.new("Frame", monitorBox)
         liveStatusRow.Size = UDim2.new(1, -14, 0, 18)
-        liveStatusRow.Position = UDim2.new(0, 7, 0, 37)
+        liveStatusRow.Position = UDim2.new(0, 7, 0, 39)
         liveStatusRow.BackgroundTransparency = 1
 
         local radarDot = Instance.new("Frame", liveStatusRow)
@@ -2355,10 +2408,10 @@ task.spawn(function()
         modeBannerLbl.Size = UDim2.new(0.72, 0, 1, 0)
         modeBannerLbl.Position = UDim2.new(0, 15, 0, 0)
         modeBannerLbl.BackgroundTransparency = 1
-        modeBannerLbl.Text = "LIVE GLOBAL CHAT STREAM"
+        modeBannerLbl.Text = "LIVE GLOBAL CHAT  •  TAP CARD TO @MENTION"
         modeBannerLbl.TextColor3 = Color3.fromRGB(0, 235, 255)
         modeBannerLbl.Font = Enum.Font.GothamBlack
-        modeBannerLbl.TextSize = 8.5
+        modeBannerLbl.TextSize = 8
         modeBannerLbl.TextXAlignment = Enum.TextXAlignment.Left
 
         local logCounterLbl = Instance.new("TextLabel", liveStatusRow)
@@ -2372,79 +2425,201 @@ task.spawn(function()
         logCounterLbl.TextSize = 8.5
         logCounterLbl.TextXAlignment = Enum.TextXAlignment.Right
 
-        local monScroll = Instance.new("ScrollingFrame", monitorBox)
-        monScroll.Size = UDim2.new(1, -14, 1, -98)
-        monScroll.Position = UDim2.new(0, 7, 0, 58)
-        monScroll.BackgroundTransparency = 1
-        monScroll.ScrollBarThickness = 2
-        monScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 225, 255)
-        monScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-        monScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        -- Separate Persistent Scrolls for Smooth Zero-Flicker Switching
+        local chatScroll = Instance.new("ScrollingFrame", monitorBox)
+        chatScroll.Size = UDim2.new(1, -14, 1, -102)
+        chatScroll.Position = UDim2.new(0, 7, 0, 60)
+        chatScroll.BackgroundTransparency = 1
+        chatScroll.ScrollBarThickness = 2
+        chatScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 225, 255)
+        chatScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        chatScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        chatScroll.Visible = true
 
-        local monList = Instance.new("UIListLayout", monScroll)
-        monList.Padding = UDim.new(0, 5)
-        monList.SortOrder = Enum.SortOrder.LayoutOrder
+        local chatList = Instance.new("UIListLayout", chatScroll)
+        chatList.Padding = UDim.new(0, 5)
+        chatList.SortOrder = Enum.SortOrder.LayoutOrder
+
+        local reportScroll = Instance.new("ScrollingFrame", monitorBox)
+        reportScroll.Size = UDim2.new(1, -14, 1, -102)
+        reportScroll.Position = UDim2.new(0, 7, 0, 60)
+        reportScroll.BackgroundTransparency = 1
+        reportScroll.ScrollBarThickness = 2
+        reportScroll.ScrollBarImageColor3 = Color3.fromRGB(185, 110, 255)
+        reportScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        reportScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        reportScroll.Visible = false
+
+        local reportList = Instance.new("UIListLayout", reportScroll)
+        reportList.Padding = UDim.new(0, 5)
+        reportList.SortOrder = Enum.SortOrder.LayoutOrder
 
         local inputDock = Instance.new("Frame", monitorBox)
-        inputDock.Size = UDim2.new(1, -14, 0, 34)
+        inputDock.Size = UDim2.new(1, -14, 0, 36)
         inputDock.AnchorPoint = Vector2.new(0.5, 1)
         inputDock.Position = UDim2.new(0.5, 0, 1, -5)
-        inputDock.BackgroundColor3 = Color3.fromRGB(18, 23, 34)
-        Instance.new("UICorner", inputDock).CornerRadius = UDim.new(0, 8)
+        inputDock.BackgroundColor3 = Color3.fromRGB(17, 22, 33)
+        Instance.new("UICorner", inputDock).CornerRadius = UDim.new(0, 9)
 
         local dockStroke = Instance.new("UIStroke", inputDock)
         dockStroke.Thickness = 1
         dockStroke.Color = Color3.fromRGB(0, 210, 255)
-        dockStroke.Transparency = 0.55
+        dockStroke.Transparency = 0.50
 
         local inputBox = Instance.new("TextBox", inputDock)
         inputBox.Size = UDim2.new(1, -84, 1, -4)
         inputBox.Position = UDim2.new(0, 10, 0, 2)
         inputBox.BackgroundTransparency = 1
         inputBox.Text = ""
-        inputBox.PlaceholderText = "Type message in global chat..."
+        inputBox.PlaceholderText = "Say something in global chat..."
         inputBox.PlaceholderColor3 = Color3.fromRGB(125, 140, 165)
         inputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
         inputBox.Font = Enum.Font.GothamMedium
-        inputBox.TextSize = 10
+        inputBox.TextSize = 10.5
         inputBox.TextXAlignment = Enum.TextXAlignment.Left
         inputBox.ClearTextOnFocus = false
 
         local sendBtn = Instance.new("TextButton", inputDock)
-        sendBtn.Size = UDim2.fromOffset(66, 26)
+        sendBtn.Size = UDim2.fromOffset(66, 28)
         sendBtn.AnchorPoint = Vector2.new(1, 0.5)
         sendBtn.Position = UDim2.new(1, -4, 0.5, 0)
-        sendBtn.BackgroundColor3 = Color3.fromRGB(0, 205, 135)
+        sendBtn.BackgroundColor3 = Color3.fromRGB(0, 210, 140)
         sendBtn.Text = "SEND ➤"
         sendBtn.TextColor3 = Color3.fromRGB(10, 15, 20)
         sendBtn.Font = Enum.Font.GothamBlack
         sendBtn.TextSize = 9.5
         sendBtn.AutoButtonColor = false
-        Instance.new("UICorner", sendBtn).CornerRadius = UDim.new(0, 6)
+        Instance.new("UICorner", sendBtn).CornerRadius = UDim.new(0, 7)
 
-        local function refreshActivePanelVisuals()
-            if pollState.activePanel == "CHAT" then
-                chatTabBtn.BackgroundColor3 = Color3.fromRGB(0, 155, 255)
+        local sendBtnScale = Instance.new("UIScale", sendBtn)
+
+        local function smoothScrollDown(scrollFrame)
+            task.defer(function()
+                task.wait(0.04)
+                if scrollFrame and scrollFrame.Parent then
+                    local maxY = math.max(0, scrollFrame.AbsoluteCanvasSize.Y - scrollFrame.AbsoluteWindowSize.Y)
+                    TweenService:Create(scrollFrame, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                        CanvasPosition = Vector2.new(0, maxY)
+                    }):Play()
+                end
+            end)
+        end
+
+        local function createFeedBubble(parentScroll, orderNum, uName, uId, msgStr, timeStr, isReportMode)
+            local isOwner = (tonumber(uId) == MODERATOR_USER_ID) or (uName == "TxR_AsHU")
+            local isSelf = (lp and tostring(uId) == tostring(lp.UserId))
+            local accentCol = isOwner and Color3.fromRGB(255, 205, 55)
+                or (isReportMode and Color3.fromRGB(185, 110, 255) or Color3.fromRGB(0, 230, 255))
+
+            local row = Instance.new("TextButton", parentScroll)
+            row.Size = UDim2.new(1, -6, 0, 44)
+            row.BackgroundColor3 = isSelf and Color3.fromRGB(22, 30, 46) or Color3.fromRGB(17, 22, 33)
+            row.BackgroundTransparency = 0.14
+            row.Text = ""
+            row.AutoButtonColor = false
+            row.LayoutOrder = orderNum
+            row.ClipsDescendants = true
+            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+
+            local rScale = Instance.new("UIScale", row)
+            rScale.Scale = 0.92
+            TweenService:Create(rScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+
+            local rStroke = Instance.new("UIStroke", row)
+            rStroke.Thickness = isOwner and 1.2 or 0.9
+            rStroke.Color = accentCol
+            rStroke.Transparency = isOwner and 0.30 or 0.62
+
+            local avatar = Instance.new("ImageLabel", row)
+            avatar.Size = UDim2.fromOffset(28, 28)
+            avatar.AnchorPoint = Vector2.new(0, 0.5)
+            avatar.Position = UDim2.new(0, 7, 0.5, 0)
+            avatar.BackgroundColor3 = Color3.fromRGB(10, 13, 20)
+            avatar.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", tonumber(uId) or 9685785248)
+            Instance.new("UICorner", avatar).CornerRadius = UDim.new(1, 0)
+
+            local tagPrefix = isOwner and "👑 OWNER • " or (isReportMode and "🛠️ IDEA • " or "")
+            local uLbl = Instance.new("TextLabel", row)
+            uLbl.Size = UDim2.new(0.72, 0, 0, 14)
+            uLbl.Position = UDim2.new(0, 42, 0, 5)
+            uLbl.BackgroundTransparency = 1
+            uLbl.Text = tagPrefix .. "@" .. tostring(uName or "Player")
+            uLbl.TextColor3 = accentCol
+            uLbl.Font = Enum.Font.GothamBlack
+            uLbl.TextSize = 9.5
+            uLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+            local tLbl = Instance.new("TextLabel", row)
+            tLbl.Size = UDim2.new(0.24, -8, 0, 14)
+            tLbl.AnchorPoint = Vector2.new(1, 0)
+            tLbl.Position = UDim2.new(1, -8, 0, 5)
+            tLbl.BackgroundTransparency = 1
+            tLbl.Text = tostring(timeStr or os.date("%H:%M"))
+            tLbl.TextColor3 = Color3.fromRGB(120, 135, 160)
+            tLbl.Font = Enum.Font.Code
+            tLbl.TextSize = 8
+            tLbl.TextXAlignment = Enum.TextXAlignment.Right
+
+            local mLbl = Instance.new("TextLabel", row)
+            mLbl.Size = UDim2.new(1, -48, 0, 18)
+            mLbl.Position = UDim2.new(0, 42, 0, 20)
+            mLbl.BackgroundTransparency = 1
+            mLbl.Text = tostring(msgStr or "")
+            mLbl.TextColor3 = Color3.fromRGB(242, 246, 255)
+            mLbl.Font = Enum.Font.GothamMedium
+            mLbl.TextSize = 10
+            mLbl.TextTruncate = Enum.TextTruncate.AtEnd
+            mLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+            -- Tap bubble to @mention user
+            row.MouseButton1Click:Connect(function()
+                if uName and uName ~= "" then
+                    inputBox.Text = "@" .. tostring(uName) .. " " .. inputBox.Text
+                    inputBox:CaptureFocus()
+                end
+            end)
+        end
+
+        local function switchPanel(targetPanel)
+            pollState.activePanel = targetPanel
+            if targetPanel == "CHAT" then
+                TweenService:Create(activePillSlider, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                    Position = UDim2.new(0, 2, 0, 2),
+                    Size = UDim2.new(0.40, -4, 1, -4),
+                    BackgroundColor3 = Color3.fromRGB(0, 155, 255)
+                }):Play()
                 chatTabBtn.TextColor3 = Color3.new(1, 1, 1)
-                reportsTabBtn.BackgroundColor3 = Color3.fromRGB(23, 29, 44)
                 reportsTabBtn.TextColor3 = Color3.fromRGB(175, 195, 225)
-                modeBannerLbl.Text = "LIVE GLOBAL CHAT STREAM"
-                inputBox.PlaceholderText = "Type message in global chat..."
+                modeBannerLbl.Text = "LIVE GLOBAL CHAT  •  TAP CARD TO @MENTION"
+                inputBox.PlaceholderText = "Say something in global chat..."
                 sendBtn.Text = "SEND ➤"
+                sendBtn.BackgroundColor3 = Color3.fromRGB(0, 210, 140)
+                dockStroke.Color = Color3.fromRGB(0, 210, 255)
+                chatScroll.Visible = true
+                reportScroll.Visible = false
+                logCounterLbl.Text = string.format("%d LIVE", pollState.chatOrderCounter)
+                smoothScrollDown(chatScroll)
             else
-                reportsTabBtn.BackgroundColor3 = Color3.fromRGB(165, 65, 255)
+                TweenService:Create(activePillSlider, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                    Position = UDim2.new(0.40, 2, 0, 2),
+                    Size = UDim2.new(0.60, -4, 1, -4),
+                    BackgroundColor3 = Color3.fromRGB(165, 65, 255)
+                }):Play()
                 reportsTabBtn.TextColor3 = Color3.new(1, 1, 1)
-                chatTabBtn.BackgroundColor3 = Color3.fromRGB(23, 29, 44)
                 chatTabBtn.TextColor3 = Color3.fromRGB(175, 195, 225)
-                modeBannerLbl.Text = "BUG REPORTS & NEXT UPDATE FEATURES"
-                inputBox.PlaceholderText = "Report a bug or next update feature..."
+                modeBannerLbl.Text = "REPORT BUGS & NEXT UPDATE FEATURES"
+                inputBox.PlaceholderText = "Report a bug or suggest next update feature..."
                 sendBtn.Text = "POST ➤"
+                sendBtn.BackgroundColor3 = Color3.fromRGB(175, 85, 255)
+                dockStroke.Color = Color3.fromRGB(175, 85, 255)
+                chatScroll.Visible = false
+                reportScroll.Visible = true
+                logCounterLbl.Text = string.format("%d LIVE", pollState.reportOrderCounter)
+                smoothScrollDown(reportScroll)
             end
         end
 
-        local function renderMonitor()
-            refreshActivePanelVisuals()
-
+        local function updateLikeUI()
             local count = math.max(0, pollState.totalLikes)
             local ratio = math.clamp(count / LIKE_TARGET_GOAL, 0.02, 1)
             local pctVal = math.min(100, (count / LIKE_TARGET_GOAL) * 100)
@@ -2460,18 +2635,19 @@ task.spawn(function()
                 statusPillLbl.TextColor3 = Color3.fromRGB(255, 195, 65)
             end
 
-            TweenService:Create(likeBarFill, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            TweenService:Create(likeBarFill, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                 Size = UDim2.new(ratio, 0, 1, 0)
             }):Play()
 
             if pollState.hasLiked then
                 btnGrad.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(22, 32, 46)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(18, 46, 40))
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 32, 46)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(16, 48, 38))
                 })
                 btnStroke.Color = Color3.fromRGB(75, 245, 165)
                 likeBtnText.Text = "🔒  LOCKED • LIKE COUNTED"
                 likeBtnText.TextColor3 = Color3.fromRGB(75, 245, 165)
+                shimmerBar.Visible = false
             else
                 btnGrad.Color = ColorSequence.new({
                     ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 165, 255)),
@@ -2480,70 +2656,12 @@ task.spawn(function()
                 btnStroke.Color = Color3.fromRGB(140, 235, 255)
                 likeBtnText.Text = "👍  LIKE FOR NEXT UPDATE"
                 likeBtnText.TextColor3 = Color3.new(1, 1, 1)
-            end
-
-            local activeList = (pollState.activePanel == "CHAT") and pollState.chatItems or pollState.reportItems
-            logCounterLbl.Text = string.format("%d LIVE", #activeList)
-
-            for _, child in ipairs(monScroll:GetChildren()) do
-                if child:IsA("Frame") then child:Destroy() end
-            end
-
-            for idx, item in ipairs(activeList) do
-                local accentCol = (pollState.activePanel == "CHAT") and Color3.fromRGB(0, 225, 255) or Color3.fromRGB(185, 110, 255)
-                local row = Instance.new("Frame", monScroll)
-                row.Size = UDim2.new(1, -6, 0, 44)
-                row.BackgroundColor3 = Color3.fromRGB(18, 23, 34)
-                row.BackgroundTransparency = 0.16
-                row.LayoutOrder = idx
-                Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
-
-                local rStroke = Instance.new("UIStroke", row)
-                rStroke.Thickness = 1
-                rStroke.Color = accentCol
-                rStroke.Transparency = 0.55
-
-                local avatar = Instance.new("ImageLabel", row)
-                avatar.Size = UDim2.fromOffset(28, 28)
-                avatar.AnchorPoint = Vector2.new(0, 0.5)
-                avatar.Position = UDim2.new(0, 7, 0.5, 0)
-                avatar.BackgroundColor3 = Color3.fromRGB(10, 13, 20)
-                local uidNum = tonumber(item.uid) or 9685785248
-                avatar.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", uidNum)
-                Instance.new("UICorner", avatar).CornerRadius = UDim.new(1, 0)
-
-                local uLbl = Instance.new("TextLabel", row)
-                uLbl.Size = UDim2.new(0.75, 0, 0, 14)
-                uLbl.Position = UDim2.new(0, 42, 0, 5)
-                uLbl.BackgroundTransparency = 1
-                uLbl.Text = "@" .. tostring(item.user or "Player")
-                uLbl.TextColor3 = accentCol
-                uLbl.Font = Enum.Font.GothamBlack
-                uLbl.TextSize = 9.5
-                uLbl.TextXAlignment = Enum.TextXAlignment.Left
-
-                local mLbl = Instance.new("TextLabel", row)
-                mLbl.Size = UDim2.new(1, -48, 0, 18)
-                mLbl.Position = UDim2.new(0, 42, 0, 20)
-                mLbl.BackgroundTransparency = 1
-                mLbl.Text = tostring(item.msg or "")
-                mLbl.TextColor3 = Color3.fromRGB(240, 245, 255)
-                mLbl.Font = Enum.Font.GothamMedium
-                mLbl.TextSize = 9.5
-                mLbl.TextTruncate = Enum.TextTruncate.AtEnd
-                mLbl.TextXAlignment = Enum.TextXAlignment.Left
+                shimmerBar.Visible = true
             end
         end
 
-        chatTabBtn.MouseButton1Click:Connect(function()
-            pollState.activePanel = "CHAT"
-            renderMonitor()
-        end)
-
-        reportsTabBtn.MouseButton1Click:Connect(function()
-            pollState.activePanel = "REPORTS"
-            renderMonitor()
-        end)
+        chatTabBtn.MouseButton1Click:Connect(function() switchPanel("CHAT") end)
+        reportsTabBtn.MouseButton1Click:Connect(function() switchPanel("REPORTS") end)
 
         -- Webhook ONLY reports WHO did WHAT
         local function notifyWebhookAction(actionSummary)
@@ -2575,12 +2693,8 @@ task.spawn(function()
             local freshLikers = {}
             local freshLikeCount = 0
             local myIdStr = tostring(lp and lp.UserId or 0)
-
-            local freshChats = {}
-            local seenChats = {}
-
-            local freshReports = {}
-            local seenReports = {}
+            local addedNewChat = false
+            local addedNewReport = false
 
             for _, item in ipairs(dataList) do
                 local mText = tostring(item.msg or "")
@@ -2611,17 +2725,13 @@ task.spawn(function()
                 -- 2. Bug & Next Update Feature Reports: [EMP_REPORT_V206:UID:USER] MSG
                 local rUid, rUser, rMsg = mText:match("^%[EMP_REPORT_V206:(.-):(.-)%]%s*(.*)$")
                 if rUid and rMsg then
-                    local rKey = tostring(item.id or (rUid .. "_" .. tostring(item.time or "") .. "_" .. rMsg))
-                    if not seenReports[rKey] then
-                        seenReports[rKey] = true
-                        table.insert(freshReports, 1, {
-                            user = (rUser ~= "" and rUser) or uName,
-                            uid = tonumber(rUid) or uId,
-                            msg = rMsg
-                        })
-                        if #freshReports > 30 then
-                            table.remove(freshReports)
-                        end
+                    local rKey = tostring(item.id or (rUid .. "_" .. rMsg))
+                    if not pollState.renderedReportKeys[rKey] then
+                        pollState.renderedReportKeys[rKey] = true
+                        pollState.reportOrderCounter += 1
+                        addedNewReport = true
+                        local tStr = item.time and os.date("%H:%M", math.floor(tonumber(item.time) / 1000)) or os.date("%H:%M")
+                        createFeedBubble(reportScroll, pollState.reportOrderCounter, (rUser ~= "" and rUser) or uName, rUid, rMsg, tStr, true)
                     end
                     continue
                 end
@@ -2629,28 +2739,28 @@ task.spawn(function()
                 -- 3. Global Chat Messages: [EMP_HUBCHAT_V206:UID:USER] MSG
                 local cUid, cUser, cMsg = mText:match("^%[EMP_HUBCHAT_V206:(.-):(.-)%]%s*(.*)$")
                 if cUid and cMsg then
-                    local cKey = tostring(item.id or (cUid .. "_" .. tostring(item.time or "") .. "_" .. cMsg))
-                    if not seenChats[cKey] then
-                        seenChats[cKey] = true
-                        table.insert(freshChats, 1, {
-                            user = (cUser ~= "" and cUser) or uName,
-                            uid = tonumber(cUid) or uId,
-                            msg = cMsg
-                        })
-                        if #freshChats > 35 then
-                            table.remove(freshChats)
-                        end
+                    local cKey = tostring(item.id or (cUid .. "_" .. cMsg))
+                    if not pollState.renderedChatKeys[cKey] then
+                        pollState.renderedChatKeys[cKey] = true
+                        pollState.chatOrderCounter += 1
+                        addedNewChat = true
+                        local tStr = item.time and os.date("%H:%M", math.floor(tonumber(item.time) / 1000)) or os.date("%H:%M")
+                        createFeedBubble(chatScroll, pollState.chatOrderCounter, (cUser ~= "" and cUser) or uName, cUid, cMsg, tStr, false)
                     end
                 end
             end
 
             pollState.likersMap = freshLikers
-            pollState.totalLikes = freshLikeCount
-            pollState.seenChatKeys = seenChats
-            pollState.seenReportKeys = seenReports
-            pollState.chatItems = freshChats
-            pollState.reportItems = freshReports
-            renderMonitor()
+            pollState.totalLikes = math.max(pollState.totalLikes, freshLikeCount)
+            updateLikeUI()
+
+            if pollState.activePanel == "CHAT" then
+                logCounterLbl.Text = string.format("%d LIVE", pollState.chatOrderCounter)
+                if addedNewChat then smoothScrollDown(chatScroll) end
+            else
+                logCounterLbl.Text = string.format("%d LIVE", pollState.reportOrderCounter)
+                if addedNewReport then smoothScrollDown(reportScroll) end
+            end
         end
 
         local function syncFromGlobalServer()
@@ -2659,17 +2769,19 @@ task.spawn(function()
                 local decOk, decoded = pcall(function() return HttpService:JSONDecode(raw) end)
                 if decOk and type(decoded) == "table" then
                     ingestServerMessages(decoded)
-                    return
                 end
             end
-            renderMonitor()
         end
 
         local likeBusy = false
         likeBtn.MouseButton1Click:Connect(function()
+            -- Tactile spring bounce on click
+            likeBtnScale.Scale = 0.94
+            TweenService:Create(likeBtnScale, TweenInfo.new(0.35, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {Scale = 1}):Play()
+
             if pollState.hasLiked or isLocallyLiked() or likeBusy then
                 pollState.hasLiked = true
-                renderMonitor()
+                updateLikeUI()
                 TXR_Lib:Notify({
                     Title = "🔒 LIKE LOCKED",
                     Content = "Your like is already recorded!",
@@ -2689,20 +2801,22 @@ task.spawn(function()
                 pollState.likersMap[uId] = uName
                 pollState.totalLikes += 1
             end
-            renderMonitor()
+
+            spawnJuiceParticles(goalBox, UDim2.new(0.5, 0, 0.75, 0), 24)
+            updateLikeUI()
 
             local currentCount = pollState.totalLikes
             notifyWebhookAction(string.format("**@%s** (`%s`) ne **Like** kiya (**%d / %d**)", uName, uId, currentCount, LIKE_TARGET_GOAL))
 
             task.spawn(function()
                 postToGlobalServer(string.format("[EMP_LIKE_V206:%s:%s]", uId, uName))
-                task.wait(0.7)
+                task.wait(0.6)
                 syncFromGlobalServer()
                 likeBusy = false
             end)
 
             TXR_Lib:Notify({
-                Title = "👍 LIKE COUNTED",
+                Title = "👍 LIKE COUNTED!",
                 Content = string.format("%d / %d Likes for Next Update", currentCount, LIKE_TARGET_GOAL),
                 Duration = 2.5,
                 Image = 4483345998
@@ -2727,38 +2841,48 @@ task.spawn(function()
             end
 
             sendingItem = true
+            sendBtnScale.Scale = 0.90
+            TweenService:Create(sendBtnScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+
             local uName = lp and lp.Name or "Player"
             local uId = tostring(lp and lp.UserId or 0)
             local modeNow = pollState.activePanel
+            local localDedupKey = uId .. "_" .. trimmed
 
             inputBox.Text = ""
             sendBtn.Text = "SENT ✓"
 
             if modeNow == "CHAT" then
-                table.insert(pollState.chatItems, 1, {user = uName, uid = tonumber(uId) or 0, msg = trimmed})
-                renderMonitor()
+                pollState.renderedChatKeys[localDedupKey] = true
+                pollState.chatOrderCounter += 1
+                createFeedBubble(chatScroll, pollState.chatOrderCounter, uName, uId, trimmed, os.date("%H:%M"), false)
+                logCounterLbl.Text = string.format("%d LIVE", pollState.chatOrderCounter)
+                smoothScrollDown(chatScroll)
                 notifyWebhookAction(string.format("**@%s** (`%s`) ne **CHAT** mein bheja: **%s**", uName, uId, trimmed))
                 task.spawn(function()
                     postToGlobalServer(string.format("[EMP_HUBCHAT_V206:%s:%s] %s", uId, uName, trimmed))
-                    task.wait(0.7)
+                    task.wait(0.6)
                     syncFromGlobalServer()
                     sendingItem = false
                 end)
             else
-                table.insert(pollState.reportItems, 1, {user = uName, uid = tonumber(uId) or 0, msg = trimmed})
-                renderMonitor()
+                pollState.renderedReportKeys[localDedupKey] = true
+                pollState.reportOrderCounter += 1
+                createFeedBubble(reportScroll, pollState.reportOrderCounter, uName, uId, trimmed, os.date("%H:%M"), true)
+                logCounterLbl.Text = string.format("%d LIVE", pollState.reportOrderCounter)
+                smoothScrollDown(reportScroll)
                 notifyWebhookAction(string.format("**@%s** (`%s`) ne **Bug / Next Update Feature** bheja: **%s**", uName, uId, trimmed))
                 task.spawn(function()
                     postToGlobalServer(string.format("[EMP_REPORT_V206:%s:%s] %s", uId, uName, trimmed))
-                    task.wait(0.7)
+                    task.wait(0.6)
                     syncFromGlobalServer()
                     sendingItem = false
                 end)
             end
 
-            task.delay(1.2, function()
+            task.delay(1.0, function()
                 if sendBtn and sendBtn.Parent then
-                    refreshActivePanelVisuals()
+                    sendBtn.Text = (pollState.activePanel == "CHAT") and "SEND ➤" or "POST ➤"
                 end
             end)
         end
@@ -2777,13 +2901,18 @@ task.spawn(function()
             if radarDot and radarDot.Parent then
                 radarDot.BackgroundTransparency = 0.15 + ((math.sin(mClock * 4) + 1) / 2) * 0.65
             end
+            if shimmerBar and shimmerBar.Parent and shimmerBar.Visible then
+                local sweep = ((mClock * 0.65) % 1.8) - 0.3
+                shimmerBar.Position = UDim2.new(sweep, 0, 0.5, 0)
+            end
         end)
 
-        renderMonitor()
+        updateLikeUI()
+        switchPanel("CHAT")
         task.spawn(function()
             while card and card.Parent do
                 syncFromGlobalServer()
-                task.wait(5.0)
+                task.wait(2.2)
             end
         end)
     end
