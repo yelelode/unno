@@ -406,7 +406,7 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- ✅ ROBLOX IN-GAME CHAT VERIFIED BADGE & LIVE RANK 1-100 PREFIX
+-- ✅ ROBLOX IN-GAME CHAT VERIFIED BADGE & SINGLE EQUIPPED RANK 1-100 PREFIX
 -- ========================================================
 pcall(function()
     if TextChatService then
@@ -420,10 +420,10 @@ pcall(function()
                     local badge = resolveActiveBadgeForPlayer(senderId)
                     local bestR = getBestNumericRankForPlayer(senderId)
                     if senderId == MODERATOR_USER_ID then
-                        local rPart = bestR and string.format("[#%d] ", bestR) or ""
-                        local tagPart = (badge and badge.id ~= "DEV") and string.format("[%s] ", badge.title) or ""
+                        local activeTitle = (badge and badge.id ~= "DEV") and badge.title or "DEV"
+                        local rPart = bestR and string.format("[#%d • %s] ", bestR, activeTitle) or "[👑 DEV] "
                         if not basePrefix:find("☑️", 1, true) then
-                            props.PrefixText = "☑️ " .. rPart .. tagPart .. basePrefix
+                            props.PrefixText = "☑️ " .. rPart .. basePrefix
                         end
                     elseif badge and bestR and bestR >= 1 and bestR <= 100 then
                         local tagStr = string.format("[#%d • %s] ", bestR, badge.title)
@@ -439,7 +439,7 @@ pcall(function()
 end)
 
 -- ========================================================
--- 🛡️ MODERATOR & TOP 1-100 OVERHEAD CROWN/RANK TAG ENGINE
+-- 🛡️ SINGLE CLEAN OVERHEAD TAG ENGINE (NO DUPLICATE TAG STACKING)
 -- ========================================================
 local refreshAllOverheadTags = nil
 
@@ -543,14 +543,19 @@ task.spawn(function()
         local grad = lbl and lbl:FindFirstChild("TagGrad")
         if lbl and grad then
             if isMod then
-                local subRank = bestR and string.format(" • #%d %s", bestR, (badge and badge.title or "")) or ""
-                lbl.Text = "ᴍᴏᴅᴇʀᴀᴛᴏʀ" .. subRank
-                lbl.TextColor3 = Color3.fromRGB(0, 240, 255)
-                grad.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 165, 255)),
-                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 240, 255))
-                })
+                if badge and badge.id ~= "DEV" then
+                    lbl.Text = string.format("ᴍᴏᴅᴇʀᴀᴛᴏʀ • %s", badge.title)
+                    lbl.TextColor3 = badge.theme.border
+                    grad.Color = ColorSequence.new(badge.theme.colors)
+                else
+                    lbl.Text = "ᴍᴏᴅᴇʀᴀᴛᴏʀ"
+                    lbl.TextColor3 = Color3.fromRGB(0, 240, 255)
+                    grad.Color = ColorSequence.new({
+                        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 165, 255)),
+                        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
+                        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 240, 255))
+                    })
+                end
             elseif badge and bestR then
                 lbl.Text = string.format("[#%d]  %s", bestR, badge.title)
                 lbl.TextColor3 = badge.theme.border
@@ -753,7 +758,7 @@ local function setLagFreeMode(enable)
 end
 
 -- ========================================================
--- PART 2: RAYFIELD GLASS + SETTINGS UI SCALER + TOPBAR CUSTOM TAG SELECTOR
+-- PART 2: RAYFIELD GLASS + NATIVE SETTINGS UI SCALE + TOPBAR TAG SELECTOR + MINIMIZE GUARD
 -- ========================================================
 local scalePresets = {1.00, 0.85, 0.75, 1.15}
 local scalePresetIdx = 1
@@ -761,6 +766,7 @@ local currentUiScaleValue = 1.00
 
 local pushTagSelectionToServer = nil
 local updateAllTagPillDisplays = nil
+local customCardsRegistry = {}
 
 local function getSafeGuiRoot()
     local root
@@ -894,6 +900,7 @@ local function applyGlassyStyle(obj)
         if n == "Main" then
             obj.BackgroundColor3 = Color3.fromRGB(14, 16, 22)
             obj.BackgroundTransparency = 0.36
+            obj.ClipsDescendants = true
 
             local grad = obj:FindFirstChild("TXR_AcrylicMain") or Instance.new("UIGradient", obj)
             grad.Name = "TXR_AcrylicMain"
@@ -910,6 +917,7 @@ local function applyGlassyStyle(obj)
         elseif n == "Topbar" then
             obj.BackgroundColor3 = Color3.fromRGB(10, 12, 18)
             obj.BackgroundTransparency = 0.48
+            obj.ClipsDescendants = true
         elseif n == "Elements" or n == "TabBar" or n == "Placeholder" or n == "List" then
             obj.BackgroundTransparency = 1
         elseif obj.Parent and obj.Parent:IsA("ScrollingFrame") and obj.BackgroundTransparency < 0.85 then
@@ -938,12 +946,13 @@ local function applyGlassyStyle(obj)
 end
 
 -- ========================================================
--- TOPBAR CUSTOM TAG SELECTOR (LEFT OF SEARCH ICON) + SETTINGS UI SCALE INJECTOR
+-- TOPBAR CUSTOM TAG SELECTOR + MATCHING SETTINGS UI SCALE + WINDOW MINIMIZE GUARD
 -- ========================================================
 local function installTopbarAndSettingsControls(gui)
     task.spawn(function()
         local mainWin = gui:WaitForChild("Main", 5)
         if not mainWin or not mainWin:IsA("Frame") then return end
+        mainWin.ClipsDescendants = true
 
         local uiScale = mainWin:FindFirstChild("TXR_CustomScaler")
         if not uiScale then
@@ -955,14 +964,16 @@ local function installTopbarAndSettingsControls(gui)
 
         local topbar = mainWin:WaitForChild("Topbar", 5)
         if not topbar then return end
+        topbar.ClipsDescendants = true
 
-        -- 1) TOPBAR CUSTOM TAG BUTTON (LEFT OF SEARCH ICON) + FLOATING POPOVER MENU
+        -- 1) TOPBAR CUSTOM TAG BUTTON (LEFT OF SEARCH ICON, NO BOX UNICODE SYMBOLS!)
+        local tagBtn, tagMenu
         if not topbar:FindFirstChild("TXR_TopbarTagSelector") then
-            local tagBtn = Instance.new("TextButton")
+            tagBtn = Instance.new("TextButton")
             tagBtn.Name = "TXR_TopbarTagSelector"
             tagBtn.Size = UDim2.fromOffset(104, 23)
             tagBtn.AnchorPoint = Vector2.new(1, 0.5)
-            tagBtn.Position = UDim2.new(1, -138, 0.5, 0) -- Right next to the Search icon on the left
+            tagBtn.Position = UDim2.new(1, -138, 0.5, 0)
             tagBtn.BackgroundColor3 = Color3.fromRGB(16, 22, 36)
             tagBtn.BackgroundTransparency = 0.10
             tagBtn.Text = ""
@@ -982,7 +993,7 @@ local function installTopbarAndSettingsControls(gui)
             tagBtnText.Size = UDim2.new(1, -12, 1, 0)
             tagBtnText.Position = UDim2.fromOffset(6, 0)
             tagBtnText.BackgroundTransparency = 1
-            tagBtnText.Text = "🏷️ TAGS ▾"
+            tagBtnText.Text = "TAGS  [v]"
             tagBtnText.TextColor3 = Color3.fromRGB(0, 245, 255)
             tagBtnText.Font = Enum.Font.GothamBlack
             tagBtnText.TextSize = 8.2
@@ -991,8 +1002,7 @@ local function installTopbarAndSettingsControls(gui)
 
             local tagBtnScale = Instance.new("UIScale", tagBtn)
 
-            -- Floating Tag Dropdown Drawer inside Main Window
-            local tagMenu = Instance.new("Frame", mainWin)
+            tagMenu = Instance.new("Frame", mainWin)
             tagMenu.Name = "TXR_TagSelectorDropdown"
             tagMenu.Size = UDim2.fromOffset(176, 128)
             tagMenu.AnchorPoint = Vector2.new(1, 0)
@@ -1013,7 +1023,7 @@ local function installTopbarAndSettingsControls(gui)
             menuTitle.Size = UDim2.new(1, -16, 0, 18)
             menuTitle.Position = UDim2.fromOffset(8, 5)
             menuTitle.BackgroundTransparency = 1
-            menuTitle.Text = "🏷️ SELECT EQUIPPED TAG"
+            menuTitle.Text = "SELECT EQUIPPED TAG"
             menuTitle.TextColor3 = Color3.fromRGB(185, 210, 240)
             menuTitle.Font = Enum.Font.GothamBlack
             menuTitle.TextSize = 8
@@ -1087,10 +1097,10 @@ local function installTopbarAndSettingsControls(gui)
                     checkLbl.AnchorPoint = Vector2.new(1, 0)
                     checkLbl.Position = UDim2.new(1, -4, 0, 0)
                     checkLbl.BackgroundTransparency = 1
-                    checkLbl.Text = isSelected and "✓" or ""
+                    checkLbl.Text = isSelected and "ON" or ""
                     checkLbl.TextColor3 = Color3.fromRGB(75, 250, 165)
                     checkLbl.Font = Enum.Font.GothamBlack
-                    checkLbl.TextSize = 9.5
+                    checkLbl.TextSize = 8
                     checkLbl.ZIndex = 93
 
                     optBtn.MouseButton1Click:Connect(function()
@@ -1123,12 +1133,12 @@ local function installTopbarAndSettingsControls(gui)
                 local avail = getPlayerAvailableTags(myId)
                 local activeBadge = resolveActiveBadgeForPlayer(myId, myTagSelectionState.selectedMode)
                 if activeBadge then
-                    tagBtnText.Text = activeBadge.title .. " ▾"
+                    tagBtnText.Text = activeBadge.title .. " [v]"
                     tagBtnText.TextColor3 = activeBadge.theme.border
                     tagBtnStroke.Color = activeBadge.theme.border
                     tagBtn.BackgroundColor3 = activeBadge.theme.tagBg
                 else
-                    tagBtnText.Text = string.format("🏷️ %d TAGS ▾", #avail)
+                    tagBtnText.Text = string.format("%d TAGS [v]", #avail)
                     tagBtnText.TextColor3 = Color3.fromRGB(0, 245, 255)
                     tagBtnStroke.Color = Color3.fromRGB(0, 240, 255)
                     tagBtn.BackgroundColor3 = Color3.fromRGB(16, 22, 36)
@@ -1149,7 +1159,24 @@ local function installTopbarAndSettingsControls(gui)
             updateAllTagPillDisplays()
         end
 
-        -- 2) INJECT "UI Scale" INSIDE RAYFIELD SETTINGS DRAWER (IMAGE 1 LOCATION)
+        -- 2) SYNC CUSTOM CARDS & TOPBAR WHEN WINDOW CLOSES / MINIMIZES ("Show TXR")
+        RunService.Heartbeat:Connect(function()
+            if not mainWin or not mainWin.Parent then return end
+            local isWindowOpen = mainWin.Visible and (mainWin.AbsoluteSize.Y > 90)
+            if tagBtn and tagBtn.Parent then
+                tagBtn.Visible = isWindowOpen
+            end
+            if not isWindowOpen and tagMenu and tagMenu.Parent then
+                tagMenu.Visible = false
+            end
+            for _, cObj in ipairs(customCardsRegistry) do
+                if cObj and cObj.Parent then
+                    cObj.Visible = isWindowOpen
+                end
+            end
+        end)
+
+        -- 3) NATIVE-MATCHING "UI Size / Scale" BUTTON INSIDE RAYFIELD SETTINGS (MATCHES "K" KEYBIND BUTTON)
         task.spawn(function()
             while mainWin and mainWin.Parent do
                 for _, desc in ipairs(mainWin:GetDescendants()) do
@@ -1159,9 +1186,9 @@ local function installTopbarAndSettingsControls(gui)
                         if settingsScroll and not settingsScroll:FindFirstChild("TXR_SettingsUiScaleCard") then
                             local scaleCard = Instance.new("Frame")
                             scaleCard.Name = "TXR_SettingsUiScaleCard"
-                            scaleCard.Size = UDim2.new(1, 0, 0, 38)
+                            scaleCard.Size = UDim2.new(1, 0, 0, 42)
                             scaleCard.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
-                            scaleCard.BackgroundTransparency = 0.35
+                            scaleCard.BackgroundTransparency = 0.45
                             scaleCard.LayoutOrder = keybindCard.LayoutOrder + 1
                             scaleCard:SetAttribute("TXR_CustomCard", true)
                             scaleCard.Parent = settingsScroll
@@ -1169,36 +1196,33 @@ local function installTopbarAndSettingsControls(gui)
                             Instance.new("UICorner", scaleCard).CornerRadius = UDim.new(0, 6)
 
                             local titleLbl = Instance.new("TextLabel", scaleCard)
-                            titleLbl.Size = UDim2.new(0.60, 0, 1, 0)
+                            titleLbl.Size = UDim2.new(0.65, 0, 1, 0)
                             titleLbl.Position = UDim2.fromOffset(14, 0)
                             titleLbl.BackgroundTransparency = 1
                             titleLbl.Text = "UI Size / Scale"
-                            titleLbl.TextColor3 = Color3.fromRGB(240, 244, 250)
+                            titleLbl.TextColor3 = Color3.fromRGB(235, 240, 248)
                             titleLbl.Font = Enum.Font.GothamMedium
                             titleLbl.TextSize = 13
                             titleLbl.TextXAlignment = Enum.TextXAlignment.Left
 
+                            -- Exact same muted dark-slate style & typography as the "K" Keybind button above it
                             local scaleCycleBtn = Instance.new("TextButton", scaleCard)
-                            scaleCycleBtn.Size = UDim2.fromOffset(72, 24)
+                            scaleCycleBtn.Size = UDim2.fromOffset(58, 28)
                             scaleCycleBtn.AnchorPoint = Vector2.new(1, 0.5)
                             scaleCycleBtn.Position = UDim2.new(1, -10, 0.5, 0)
-                            scaleCycleBtn.BackgroundColor3 = Color3.fromRGB(16, 22, 34)
-                            scaleCycleBtn.Text = string.format("📐 %d%%", math.floor(currentUiScaleValue * 100 + 0.5))
-                            scaleCycleBtn.TextColor3 = Color3.fromRGB(0, 240, 255)
-                            scaleCycleBtn.Font = Enum.Font.GothamBlack
-                            scaleCycleBtn.TextSize = 10.5
+                            scaleCycleBtn.BackgroundColor3 = Color3.fromRGB(30, 34, 44)
+                            scaleCycleBtn.BackgroundTransparency = 0.15
+                            scaleCycleBtn.Text = string.format("%d%%", math.floor(currentUiScaleValue * 100 + 0.5))
+                            scaleCycleBtn.TextColor3 = Color3.fromRGB(220, 226, 236)
+                            scaleCycleBtn.Font = Enum.Font.GothamMedium
+                            scaleCycleBtn.TextSize = 12
                             scaleCycleBtn.AutoButtonColor = false
                             Instance.new("UICorner", scaleCycleBtn).CornerRadius = UDim.new(0, 6)
-
-                            local scStroke = Instance.new("UIStroke", scaleCycleBtn)
-                            scStroke.Thickness = 1
-                            scStroke.Color = Color3.fromRGB(0, 225, 255)
-                            scStroke.Transparency = 0.40
 
                             scaleCycleBtn.MouseButton1Click:Connect(function()
                                 scalePresetIdx = (scalePresetIdx % #scalePresets) + 1
                                 currentUiScaleValue = scalePresets[scalePresetIdx]
-                                scaleCycleBtn.Text = string.format("📐 %d%%", math.floor(currentUiScaleValue * 100 + 0.5))
+                                scaleCycleBtn.Text = string.format("%d%%", math.floor(currentUiScaleValue * 100 + 0.5))
 
                                 if uiScale and uiScale.Parent then
                                     TweenService:Create(uiScale, TweenInfo.new(0.26, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
@@ -2110,6 +2134,7 @@ task.spawn(function()
     if termLabel and termLabel.Parent and termLabel.Parent:IsA("Frame") then
         local card = termLabel.Parent
         card:SetAttribute("TXR_CustomCard", true)
+        table.insert(customCardsRegistry, card)
         pcall(function() terminalPlaceholder:Set("") end)
         termLabel.Text = ""
         termLabel.TextTransparency = 1
@@ -2170,7 +2195,7 @@ task.spawn(function()
         pairTitle.AnchorPoint = Vector2.new(0, 0.5)
         pairTitle.Position = UDim2.new(0, 32, 0.5, 0)
         pairTitle.BackgroundTransparency = 1
-        pairTitle.Text = "EMP-SRV ▾"
+        pairTitle.Text = "EMP-SRV"
         pairTitle.TextColor3 = Color3.fromRGB(245, 248, 255)
         pairTitle.Font = Enum.Font.GothamBlack
         pairTitle.TextSize = 11.5
@@ -2874,6 +2899,7 @@ task.spawn(function()
     if rkLabel and rkLabel.Parent and rkLabel.Parent:IsA("Frame") then
         local card = rkLabel.Parent
         card:SetAttribute("TXR_CustomCard", true)
+        table.insert(customCardsRegistry, card)
         pcall(function() rankingPlaceholder:Set("") end)
         rkLabel.Text = ""
         rkLabel.TextTransparency = 1
@@ -3063,15 +3089,16 @@ task.spawn(function()
 
         local locScale = Instance.new("UIScale", locateMeBtn)
 
+        -- Clean "R" Refresh Button (No Box Unicode Symbol!)
         local refreshRankBtn = Instance.new("TextButton", topBar)
         refreshRankBtn.Size = UDim2.fromOffset(26, 24)
         refreshRankBtn.AnchorPoint = Vector2.new(1, 0.5)
         refreshRankBtn.Position = UDim2.new(1, 0, 0.5, 0)
         refreshRankBtn.BackgroundColor3 = Color3.fromRGB(16, 26, 44)
-        refreshRankBtn.Text = "↻"
+        refreshRankBtn.Text = "R"
         refreshRankBtn.TextColor3 = Color3.fromRGB(75, 245, 175)
         refreshRankBtn.Font = Enum.Font.GothamBlack
-        refreshRankBtn.TextSize = 13
+        refreshRankBtn.TextSize = 11
         refreshRankBtn.AutoButtonColor = false
         refreshRankBtn.ZIndex = 11
         Instance.new("UICorner", refreshRankBtn).CornerRadius = UDim.new(0, 7)
@@ -3084,7 +3111,7 @@ task.spawn(function()
         local refScale = Instance.new("UIScale", refreshRankBtn)
 
         -- ====================================================
-        -- IN-CARD GLASSY PLAYER INSPECTOR OVERLAY
+        -- IN-CARD GLASSY PLAYER INSPECTOR OVERLAY (CLEAN "X" CLOSE BUTTON)
         -- ====================================================
         local inspectorOverlay = Instance.new("Frame", card)
         inspectorOverlay.Size = UDim2.fromScale(1, 1)
@@ -3115,7 +3142,7 @@ task.spawn(function()
         inspCloseBtn.AnchorPoint = Vector2.new(1, 0)
         inspCloseBtn.Position = UDim2.new(1, -8, 0, 8)
         inspCloseBtn.BackgroundColor3 = Color3.fromRGB(26, 32, 50)
-        inspCloseBtn.Text = "✕"
+        inspCloseBtn.Text = "X"
         inspCloseBtn.TextColor3 = Color3.fromRGB(255, 85, 115)
         inspCloseBtn.Font = Enum.Font.GothamBlack
         inspCloseBtn.TextSize = 10
@@ -3278,7 +3305,6 @@ task.spawn(function()
             TweenService:Create(inspScale, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
         end
 
-        -- 3D-Pedestal Champions Stage (With Crisp High-Contrast RANK #1 / #2 / #3 Medallions)
         local podiumStage = Instance.new("Frame", card)
         podiumStage.Size = UDim2.new(1, -16, 0, 140)
         podiumStage.Position = UDim2.new(0, 8, 0, 42)
@@ -3378,7 +3404,6 @@ task.spawn(function()
             av.ZIndex = 10
             Instance.new("UICorner", av).CornerRadius = UDim.new(1, 0)
 
-            -- CRISP PREMIUM RANK #1 / #2 / #3 MEDALLION PILL (FIXED & SUPER READABLE!)
             local medalPill = Instance.new("Frame", box)
             medalPill.Size = UDim2.fromOffset(54, 15)
             medalPill.AnchorPoint = Vector2.new(0.5, 0)
@@ -3496,7 +3521,6 @@ task.spawn(function()
         local pod3 = createPedestalSlot(3, 0.828, 0.33, 118)
         local podiumSlots = {pod1, pod2, pod3}
 
-        -- Ranked Glass Cards Scroll (#4 to #100)
         local rankScroll = Instance.new("ScrollingFrame", card)
         rankScroll.Size = UDim2.new(1, -16, 0, 166)
         rankScroll.Position = UDim2.new(0, 8, 0, 188)
@@ -3511,7 +3535,6 @@ task.spawn(function()
         rankListLayout.Padding = UDim.new(0, 5)
         rankListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-        -- Sticky OLED Footer with Live Rank + Equipped Tag
         local myRankBar = Instance.new("Frame", card)
         myRankBar.Size = UDim2.new(1, -16, 0, 31)
         myRankBar.AnchorPoint = Vector2.new(0.5, 1)
@@ -4091,7 +4114,6 @@ end)
 
 -- ========================================================
 -- TAB 5: COMPACT NEXT-GEN POLL & LIVE CHAT CONSOLE
--- (LEFT-SIDE PREMIUM RANK BADGE + ADJACENT PREMIUM TAG)
 -- ========================================================
 local LIKE_TARGET_GOAL = 1000
 local LOCAL_LOCK_FILE = "txr_emp_vote_" .. UPDATE_CAMPAIGN_ID .. "_" .. tostring(lp and lp.UserId or 0) .. ".txt"
@@ -4147,6 +4169,7 @@ task.spawn(function()
     if hubLabel and hubLabel.Parent and hubLabel.Parent:IsA("Frame") then
         local card = hubLabel.Parent
         card:SetAttribute("TXR_CustomCard", true)
+        table.insert(customCardsRegistry, card)
         pcall(function() nextGenHubPlaceholder:Set("") end)
         hubLabel.Text = ""
         hubLabel.TextTransparency = 1
@@ -4512,10 +4535,6 @@ task.spawn(function()
             end)
         end
 
-        -- ====================================================
-        -- CHAT BUBBLE BUILDER (IMAGE 3 FIX):
-        -- [Avatar] -> [LEFT SIDE: #1 RANK MEDALLION] -> [@Name] -> [ADJACENT PREMIUM TAG]
-        -- ====================================================
         local function createFeedBubble(parentScroll, orderNum, uName, uId, msgStr, timeStr, isReportMode)
             local uidNum = tonumber(uId) or 0
             local isOwner = (uidNum == MODERATOR_USER_ID) or (uName == "TxR_AsHU")
@@ -4551,7 +4570,6 @@ task.spawn(function()
             avatar.ZIndex = 7
             Instance.new("UICorner", avatar).CornerRadius = UDim.new(1, 0)
 
-            -- Top Header Row Container using UIListLayout so [Rank] -> [@Name] -> [Tag] sit tightly together!
             local headerFlow = Instance.new("Frame", row)
             headerFlow.Size = UDim2.new(1, -82, 0, 15)
             headerFlow.Position = UDim2.new(0, 37, 0, 3)
@@ -4564,7 +4582,6 @@ task.spawn(function()
             hLayout.Padding = UDim.new(0, 4)
             hLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-            -- 1. LEFT SIDE OF NAME: PREMIUM TEXTURED RANK MEDALLION (#1 to #100)
             if hasRank then
                 local rankMedallion = Instance.new("Frame", headerFlow)
                 rankMedallion.Size = UDim2.fromOffset((bestR >= 100) and 30 or 25, 14)
@@ -4595,7 +4612,6 @@ task.spawn(function()
                 rmTxt.ZIndex = 9
             end
 
-            -- 2. USERNAME LABEL (Auto-sized so the tag sits right beside it!)
             local displayUserStr = (isOwner and "👑 @" or (isReportMode and "🛠️ @" or "@")) .. tostring(uName or "Player")
             local uLbl = Instance.new("TextLabel", headerFlow)
             uLbl.AutomaticSize = Enum.AutomaticSize.X
@@ -4608,7 +4624,6 @@ task.spawn(function()
             uLbl.LayoutOrder = 2
             uLbl.ZIndex = 8
 
-            -- 3. IMMEDIATELY RIGHT OF NAME: PREMIUM ANIMATED TAG PILL
             if isOwner or badge then
                 local tagTheme = badge and badge.theme or DEV_SPECIAL_THEME
                 local tagTitleStr = badge and badge.title or "👑 DEVELOPER"
@@ -5092,6 +5107,7 @@ task.spawn(function()
     if profileLabel and profileLabel.Parent and profileLabel.Parent:IsA("Frame") then
         local card = profileLabel.Parent
         card:SetAttribute("TXR_CustomCard", true)
+        table.insert(customCardsRegistry, card)
         lockHideLabel(profileLabel, devCardPlaceholder)
 
         card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 114)
@@ -5312,6 +5328,7 @@ task.spawn(function()
     if discordLabel and discordLabel.Parent and discordLabel.Parent:IsA("Frame") then
         local dCard = discordLabel.Parent
         dCard:SetAttribute("TXR_CustomCard", true)
+        table.insert(customCardsRegistry, dCard)
         lockHideLabel(discordLabel, discordCardPlaceholder)
 
         dCard.Size = UDim2.new(dCard.Size.X.Scale, dCard.Size.X.Offset, 0, 86)
