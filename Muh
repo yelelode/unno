@@ -2,6 +2,7 @@
 -- PART 0: UNIVERSAL EXECUTOR SHIM & AUTO MAX-FPS ENGINE
 -- (Works on iOS, Android, PC & All Executors / Low-End Devices)
 -- ========================================================
+local GLOBAL_CHAT_SERVER = "https://my-roblox-private-chat.onrender.com"
 local DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1573276829048119307/tyJAzblu_3LU0vK-akPNwJaRTFM5aDORLYs9BxduE22fUT_LiLfli6ggqVljopH6cOsW"
 
 pcall(function()
@@ -2057,26 +2058,20 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- TAB 5: GLOBAL 1,000 LIKES + TICKET & SUGGESTION CONSOLE
--- (Auto-Provisioned kvdb Relay + Webhook Action Alerts Only)
+-- TAB 5: PERSISTENT GLOBAL 1,000 LIKES + TICKET MONITOR
+-- (Uses GLOBAL_CHAT_SERVER /send & /messages + Webhook Alert)
 -- ========================================================
 local LIKE_TARGET_GOAL = 1000
-local RELAY_SEED_FILE = "txr_emp_v206_relay_bucket.txt"
 local LOCAL_LOCK_FILE = "txr_emp_v206_like_" .. tostring(lp and lp.UserId or 0) .. ".txt"
 local reqFn = (syn and syn.request) or (http and http.request) or http_request or request
 
-local function rawHttp(method, url, bodyStr, extraHeaders)
+local function rawHttp(method, url, bodyStr)
     local resBody, okCode = "", false
     pcall(function()
         local headers = {
             ["Content-Type"] = "application/json",
-            ["Accept"] = "application/json"
+            ["User-Agent"] = "Roblox/WinInet"
         }
-        if extraHeaders then
-            for k, v in pairs(extraHeaders) do
-                headers[k] = v
-            end
-        end
         if reqFn then
             local opts = {Url = url, Method = method, Headers = headers}
             if bodyStr then opts.Body = bodyStr end
@@ -2118,54 +2113,13 @@ local function lockLikeLocally()
     end)
 end
 
-local relayUrl = ""
-local function resolveGlobalRelay()
-    if relayUrl ~= "" then return relayUrl end
-
-    -- Check cached bucket from local file first
-    pcall(function()
-        if isfile and readfile and isfile(RELAY_SEED_FILE) then
-            local saved = tostring(readfile(RELAY_SEED_FILE)):gsub("%s+", "")
-            if saved:find("https://kvdb.io/", 1, true) then
-                relayUrl = saved
-            end
-        end
-    end)
-
-    -- Auto-create a fresh kvdb bucket without login if none exists
-    if relayUrl == "" then
-        local createdBody, createdOk = rawHttp("POST", "https://kvdb.io/", "")
-        if createdOk and createdBody and createdBody ~= "" then
-            local cleanedId = createdBody:gsub("%s+", "")
-            if cleanedId:find("https://", 1, true) then
-                relayUrl = cleanedId
-            else
-                relayUrl = "https://kvdb.io/" .. cleanedId
-            end
-            pcall(function()
-                if writefile then writefile(RELAY_SEED_FILE, relayUrl) end
-            end)
-            -- Seed initial state
-            rawHttp("PUT", relayUrl .. "/state", HttpService:JSONEncode({
-                likes = 1,
-                likers = {},
-                tickets = {
-                    {id = "#001", tag = "ROADMAP", user = "TxR_AsHU", uid = 9685785248, msg = "1,000 LIKES FOR NEXT SCRIPT UPDATE • SUBMIT FEATURE OR BUG TICKET"}
-                }
-            }))
-        end
-    end
-
-    return relayUrl
-end
-
 local pollState = {
-    totalLikes = 1,
+    totalLikes = 0,
     hasLiked = isLocallyLiked(),
     selectedTag = "FEATURE",
-    tickets = {
-        {id = "#001", tag = "ROADMAP", user = "TxR_AsHU", uid = 9685785248, msg = "1,000 LIKES FOR NEXT SCRIPT UPDATE • SUBMIT FEATURE OR BUG TICKET"}
-    }
+    likersMap = {},
+    seenTicketKeys = {},
+    tickets = {}
 }
 
 local nextGenHubPlaceholder = CommunityTab:CreateLabel("TXR_NEXTGEN_COMMUNITY_HUB")
@@ -2219,9 +2173,7 @@ task.spawn(function()
             ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 35, 110))
         })
 
-        -- ====================================================
         -- 1. 1,000 LIKES FOR NEXT SCRIPT UPDATE MODULE
-        -- ====================================================
         local goalBox = Instance.new("Frame", card)
         goalBox.Size = UDim2.new(1, -20, 0, 124)
         goalBox.Position = UDim2.new(0, 10, 0, 10)
@@ -2264,7 +2216,7 @@ task.spawn(function()
         counterRow.Size = UDim2.new(0.7, 0, 0, 18)
         counterRow.Position = UDim2.new(0, 12, 0, 30)
         counterRow.BackgroundTransparency = 1
-        counterRow.Text = "1 / 1,000 LIKES"
+        counterRow.Text = "0 / 1,000 LIKES"
         counterRow.TextColor3 = Color3.fromRGB(0, 240, 255)
         counterRow.Font = Enum.Font.GothamBlack
         counterRow.TextSize = 13
@@ -2275,7 +2227,7 @@ task.spawn(function()
         pctText.AnchorPoint = Vector2.new(1, 0)
         pctText.Position = UDim2.new(1, -12, 0, 30)
         pctText.BackgroundTransparency = 1
-        pctText.Text = "0.1%"
+        pctText.Text = "0.0%"
         pctText.TextColor3 = Color3.fromRGB(165, 185, 215)
         pctText.Font = Enum.Font.Code
         pctText.TextSize = 11
@@ -2289,7 +2241,7 @@ task.spawn(function()
         Instance.new("UICorner", barTrack).CornerRadius = UDim.new(1, 0)
 
         local likeBarFill = Instance.new("Frame", barTrack)
-        likeBarFill.Size = UDim2.new(0.03, 0, 1, 0)
+        likeBarFill.Size = UDim2.new(0.02, 0, 1, 0)
         likeBarFill.BackgroundColor3 = Color3.new(1, 1, 1)
         likeBarFill.BorderSizePixel = 0
         Instance.new("UICorner", likeBarFill).CornerRadius = UDim.new(1, 0)
@@ -2328,9 +2280,7 @@ task.spawn(function()
         likeBtnText.Font = Enum.Font.GothamBlack
         likeBtnText.TextSize = 11
 
-        -- ====================================================
-        -- 2. TICKET & SUGGESTION CONSOLE (NOT A CHAT APP)
-        -- ====================================================
+        -- 2. TICKET & SUGGESTION CONSOLE
         local monitorBox = Instance.new("Frame", card)
         monitorBox.Size = UDim2.new(1, -20, 0, 272)
         monitorBox.Position = UDim2.new(0, 10, 0, 142)
@@ -2370,13 +2320,12 @@ task.spawn(function()
         feedCountLbl.AnchorPoint = Vector2.new(1, 0)
         feedCountLbl.Position = UDim2.new(1, -10, 0, 0)
         feedCountLbl.BackgroundTransparency = 1
-        feedCountLbl.Text = "1 TICKETS"
+        feedCountLbl.Text = "0 TICKETS"
         feedCountLbl.TextColor3 = Color3.fromRGB(0, 235, 255)
         feedCountLbl.Font = Enum.Font.Code
         feedCountLbl.TextSize = 9
         feedCountLbl.TextXAlignment = Enum.TextXAlignment.Right
 
-        -- Category Selector Chips (FEATURE / BUG / UI)
         local chipBar = Instance.new("Frame", monitorBox)
         chipBar.Size = UDim2.new(1, -14, 0, 22)
         chipBar.Position = UDim2.new(0, 7, 0, 32)
@@ -2456,8 +2405,8 @@ task.spawn(function()
         Instance.new("UICorner", sendBtn).CornerRadius = UDim.new(0, 6)
 
         local function renderMonitor()
-            local count = math.max(1, pollState.totalLikes)
-            local ratio = math.clamp(count / LIKE_TARGET_GOAL, 0.03, 1)
+            local count = math.max(0, pollState.totalLikes)
+            local ratio = math.clamp(count / LIKE_TARGET_GOAL, 0.02, 1)
             local pctVal = math.min(100, (count / LIKE_TARGET_GOAL) * 100)
 
             counterRow.Text = string.format("%d / %d LIKES", count, LIKE_TARGET_GOAL)
@@ -2574,28 +2523,79 @@ task.spawn(function()
             end)
         end
 
-        local function syncGlobalState()
-            local baseUrl = resolveGlobalRelay()
-            if baseUrl == "" then
-                renderMonitor()
-                return
-            end
+        local function postToGlobalServer(rawPayload)
+            rawHttp("POST", GLOBAL_CHAT_SERVER .. "/send", HttpService:JSONEncode({
+                user = (lp and lp.Name or "Player") .. "::" .. tostring(lp and lp.UserId or 0),
+                msg = rawPayload,
+                jobId = game.JobId or "global",
+                hidden = false
+            }))
+        end
 
-            local raw, ok = rawHttp("GET", baseUrl .. "/state")
-            if ok and raw and raw ~= "" then
-                local decOk, decoded = pcall(function() return HttpService:JSONDecode(raw) end)
-                if decOk and type(decoded) == "table" then
-                    if type(decoded.likes) == "number" then
-                        pollState.totalLikes = math.max(1, decoded.likes)
+        local function ingestServerMessages(dataList)
+            if type(dataList) ~= "table" then return end
+            local newTicketsAdded = false
+
+            for _, item in ipairs(dataList) do
+                local mText = tostring(item.msg or "")
+                local rawU = tostring(item.user or "")
+                local uName, uIdStr = rawU:match("^(.-)::(.-)$")
+                uName = uName or rawU
+                local uId = tonumber(uIdStr) or 0
+
+                -- Parse persistent global like vote: [EMP_LIKE_V206:UID:USERNAME]
+                local vUid, vUser = mText:match("^%[EMP_LIKE_V206:(.-):(.-)%]$")
+                if vUid and vUid ~= "" then
+                    local uidKey = tostring(vUid)
+                    if not pollState.likersMap[uidKey] then
+                        pollState.likersMap[uidKey] = vUser or uName
+                        pollState.totalLikes += 1
                     end
-                    local myIdStr = tostring(lp and lp.UserId or 0)
-                    if type(decoded.likers) == "table" and decoded.likers[myIdStr] then
+                    if uidKey == tostring(lp and lp.UserId or 0) then
                         pollState.hasLiked = true
                         lockLikeLocally()
                     end
-                    if type(decoded.tickets) == "table" and #decoded.tickets > 0 then
-                        pollState.tickets = decoded.tickets
+                    continue
+                end
+
+                -- Parse persistent global feedback ticket: [EMP_TICKET_V206:TAG:UID:USER] MSG
+                local tTag, tUid, tUser, tMsg = mText:match("^%[EMP_TICKET_V206:(.-):(.-):(.-)%]%s*(.*)$")
+                if tTag and tMsg then
+                    local uniq = tostring(item.id or (tUid .. "_" .. tostring(item.time or "") .. "_" .. tMsg))
+                    if not pollState.seenTicketKeys[uniq] then
+                        pollState.seenTicketKeys[uniq] = true
+                        newTicketsAdded = true
+                        local tNum = string.format("#%03d", #pollState.tickets + 1)
+                        table.insert(pollState.tickets, 1, {
+                            id = tNum,
+                            tag = tTag,
+                            user = (tUser ~= "" and tUser) or uName,
+                            uid = tonumber(tUid) or uId,
+                            msg = tMsg
+                        })
+                        while #pollState.tickets > 30 do
+                            table.remove(pollState.tickets)
+                        end
                     end
+                end
+            end
+
+            if newTicketsAdded or pollState.totalLikes >= 0 then
+                renderMonitor()
+            end
+        end
+
+        local function syncFromGlobalServer()
+            local raw, ok = rawHttp("GET", GLOBAL_CHAT_SERVER .. "/messages?since=0")
+            if ok and raw and raw ~= "" then
+                local decOk, decoded = pcall(function() return HttpService:JSONDecode(raw) end)
+                if decOk and type(decoded) == "table" then
+                    pollState.totalLikes = 0
+                    pollState.likersMap = {}
+                    pollState.seenTicketKeys = {}
+                    pollState.tickets = {}
+                    ingestServerMessages(decoded)
+                    return
                 end
             end
             renderMonitor()
@@ -2618,38 +2618,23 @@ task.spawn(function()
             likeBusy = true
             pollState.hasLiked = true
             lockLikeLocally()
-            pollState.totalLikes += 1
-            renderMonitor()
 
             local uName = lp and lp.Name or "Player"
-            local uId = lp and lp.UserId or 0
+            local uId = tostring(lp and lp.UserId or 0)
+            if not pollState.likersMap[uId] then
+                pollState.likersMap[uId] = uName
+                pollState.totalLikes += 1
+            end
+            renderMonitor()
 
             task.spawn(function()
-                local baseUrl = resolveGlobalRelay()
-                if baseUrl ~= "" then
-                    local stateObj = {likes = pollState.totalLikes, likers = {}, tickets = pollState.tickets}
-                    local raw, ok = rawHttp("GET", baseUrl .. "/state")
-                    if ok and raw and raw ~= "" then
-                        local decOk, decoded = pcall(function() return HttpService:JSONDecode(raw) end)
-                        if decOk and type(decoded) == "table" then
-                            stateObj.likes = tonumber(decoded.likes) or pollState.totalLikes
-                            stateObj.likers = (type(decoded.likers) == "table") and decoded.likers or {}
-                            stateObj.tickets = (type(decoded.tickets) == "table") and decoded.tickets or pollState.tickets
-                        end
-                    end
-                    local idKey = tostring(uId)
-                    if not stateObj.likers[idKey] then
-                        stateObj.likers[idKey] = true
-                        stateObj.likes = math.max(stateObj.likes + 1, pollState.totalLikes)
-                    end
-                    pollState.totalLikes = stateObj.likes
-                    rawHttp("PUT", baseUrl .. "/state", HttpService:JSONEncode(stateObj))
-                    syncGlobalState()
-                end
+                postToGlobalServer(string.format("[EMP_LIKE_V206:%s:%s]", uId, uName))
+                task.wait(0.6)
+                syncFromGlobalServer()
                 likeBusy = false
             end)
 
-            notifyWebhookAction(string.format("**@%s** (`%s`) ne **+1 Like** diya (**%d / %d**)", uName, tostring(uId), pollState.totalLikes, LIKE_TARGET_GOAL))
+            notifyWebhookAction(string.format("**@%s** (`%s`) ne **+1 Like** lock kiya (**%d / %d**)", uName, uId, pollState.totalLikes, LIKE_TARGET_GOAL))
 
             TXR_Lib:Notify({
                 Title = "⚡ ʟɪᴋᴇ ʟᴏᴄᴋᴇᴅ",
@@ -2678,46 +2663,33 @@ task.spawn(function()
 
             sendingTicket = true
             local uName = lp and lp.Name or "Player"
-            local uId = lp and lp.UserId or 0
+            local uId = tostring(lp and lp.UserId or 0)
             local tagChoice = pollState.selectedTag or "FEATURE"
-            local ticketNum = string.format("#%03d", #pollState.tickets + 1)
 
             feedbackBox.Text = ""
             sendBtn.Text = "SENT ✓"
 
-            local newTicket = {id = ticketNum, tag = tagChoice, user = uName, uid = uId, msg = trimmed}
-            table.insert(pollState.tickets, 1, newTicket)
+            table.insert(pollState.tickets, 1, {
+                id = string.format("#%03d", #pollState.tickets + 1),
+                tag = tagChoice,
+                user = uName,
+                uid = tonumber(uId) or 0,
+                msg = trimmed
+            })
             renderMonitor()
 
             task.spawn(function()
-                local baseUrl = resolveGlobalRelay()
-                if baseUrl ~= "" then
-                    local stateObj = {likes = pollState.totalLikes, likers = {}, tickets = {}}
-                    local raw, ok = rawHttp("GET", baseUrl .. "/state")
-                    if ok and raw and raw ~= "" then
-                        local decOk, decoded = pcall(function() return HttpService:JSONDecode(raw) end)
-                        if decOk and type(decoded) == "table" then
-                            stateObj.likes = tonumber(decoded.likes) or pollState.totalLikes
-                            stateObj.likers = (type(decoded.likers) == "table") and decoded.likers or {}
-                            stateObj.tickets = (type(decoded.tickets) == "table") and decoded.tickets or {}
-                        end
-                    end
-                    newTicket.id = string.format("#%03d", #stateObj.tickets + 1)
-                    table.insert(stateObj.tickets, 1, newTicket)
-                    while #stateObj.tickets > 25 do
-                        table.remove(stateObj.tickets)
-                    end
-                    rawHttp("PUT", baseUrl .. "/state", HttpService:JSONEncode(stateObj))
-                    syncGlobalState()
-                end
+                postToGlobalServer(string.format("[EMP_TICKET_V206:%s:%s:%s] %s", tagChoice, uId, uName, trimmed))
+                task.wait(0.6)
+                syncFromGlobalServer()
                 sendingTicket = false
             end)
 
-            notifyWebhookAction(string.format("**@%s** (`%s`) ne `[%s]` feedback diya: **%s**", uName, tostring(uId), tagChoice, trimmed))
+            notifyWebhookAction(string.format("**@%s** (`%s`) ne `[%s]` feedback diya: **%s**", uName, uId, tagChoice, trimmed))
 
             TXR_Lib:Notify({
                 Title = "📋 ᴛɪᴄᴋᴇᴛ ʟᴏɢɢᴇᴅ",
-                Content = "Submitted under [" .. tagChoice .. "]",
+                Content = "Submitted under [" .. tagChoice .. "] globally!",
                 Duration = 2.5,
                 Image = 4483345998
             })
@@ -2748,8 +2720,8 @@ task.spawn(function()
         renderMonitor()
         task.spawn(function()
             while card and card.Parent do
-                syncGlobalState()
-                task.wait(8.0)
+                syncFromGlobalServer()
+                task.wait(5.0)
             end
         end)
     end
