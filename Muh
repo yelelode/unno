@@ -61,7 +61,7 @@ local ChatService = game:GetService("Chat")
 local MODERATOR_USER_ID = 9685785248
 local playerName = lp and lp.Name or "UNKNOWN"
 
-local myRPName = (lp.UserId == MODERATOR_USER_ID) and "A  S  H  U" or "ᴇ ᴍ ᴩ  ꜱ ᴩ ᴀ ᴍ ᴍ ᴇʀ"
+local myRPName = (lp.UserId == MODERATOR_USER_ID) and "A  S  H  U" or "ᴇ ᴍ ᴩ  ꜱ ᴩ ᴀ ᴍ ᴍ ᴇ ʀ"
 local myRPBio = (lp.UserId == MODERATOR_USER_ID) and "" or ("Welcome " .. playerName .. " • ᴇ ᴍ ᴩ ᴏɴ ᴛᴏᴩ 🗿")
 local chatMsg = "----====<<// [!] \\>>====---- ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06 ʟᴏᴀᴅᴇᴅ ----====<<// [!] \\>>====----"
 
@@ -2060,7 +2060,7 @@ end)
 
 -- ========================================================
 -- TAB 5: NEXT-GEN CYBER CREATOR MILESTONE & LIVE ARENA
--- (Auto-Reset on UPDATE_CAMPAIGN_ID + 30-Particle Burst + Smooth Chat)
+-- (Feathered Shine + Clean Already Registered + Live Typing Indicator)
 -- ========================================================
 local LIKE_TARGET_GOAL = 1000
 local LOCAL_LOCK_FILE = "txr_emp_vote_" .. UPDATE_CAMPAIGN_ID .. "_" .. tostring(lp and lp.UserId or 0) .. ".txt"
@@ -2123,7 +2123,8 @@ local pollState = {
     renderedChatKeys = {},
     renderedReportKeys = {},
     chatOrderCounter = 0,
-    reportOrderCounter = 0
+    reportOrderCounter = 0,
+    liveTypers = {}
 }
 
 local nextGenHubPlaceholder = CommunityTab:CreateLabel("TXR_NEXTGEN_COMMUNITY_HUB")
@@ -2152,7 +2153,7 @@ task.spawn(function()
             if hubLabel.Visible then hubLabel.Visible = false end
         end)
 
-        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 466)
+        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 504)
         card.BackgroundColor3 = Color3.fromRGB(6, 8, 13)
         card.BackgroundTransparency = 0.03
         card.ClipsDescendants = true
@@ -2213,9 +2214,8 @@ task.spawn(function()
                 end)
             end
 
-            -- Floating +1 LIKE! Pop-up
             local pop = Instance.new("TextLabel", parentObj)
-            pop.Size = UDim2.fromOffset(110, 24)
+            pop.Size = UDim2.fromOffset(115, 24)
             pop.AnchorPoint = Vector2.new(0.5, 0.5)
             pop.Position = posUDim
             pop.BackgroundTransparency = 1
@@ -2264,7 +2264,7 @@ task.spawn(function()
         goalStroke.Transparency = 0.42
 
         local goalTopBadge = Instance.new("TextLabel", goalBox)
-        goalTopBadge.Size = UDim2.new(0.66, 0, 0, 15)
+        goalTopBadge.Size = UDim2.new(0.68, 0, 0, 15)
         goalTopBadge.Position = UDim2.new(0, 12, 0, 8)
         goalTopBadge.BackgroundTransparency = 1
         goalTopBadge.Text = "🎬 NEXT UPDATE MILESTONE  •  " .. UPDATE_CAMPAIGN_ID
@@ -2274,17 +2274,17 @@ task.spawn(function()
         goalTopBadge.TextXAlignment = Enum.TextXAlignment.Left
 
         local statusPill = Instance.new("Frame", goalBox)
-        statusPill.Size = UDim2.fromOffset(80, 18)
+        statusPill.Size = UDim2.fromOffset(78, 18)
         statusPill.AnchorPoint = Vector2.new(1, 0)
         statusPill.Position = UDim2.new(1, -10, 0, 8)
-        statusPill.BackgroundColor3 = Color3.fromRGB(22, 28, 42)
+        statusPill.BackgroundColor3 = Color3.fromRGB(16, 36, 30)
         Instance.new("UICorner", statusPill).CornerRadius = UDim.new(1, 0)
 
         local statusPillLbl = Instance.new("TextLabel", statusPill)
         statusPillLbl.Size = UDim2.fromScale(1, 1)
         statusPillLbl.BackgroundTransparency = 1
-        statusPillLbl.Text = "🔒 LOCKED"
-        statusPillLbl.TextColor3 = Color3.fromRGB(255, 195, 65)
+        statusPillLbl.Text = "● LIVE GOAL"
+        statusPillLbl.TextColor3 = Color3.fromRGB(75, 245, 165)
         statusPillLbl.Font = Enum.Font.GothamBlack
         statusPillLbl.TextSize = 8.5
 
@@ -2342,7 +2342,7 @@ task.spawn(function()
         local likeBtn = Instance.new("TextButton", goalBox)
         likeBtn.Size = UDim2.new(1, -24, 0, 44)
         likeBtn.Position = UDim2.new(0, 12, 0, 86)
-        likeBtn.BackgroundColor3 = Color3.fromRGB(0, 145, 255)
+        likeBtn.BackgroundColor3 = Color3.new(1, 1, 1)
         likeBtn.Text = ""
         likeBtn.AutoButtonColor = false
         likeBtn.ClipsDescendants = true
@@ -2353,7 +2353,7 @@ task.spawn(function()
         local btnStroke = Instance.new("UIStroke", likeBtn)
         btnStroke.Thickness = 1.25
         btnStroke.Color = Color3.fromRGB(140, 235, 255)
-        btnStroke.Transparency = 0.30
+        btnStroke.Transparency = 0.28
 
         local btnGrad = Instance.new("UIGradient", likeBtn)
         btnGrad.Color = ColorSequence.new({
@@ -2362,14 +2362,25 @@ task.spawn(function()
             ColorSequenceKeypoint.new(1, Color3.fromRGB(235, 45, 135))
         })
 
-        local shimmerBar = Instance.new("Frame", likeBtn)
-        shimmerBar.Size = UDim2.new(0.28, 0, 1.7, 0)
-        shimmerBar.AnchorPoint = Vector2.new(0.5, 0.5)
-        shimmerBar.Position = UDim2.new(-0.3, 0, 0.5, 0)
-        shimmerBar.Rotation = 18
-        shimmerBar.BackgroundColor3 = Color3.new(1, 1, 1)
-        shimmerBar.BackgroundTransparency = 0.80
-        shimmerBar.BorderSizePixel = 0
+        -- Feathered Soft Shine Overlay (No Hard Box Edges)
+        local shineLayer = Instance.new("Frame", likeBtn)
+        shineLayer.Size = UDim2.fromScale(1, 1)
+        shineLayer.BackgroundColor3 = Color3.new(1, 1, 1)
+        shineLayer.BackgroundTransparency = 0
+        shineLayer.BorderSizePixel = 0
+        shineLayer.ZIndex = 2
+        Instance.new("UICorner", shineLayer).CornerRadius = UDim.new(0, 10)
+
+        local shineGrad = Instance.new("UIGradient", shineLayer)
+        shineGrad.Rotation = 22
+        shineGrad.Color = ColorSequence.new(Color3.new(1, 1, 1))
+        shineGrad.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0.00, 1.00),
+            NumberSequenceKeypoint.new(0.38, 1.00),
+            NumberSequenceKeypoint.new(0.50, 0.72),
+            NumberSequenceKeypoint.new(0.62, 1.00),
+            NumberSequenceKeypoint.new(1.00, 1.00)
+        })
 
         local likeBtnText = Instance.new("TextLabel", likeBtn)
         likeBtnText.Size = UDim2.fromScale(1, 1)
@@ -2381,10 +2392,10 @@ task.spawn(function()
         likeBtnText.ZIndex = 3
 
         -- ====================================================
-        -- 2. SMOOTH CONSOLE: CHAT || Report Bugs & Next Update Features
+        -- 2. EXPANDED LIVE CONSOLE + TYPING INDICATOR
         -- ====================================================
         local monitorBox = Instance.new("Frame", card)
-        monitorBox.Size = UDim2.new(1, -20, 0, 298)
+        monitorBox.Size = UDim2.new(1, -20, 0, 336)
         monitorBox.Position = UDim2.new(0, 10, 0, 158)
         monitorBox.BackgroundColor3 = Color3.fromRGB(11, 14, 21)
         monitorBox.BackgroundTransparency = 0.05
@@ -2461,7 +2472,7 @@ task.spawn(function()
         logCounterLbl.TextXAlignment = Enum.TextXAlignment.Right
 
         local chatScroll = Instance.new("ScrollingFrame", monitorBox)
-        chatScroll.Size = UDim2.new(1, -14, 1, -104)
+        chatScroll.Size = UDim2.new(1, -14, 1, -124)
         chatScroll.Position = UDim2.new(0, 7, 0, 62)
         chatScroll.BackgroundTransparency = 1
         chatScroll.ScrollBarThickness = 2
@@ -2475,7 +2486,7 @@ task.spawn(function()
         chatList.SortOrder = Enum.SortOrder.LayoutOrder
 
         local reportScroll = Instance.new("ScrollingFrame", monitorBox)
-        reportScroll.Size = UDim2.new(1, -14, 1, -104)
+        reportScroll.Size = UDim2.new(1, -14, 1, -124)
         reportScroll.Position = UDim2.new(0, 7, 0, 62)
         reportScroll.BackgroundTransparency = 1
         reportScroll.ScrollBarThickness = 2
@@ -2487,6 +2498,23 @@ task.spawn(function()
         local reportList = Instance.new("UIListLayout", reportScroll)
         reportList.Padding = UDim.new(0, 6)
         reportList.SortOrder = Enum.SortOrder.LayoutOrder
+
+        -- Dedicated Live Typing Status Bar right above Input Dock
+        local typingStatusBar = Instance.new("Frame", monitorBox)
+        typingStatusBar.Size = UDim2.new(1, -18, 0, 16)
+        typingStatusBar.AnchorPoint = Vector2.new(0.5, 1)
+        typingStatusBar.Position = UDim2.new(0.5, 0, 1, -43)
+        typingStatusBar.BackgroundTransparency = 1
+        typingStatusBar.Visible = false
+
+        local typingStatusLbl = Instance.new("TextLabel", typingStatusBar)
+        typingStatusLbl.Size = UDim2.fromScale(1, 1)
+        typingStatusLbl.BackgroundTransparency = 1
+        typingStatusLbl.Text = ""
+        typingStatusLbl.TextColor3 = Color3.fromRGB(90, 240, 255)
+        typingStatusLbl.Font = Enum.Font.GothamBold
+        typingStatusLbl.TextSize = 9
+        typingStatusLbl.TextXAlignment = Enum.TextXAlignment.Left
 
         local inputDock = Instance.new("Frame", monitorBox)
         inputDock.Size = UDim2.new(1, -14, 0, 36)
@@ -2546,7 +2574,7 @@ task.spawn(function()
                 or (isReportMode and Color3.fromRGB(185, 110, 255) or Color3.fromRGB(0, 235, 255))
 
             local row = Instance.new("TextButton", parentScroll)
-            row.Size = UDim2.new(1, -6, 0, 46)
+            row.Size = UDim2.new(1, -6, 0, 48)
             row.BackgroundColor3 = isSelf and Color3.fromRGB(22, 31, 48) or Color3.fromRGB(16, 21, 32)
             row.BackgroundTransparency = 0.10
             row.Text = ""
@@ -2602,7 +2630,7 @@ task.spawn(function()
             tLbl.TextXAlignment = Enum.TextXAlignment.Right
 
             local mLbl = Instance.new("TextLabel", row)
-            mLbl.Size = UDim2.new(1, -55, 0, 19)
+            mLbl.Size = UDim2.new(1, -55, 0, 20)
             mLbl.Position = UDim2.new(0, 49, 0, 21)
             mLbl.BackgroundTransparency = 1
             mLbl.Text = tostring(msgStr or "")
@@ -2670,11 +2698,11 @@ task.spawn(function()
             pctText.Text = string.format("%.1f%%", pctVal)
 
             if count >= LIKE_TARGET_GOAL then
-                statusPillLbl.Text = "🔓 UNLOCKED"
-                statusPillLbl.TextColor3 = Color3.fromRGB(0, 245, 155)
+                statusPillLbl.Text = "★ UNLOCKED"
+                statusPillLbl.TextColor3 = Color3.fromRGB(0, 250, 155)
             else
-                statusPillLbl.Text = "🔒 LOCKED"
-                statusPillLbl.TextColor3 = Color3.fromRGB(255, 195, 65)
+                statusPillLbl.Text = "● LIVE GOAL"
+                statusPillLbl.TextColor3 = Color3.fromRGB(75, 245, 165)
             end
 
             TweenService:Create(likeBarFill, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
@@ -2683,13 +2711,13 @@ task.spawn(function()
 
             if pollState.hasLiked then
                 btnGrad.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 32, 46)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(16, 48, 38))
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 155, 235)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(95, 70, 235)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 185, 130))
                 })
-                btnStroke.Color = Color3.fromRGB(75, 245, 165)
-                likeBtnText.Text = "🔒  LOCKED • LIKE COUNTED"
-                likeBtnText.TextColor3 = Color3.fromRGB(75, 245, 165)
-                shimmerBar.Visible = false
+                btnStroke.Color = Color3.fromRGB(75, 245, 175)
+                likeBtnText.Text = "✓  ALREADY REGISTERED"
+                likeBtnText.TextColor3 = Color3.new(1, 1, 1)
             else
                 btnGrad.Color = ColorSequence.new({
                     ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 175, 255)),
@@ -2699,7 +2727,6 @@ task.spawn(function()
                 btnStroke.Color = Color3.fromRGB(140, 235, 255)
                 likeBtnText.Text = "👍  LIKE FOR NEXT UPDATE"
                 likeBtnText.TextColor3 = Color3.new(1, 1, 1)
-                shimmerBar.Visible = true
             end
         end
 
@@ -2721,14 +2748,28 @@ task.spawn(function()
             end)
         end
 
-        local function postToGlobalServer(rawPayload)
+        local function postToGlobalServer(rawPayload, isHiddenFlag)
             return rawHttp("POST", GLOBAL_CHAT_SERVER .. "/send", HttpService:JSONEncode({
                 user = (lp and lp.Name or "Player") .. "::" .. tostring(lp and lp.UserId or 0),
                 msg = rawPayload,
                 jobId = game.JobId or "global",
-                hidden = false
+                hidden = isHiddenFlag == true
             }))
         end
+
+        -- Broadcast typing signal when local user types in inputBox
+        local lastTypingSent = 0
+        inputBox:GetPropertyChangedSignal("Text"):Connect(function()
+            local txtNow = tostring(inputBox.Text or "")
+            if #txtNow > 0 and (tick() - lastTypingSent >= 2.8) then
+                lastTypingSent = tick()
+                local uName = lp and lp.Name or "Player"
+                local uId = tostring(lp and lp.UserId or 0)
+                task.spawn(function()
+                    postToGlobalServer(string.format("[EMP_HUBTYPE_V206:%s:%s]", uId, uName), true)
+                end)
+            end
+        end)
 
         local function ingestServerMessages(dataList)
             if type(dataList) ~= "table" then return end
@@ -2739,10 +2780,11 @@ task.spawn(function()
             local foundMyVoteOnServer = false
             local addedNewChat = false
             local addedNewReport = false
+            local nowSec = os.time()
 
             for _, item in ipairs(dataList) do
                 local mText = tostring(item.msg or "")
-                if mText == "" or mText == "Joined" or mText == "[TYPING]" or mText:find("%[TYPING%]", 1, true) then
+                if mText == "" or mText == "Joined" or mText == "[TYPING]" then
                     continue
                 end
 
@@ -2750,6 +2792,18 @@ task.spawn(function()
                 local uName, uIdStr = rawU:match("^(.-)::(.-)$")
                 uName = uName or rawU
                 local uId = tonumber(uIdStr) or 0
+
+                -- 0. Live Typing Ping: [EMP_HUBTYPE_V206:UID:USERNAME]
+                local typUid, typUser = mText:match("^%[EMP_HUBTYPE_V206:(.-):(.-)%]$")
+                if typUid and typUid ~= "" then
+                    if tostring(typUid) ~= myIdStr then
+                        local msgTimeSec = item.time and math.floor(tonumber(item.time) / 1000) or nowSec
+                        if (nowSec - msgTimeSec) <= 6 then
+                            pollState.liveTypers[(typUser ~= "" and typUser) or uName] = tick()
+                        end
+                    end
+                    continue
+                end
 
                 -- 1. Campaign-Scoped Like Votes: [EMP_LIKE_<CAMPAIGN_ID>:UID:USERNAME]
                 if mText:sub(1, #VOTE_TAG_PREFIX) == VOTE_TAG_PREFIX then
@@ -2771,13 +2825,15 @@ task.spawn(function()
                 -- 2. Bug & Next Update Feature Reports
                 local rUid, rUser, rMsg = mText:match("^%[EMP_REPORT_V206:(.-):(.-)%]%s*(.*)$")
                 if rUid and rMsg then
+                    local actualReportUser = (rUser ~= "" and rUser) or uName
+                    pollState.liveTypers[actualReportUser] = nil
                     local rKey = tostring(item.id or (rUid .. "_" .. rMsg))
                     if not pollState.renderedReportKeys[rKey] then
                         pollState.renderedReportKeys[rKey] = true
                         pollState.reportOrderCounter += 1
                         addedNewReport = true
                         local tStr = item.time and os.date("%H:%M", math.floor(tonumber(item.time) / 1000)) or os.date("%H:%M")
-                        createFeedBubble(reportScroll, pollState.reportOrderCounter, (rUser ~= "" and rUser) or uName, rUid, rMsg, tStr, true)
+                        createFeedBubble(reportScroll, pollState.reportOrderCounter, actualReportUser, rUid, rMsg, tStr, true)
                     end
                     continue
                 end
@@ -2785,18 +2841,19 @@ task.spawn(function()
                 -- 3. Global Chat Messages
                 local cUid, cUser, cMsg = mText:match("^%[EMP_HUBCHAT_V206:(.-):(.-)%]%s*(.*)$")
                 if cUid and cMsg then
+                    local actualChatUser = (cUser ~= "" and cUser) or uName
+                    pollState.liveTypers[actualChatUser] = nil
                     local cKey = tostring(item.id or (cUid .. "_" .. cMsg))
                     if not pollState.renderedChatKeys[cKey] then
                         pollState.renderedChatKeys[cKey] = true
                         pollState.chatOrderCounter += 1
                         addedNewChat = true
                         local tStr = item.time and os.date("%H:%M", math.floor(tonumber(item.time) / 1000)) or os.date("%H:%M")
-                        createFeedBubble(chatScroll, pollState.chatOrderCounter, (cUser ~= "" and cUser) or uName, cUid, cMsg, tStr, false)
+                        createFeedBubble(chatScroll, pollState.chatOrderCounter, actualChatUser, cUid, cMsg, tStr, false)
                     end
                 end
             end
 
-            -- Auto-heal stale local lock if server has 0 likes for this campaign
             if freshLikeCount == 0 and not foundMyVoteOnServer and pollState.totalLikes == 0 then
                 pollState.hasLiked = false
                 setLocalLikeLock(false)
@@ -2837,8 +2894,8 @@ task.spawn(function()
                 pollState.hasLiked = true
                 updateLikeUI()
                 TXR_Lib:Notify({
-                    Title = "🔒 LIKE LOCKED",
-                    Content = "Your like is already recorded for " .. UPDATE_CAMPAIGN_ID,
+                    Title = "ALREADY REGISTERED",
+                    Content = "Your vote is already registered for " .. UPDATE_CAMPAIGN_ID,
                     Duration = 2,
                     Image = 4483345998
                 })
@@ -2863,7 +2920,7 @@ task.spawn(function()
             notifyWebhookAction(string.format("**@%s** (`%s`) ne **Like** kiya (**%d / %d** • `%s`)", uName, uId, currentCount, LIKE_TARGET_GOAL, UPDATE_CAMPAIGN_ID))
 
             task.spawn(function()
-                postToGlobalServer(string.format("%s%s:%s]", VOTE_TAG_PREFIX, uId, uName))
+                postToGlobalServer(string.format("%s%s:%s]", VOTE_TAG_PREFIX, uId, uName), false)
                 task.wait(0.6)
                 syncFromGlobalServer()
                 likeBusy = false
@@ -2914,7 +2971,7 @@ task.spawn(function()
                 smoothScrollDown(chatScroll)
                 notifyWebhookAction(string.format("**@%s** (`%s`) ne **CHAT** mein bheja: **%s**", uName, uId, trimmed))
                 task.spawn(function()
-                    postToGlobalServer(string.format("[EMP_HUBCHAT_V206:%s:%s] %s", uId, uName, trimmed))
+                    postToGlobalServer(string.format("[EMP_HUBCHAT_V206:%s:%s] %s", uId, uName, trimmed), false)
                     task.wait(0.6)
                     syncFromGlobalServer()
                     sendingItem = false
@@ -2927,7 +2984,7 @@ task.spawn(function()
                 smoothScrollDown(reportScroll)
                 notifyWebhookAction(string.format("**@%s** (`%s`) ne **Bug / Next Update Feature** bheja: **%s**", uName, uId, trimmed))
                 task.spawn(function()
-                    postToGlobalServer(string.format("[EMP_REPORT_V206:%s:%s] %s", uId, uName, trimmed))
+                    postToGlobalServer(string.format("[EMP_REPORT_V206:%s:%s] %s", uId, uName, trimmed), false)
                     task.wait(0.6)
                     syncFromGlobalServer()
                     sendingItem = false
@@ -2955,9 +3012,27 @@ task.spawn(function()
             if radarDot and radarDot.Parent then
                 radarDot.BackgroundTransparency = 0.15 + ((math.sin(mClock * 4) + 1) / 2) * 0.65
             end
-            if shimmerBar and shimmerBar.Parent and shimmerBar.Visible then
-                local sweep = ((mClock * 0.65) % 1.8) - 0.3
-                shimmerBar.Position = UDim2.new(sweep, 0, 0.5, 0)
+            if shineGrad and shineGrad.Parent then
+                local sweep = ((mClock * 0.55) % 2.4) - 1.2
+                shineGrad.Offset = Vector2.new(sweep, 0)
+            end
+
+            -- Render live typing indicator
+            local activeTyperNames = {}
+            for tName, tStamp in pairs(pollState.liveTypers) do
+                if (tick() - tStamp) < 4.5 then
+                    table.insert(activeTyperNames, "@" .. tName)
+                else
+                    pollState.liveTypers[tName] = nil
+                end
+            end
+            if #activeTyperNames > 0 then
+                typingStatusBar.Visible = true
+                local dots = string.rep(".", (math.floor(mClock * 3) % 3) + 1)
+                local who = (#activeTyperNames > 2) and "Multiple players" or table.concat(activeTyperNames, ", ")
+                typingStatusLbl.Text = "✍️ " .. who .. " is typing" .. dots
+            else
+                typingStatusBar.Visible = false
             end
         end)
 
@@ -2966,7 +3041,7 @@ task.spawn(function()
         task.spawn(function()
             while card and card.Parent do
                 syncFromGlobalServer()
-                task.wait(2.2)
+                task.wait(2.0)
             end
         end)
     end
