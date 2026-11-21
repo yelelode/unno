@@ -51,11 +51,11 @@ local lp = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local MODERATOR_USER_ID = 9685785248
 
 local globalPlayerMeta = {
-    -- [uidStr] = { spamRank = 1, grindRank = 2, selectedSlot = "AUTO", customTag = nil }
+    -- [uidStr] = { spamRank = 1, grindRank = 2, selectedSlot = "AUTO" }
 }
 
 local myTagSelectionState = {
-    selectedMode = "AUTO", -- "AUTO", "SPAM", "GRIND", "DEV"
+    selectedMode = "AUTO",
     equippedTitle = nil,
     equippedColor = Color3.fromRGB(0, 245, 255)
 }
@@ -137,7 +137,6 @@ local SPAM_TOP5_THEMES = {
     }
 }
 
--- DISTINCT COLOR PALETTE FOR GRINDERS MODE (NO MORE DUPLICATE COLORS!)
 local GRIND_TOP5_THEMES = {
     [1] = {
         title     = "👑 NO-LIFE GOD",
@@ -291,6 +290,18 @@ local function getPlayerAvailableTags(uidNum)
     return options
 end
 
+local function getBestNumericRankForPlayer(uidNum)
+    local uidStr = tostring(uidNum or 0)
+    local meta = globalPlayerMeta[uidStr]
+    if not meta then return nil end
+    local sR = meta.spamRank
+    local gR = meta.grindRank
+    if sR and gR then
+        return math.min(sR, gR)
+    end
+    return sR or gR
+end
+
 local function resolveActiveBadgeForPlayer(uidNum, preferredSlot)
     local uidStr = tostring(uidNum or 0)
     local meta = globalPlayerMeta[uidStr]
@@ -309,7 +320,6 @@ local function resolveActiveBadgeForPlayer(uidNum, preferredSlot)
         end
     end
 
-    -- Default priority: DEV > Highest Rank (lowest rank number)
     local best = tags[1]
     for _, t in ipairs(tags) do
         if t.id == "DEV" then
@@ -407,17 +417,18 @@ pcall(function()
                 local senderId = message.TextSource.UserId
                 local basePrefix = (props.PrefixText and props.PrefixText ~= "") and props.PrefixText or message.PrefixText
                 if basePrefix then
+                    local badge = resolveActiveBadgeForPlayer(senderId)
+                    local bestR = getBestNumericRankForPlayer(senderId)
                     if senderId == MODERATOR_USER_ID then
+                        local rPart = bestR and string.format("[#%d] ", bestR) or ""
+                        local tagPart = (badge and badge.id ~= "DEV") and string.format("[%s] ", badge.title) or ""
                         if not basePrefix:find("☑️", 1, true) then
-                            props.PrefixText = "☑️ [👑 DEV] " .. basePrefix
+                            props.PrefixText = "☑️ " .. rPart .. tagPart .. basePrefix
                         end
-                    else
-                        local badge = resolveActiveBadgeForPlayer(senderId)
-                        if badge and badge.rankNum >= 1 and badge.rankNum <= 100 then
-                            local tagStr = string.format("[%s • #%d] ", badge.title, badge.rankNum)
-                            if not basePrefix:find(badge.title, 1, true) then
-                                props.PrefixText = tagStr .. basePrefix
-                            end
+                    elseif badge and bestR and bestR >= 1 and bestR <= 100 then
+                        local tagStr = string.format("[#%d • %s] ", bestR, badge.title)
+                        if not basePrefix:find(badge.title, 1, true) then
+                            props.PrefixText = tagStr .. basePrefix
                         end
                     end
                 end
@@ -483,8 +494,9 @@ task.spawn(function()
 
         local isMod = (plr.UserId == MODERATOR_USER_ID)
         local badge = resolveActiveBadgeForPlayer(plr.UserId)
+        local bestR = getBestNumericRankForPlayer(plr.UserId)
 
-        if not isMod and (not badge or badge.rankNum < 1 or badge.rankNum > 100) then
+        if not isMod and (not badge or not bestR or bestR < 1 or bestR > 100) then
             local old = head:FindFirstChild("AshuModeratorCrown")
             if old then old:Destroy() end
             return
@@ -494,7 +506,7 @@ task.spawn(function()
         if not billboard then
             billboard = Instance.new("BillboardGui")
             billboard.Name = "AshuModeratorCrown"
-            billboard.Size = UDim2.new(0, 195, 0, 42)
+            billboard.Size = UDim2.new(0, 210, 0, 42)
             billboard.StudsOffset = Vector3.new(0, 2.8, 0)
             billboard.AlwaysOnTop = true
             billboard.MaxDistance = 260
@@ -531,7 +543,7 @@ task.spawn(function()
         local grad = lbl and lbl:FindFirstChild("TagGrad")
         if lbl and grad then
             if isMod then
-                local subRank = (badge and badge.rankNum > 0) and string.format(" • #%d %s", badge.rankNum, badge.title) or ""
+                local subRank = bestR and string.format(" • #%d %s", bestR, (badge and badge.title or "")) or ""
                 lbl.Text = "ᴍᴏᴅᴇʀᴀᴛᴏʀ" .. subRank
                 lbl.TextColor3 = Color3.fromRGB(0, 240, 255)
                 grad.Color = ColorSequence.new({
@@ -539,8 +551,8 @@ task.spawn(function()
                     ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
                     ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 240, 255))
                 })
-            elseif badge then
-                lbl.Text = string.format("%s  [#%d]", badge.title, badge.rankNum)
+            elseif badge and bestR then
+                lbl.Text = string.format("[#%d]  %s", bestR, badge.title)
                 lbl.TextColor3 = badge.theme.border
                 grad.Color = ColorSequence.new(badge.theme.colors)
             end
@@ -741,11 +753,14 @@ local function setLagFreeMode(enable)
 end
 
 -- ========================================================
--- PART 2: PURE RAYFIELD NATIVE SMOOTHNESS + TOPBAR UI SCALER
+-- PART 2: RAYFIELD GLASS + SETTINGS UI SCALER + TOPBAR CUSTOM TAG SELECTOR
 -- ========================================================
 local scalePresets = {1.00, 0.85, 0.75, 1.15}
 local scalePresetIdx = 1
 local currentUiScaleValue = 1.00
+
+local pushTagSelectionToServer = nil
+local updateAllTagPillDisplays = nil
 
 local function getSafeGuiRoot()
     local root
@@ -922,7 +937,10 @@ local function applyGlassyStyle(obj)
     end
 end
 
-local function installTopbarSizeButton(gui)
+-- ========================================================
+-- TOPBAR CUSTOM TAG SELECTOR (LEFT OF SEARCH ICON) + SETTINGS UI SCALE INJECTOR
+-- ========================================================
+local function installTopbarAndSettingsControls(gui)
     task.spawn(function()
         local mainWin = gui:WaitForChild("Main", 5)
         if not mainWin or not mainWin:IsA("Frame") then return end
@@ -936,45 +954,262 @@ local function installTopbarSizeButton(gui)
         end
 
         local topbar = mainWin:WaitForChild("Topbar", 5)
-        if not topbar or topbar:FindFirstChild("TXR_TopbarSizePill") then return end
+        if not topbar then return end
 
-        local sizePill = Instance.new("TextButton")
-        sizePill.Name = "TXR_TopbarSizePill"
-        sizePill.Size = UDim2.fromOffset(58, 22)
-        sizePill.AnchorPoint = Vector2.new(1, 0.5)
-        sizePill.Position = UDim2.new(1, -138, 0.5, 0)
-        sizePill.BackgroundColor3 = Color3.fromRGB(18, 24, 38)
-        sizePill.BackgroundTransparency = 0.15
-        sizePill.Text = "📐 100%"
-        sizePill.TextColor3 = Color3.fromRGB(0, 240, 255)
-        sizePill.Font = Enum.Font.GothamBlack
-        sizePill.TextSize = 9.5
-        sizePill.AutoButtonColor = false
-        sizePill.ZIndex = 15
-        sizePill:SetAttribute("TXR_CustomCard", true)
-        sizePill.Parent = topbar
+        -- 1) TOPBAR CUSTOM TAG BUTTON (LEFT OF SEARCH ICON) + FLOATING POPOVER MENU
+        if not topbar:FindFirstChild("TXR_TopbarTagSelector") then
+            local tagBtn = Instance.new("TextButton")
+            tagBtn.Name = "TXR_TopbarTagSelector"
+            tagBtn.Size = UDim2.fromOffset(104, 23)
+            tagBtn.AnchorPoint = Vector2.new(1, 0.5)
+            tagBtn.Position = UDim2.new(1, -138, 0.5, 0) -- Right next to the Search icon on the left
+            tagBtn.BackgroundColor3 = Color3.fromRGB(16, 22, 36)
+            tagBtn.BackgroundTransparency = 0.10
+            tagBtn.Text = ""
+            tagBtn.AutoButtonColor = false
+            tagBtn.ZIndex = 20
+            tagBtn:SetAttribute("TXR_CustomCard", true)
+            tagBtn.Parent = topbar
 
-        Instance.new("UICorner", sizePill).CornerRadius = UDim.new(1, 0)
+            Instance.new("UICorner", tagBtn).CornerRadius = UDim.new(1, 0)
 
-        local pillStroke = Instance.new("UIStroke", sizePill)
-        pillStroke.Thickness = 1
-        pillStroke.Color = Color3.fromRGB(0, 225, 255)
-        pillStroke.Transparency = 0.40
+            local tagBtnStroke = Instance.new("UIStroke", tagBtn)
+            tagBtnStroke.Thickness = 1.15
+            tagBtnStroke.Color = Color3.fromRGB(0, 240, 255)
+            tagBtnStroke.Transparency = 0.25
 
-        local pillScale = Instance.new("UIScale", sizePill)
+            local tagBtnText = Instance.new("TextLabel", tagBtn)
+            tagBtnText.Size = UDim2.new(1, -12, 1, 0)
+            tagBtnText.Position = UDim2.fromOffset(6, 0)
+            tagBtnText.BackgroundTransparency = 1
+            tagBtnText.Text = "🏷️ TAGS ▾"
+            tagBtnText.TextColor3 = Color3.fromRGB(0, 245, 255)
+            tagBtnText.Font = Enum.Font.GothamBlack
+            tagBtnText.TextSize = 8.2
+            tagBtnText.TextTruncate = Enum.TextTruncate.AtEnd
+            tagBtnText.ZIndex = 21
 
-        sizePill.MouseButton1Click:Connect(function()
-            pillScale.Scale = 0.88
-            TweenService:Create(pillScale, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+            local tagBtnScale = Instance.new("UIScale", tagBtn)
 
-            scalePresetIdx = (scalePresetIdx % #scalePresets) + 1
-            currentUiScaleValue = scalePresets[scalePresetIdx]
-            sizePill.Text = string.format("📐 %d%%", math.floor(currentUiScaleValue * 100 + 0.5))
+            -- Floating Tag Dropdown Drawer inside Main Window
+            local tagMenu = Instance.new("Frame", mainWin)
+            tagMenu.Name = "TXR_TagSelectorDropdown"
+            tagMenu.Size = UDim2.fromOffset(176, 128)
+            tagMenu.AnchorPoint = Vector2.new(1, 0)
+            tagMenu.Position = UDim2.new(1, -128, 0, 42)
+            tagMenu.BackgroundColor3 = Color3.fromRGB(11, 15, 25)
+            tagMenu.BackgroundTransparency = 0.03
+            tagMenu.Visible = false
+            tagMenu.ZIndex = 90
+            tagMenu:SetAttribute("TXR_CustomCard", true)
+            Instance.new("UICorner", tagMenu).CornerRadius = UDim.new(0, 10)
 
-            if uiScale and uiScale.Parent then
-                TweenService:Create(uiScale, TweenInfo.new(0.26, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                    Scale = currentUiScaleValue
-                }):Play()
+            local menuStroke = Instance.new("UIStroke", tagMenu)
+            menuStroke.Thickness = 1.25
+            menuStroke.Color = Color3.fromRGB(0, 240, 255)
+            menuStroke.Transparency = 0.20
+
+            local menuTitle = Instance.new("TextLabel", tagMenu)
+            menuTitle.Size = UDim2.new(1, -16, 0, 18)
+            menuTitle.Position = UDim2.fromOffset(8, 5)
+            menuTitle.BackgroundTransparency = 1
+            menuTitle.Text = "🏷️ SELECT EQUIPPED TAG"
+            menuTitle.TextColor3 = Color3.fromRGB(185, 210, 240)
+            menuTitle.Font = Enum.Font.GothamBlack
+            menuTitle.TextSize = 8
+            menuTitle.TextXAlignment = Enum.TextXAlignment.Left
+            menuTitle.ZIndex = 91
+
+            local menuListFrame = Instance.new("Frame", tagMenu)
+            menuListFrame.Size = UDim2.new(1, -12, 1, -28)
+            menuListFrame.Position = UDim2.fromOffset(6, 24)
+            menuListFrame.BackgroundTransparency = 1
+            menuListFrame.ZIndex = 91
+
+            local mLay = Instance.new("UIListLayout", menuListFrame)
+            mLay.Padding = UDim.new(0, 4)
+            mLay.SortOrder = Enum.SortOrder.LayoutOrder
+
+            local function rebuildTagDropdownMenu()
+                for _, ch in ipairs(menuListFrame:GetChildren()) do
+                    if ch:IsA("GuiObject") then ch:Destroy() end
+                end
+
+                local myId = lp and lp.UserId or 0
+                local avail = getPlayerAvailableTags(myId)
+                local activeBadge = resolveActiveBadgeForPlayer(myId, myTagSelectionState.selectedMode)
+
+                if #avail == 0 then
+                    local emptyLbl = Instance.new("TextLabel", menuListFrame)
+                    emptyLbl.Size = UDim2.new(1, 0, 0, 44)
+                    emptyLbl.BackgroundTransparency = 1
+                    emptyLbl.Text = "No rank tag yet!\nReach Top 100 in Spam or Grind."
+                    emptyLbl.TextColor3 = Color3.fromRGB(165, 185, 215)
+                    emptyLbl.Font = Enum.Font.GothamMedium
+                    emptyLbl.TextSize = 8.2
+                    emptyLbl.TextWrapped = true
+                    emptyLbl.ZIndex = 92
+                    tagMenu.Size = UDim2.fromOffset(176, 76)
+                    return
+                end
+
+                tagMenu.Size = UDim2.fromOffset(176, 30 + (#avail * 30))
+
+                for idx, item in ipairs(avail) do
+                    local isSelected = (activeBadge and activeBadge.id == item.id)
+                    local optBtn = Instance.new("TextButton", menuListFrame)
+                    optBtn.Size = UDim2.new(1, 0, 0, 26)
+                    optBtn.BackgroundColor3 = isSelected and item.theme.tagBg or Color3.fromRGB(18, 24, 38)
+                    optBtn.Text = ""
+                    optBtn.AutoButtonColor = false
+                    optBtn.LayoutOrder = idx
+                    optBtn.ZIndex = 92
+                    Instance.new("UICorner", optBtn).CornerRadius = UDim.new(0, 7)
+
+                    local oStroke = Instance.new("UIStroke", optBtn)
+                    oStroke.Thickness = isSelected and 1.15 or 0.8
+                    oStroke.Color = item.theme.border
+                    oStroke.Transparency = isSelected and 0.15 or 0.55
+
+                    local oLbl = Instance.new("TextLabel", optBtn)
+                    oLbl.Size = UDim2.new(1, -24, 1, 0)
+                    oLbl.Position = UDim2.fromOffset(8, 0)
+                    oLbl.BackgroundTransparency = 1
+                    oLbl.Text = item.title
+                    oLbl.TextColor3 = item.theme.border
+                    oLbl.Font = Enum.Font.GothamBlack
+                    oLbl.TextSize = 8.2
+                    oLbl.TextXAlignment = Enum.TextXAlignment.Left
+                    oLbl.ZIndex = 93
+
+                    local checkLbl = Instance.new("TextLabel", optBtn)
+                    checkLbl.Size = UDim2.fromOffset(18, 26)
+                    checkLbl.AnchorPoint = Vector2.new(1, 0)
+                    checkLbl.Position = UDim2.new(1, -4, 0, 0)
+                    checkLbl.BackgroundTransparency = 1
+                    checkLbl.Text = isSelected and "✓" or ""
+                    checkLbl.TextColor3 = Color3.fromRGB(75, 250, 165)
+                    checkLbl.Font = Enum.Font.GothamBlack
+                    checkLbl.TextSize = 9.5
+                    checkLbl.ZIndex = 93
+
+                    optBtn.MouseButton1Click:Connect(function()
+                        myTagSelectionState.selectedMode = item.id
+                        myTagSelectionState.equippedTitle = item.title
+                        myTagSelectionState.equippedColor = item.theme.border
+
+                        local uidStr = tostring(myId)
+                        if not globalPlayerMeta[uidStr] then globalPlayerMeta[uidStr] = {} end
+                        globalPlayerMeta[uidStr].selectedSlot = item.id
+
+                        if updateAllTagPillDisplays then
+                            updateAllTagPillDisplays()
+                        end
+                        if refreshAllOverheadTags then
+                            refreshAllOverheadTags()
+                        end
+                        if pushTagSelectionToServer then
+                            pushTagSelectionToServer(item.id)
+                        end
+
+                        rebuildTagDropdownMenu()
+                        tagMenu.Visible = false
+                    end)
+                end
+            end
+
+            updateAllTagPillDisplays = function()
+                local myId = lp and lp.UserId or 0
+                local avail = getPlayerAvailableTags(myId)
+                local activeBadge = resolveActiveBadgeForPlayer(myId, myTagSelectionState.selectedMode)
+                if activeBadge then
+                    tagBtnText.Text = activeBadge.title .. " ▾"
+                    tagBtnText.TextColor3 = activeBadge.theme.border
+                    tagBtnStroke.Color = activeBadge.theme.border
+                    tagBtn.BackgroundColor3 = activeBadge.theme.tagBg
+                else
+                    tagBtnText.Text = string.format("🏷️ %d TAGS ▾", #avail)
+                    tagBtnText.TextColor3 = Color3.fromRGB(0, 245, 255)
+                    tagBtnStroke.Color = Color3.fromRGB(0, 240, 255)
+                    tagBtn.BackgroundColor3 = Color3.fromRGB(16, 22, 36)
+                end
+            end
+
+            tagBtn.MouseButton1Click:Connect(function()
+                tagBtnScale.Scale = 0.90
+                TweenService:Create(tagBtnScale, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+                if not tagMenu.Visible then
+                    rebuildTagDropdownMenu()
+                    tagMenu.Visible = true
+                else
+                    tagMenu.Visible = false
+                end
+            end)
+
+            updateAllTagPillDisplays()
+        end
+
+        -- 2) INJECT "UI Scale" INSIDE RAYFIELD SETTINGS DRAWER (IMAGE 1 LOCATION)
+        task.spawn(function()
+            while mainWin and mainWin.Parent do
+                for _, desc in ipairs(mainWin:GetDescendants()) do
+                    if desc:IsA("TextLabel") and desc.Text == "ᴛxʀ Keybind" then
+                        local keybindCard = desc.Parent
+                        local settingsScroll = keybindCard and keybindCard.Parent
+                        if settingsScroll and not settingsScroll:FindFirstChild("TXR_SettingsUiScaleCard") then
+                            local scaleCard = Instance.new("Frame")
+                            scaleCard.Name = "TXR_SettingsUiScaleCard"
+                            scaleCard.Size = UDim2.new(1, 0, 0, 38)
+                            scaleCard.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+                            scaleCard.BackgroundTransparency = 0.35
+                            scaleCard.LayoutOrder = keybindCard.LayoutOrder + 1
+                            scaleCard:SetAttribute("TXR_CustomCard", true)
+                            scaleCard.Parent = settingsScroll
+
+                            Instance.new("UICorner", scaleCard).CornerRadius = UDim.new(0, 6)
+
+                            local titleLbl = Instance.new("TextLabel", scaleCard)
+                            titleLbl.Size = UDim2.new(0.60, 0, 1, 0)
+                            titleLbl.Position = UDim2.fromOffset(14, 0)
+                            titleLbl.BackgroundTransparency = 1
+                            titleLbl.Text = "UI Size / Scale"
+                            titleLbl.TextColor3 = Color3.fromRGB(240, 244, 250)
+                            titleLbl.Font = Enum.Font.GothamMedium
+                            titleLbl.TextSize = 13
+                            titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+                            local scaleCycleBtn = Instance.new("TextButton", scaleCard)
+                            scaleCycleBtn.Size = UDim2.fromOffset(72, 24)
+                            scaleCycleBtn.AnchorPoint = Vector2.new(1, 0.5)
+                            scaleCycleBtn.Position = UDim2.new(1, -10, 0.5, 0)
+                            scaleCycleBtn.BackgroundColor3 = Color3.fromRGB(16, 22, 34)
+                            scaleCycleBtn.Text = string.format("📐 %d%%", math.floor(currentUiScaleValue * 100 + 0.5))
+                            scaleCycleBtn.TextColor3 = Color3.fromRGB(0, 240, 255)
+                            scaleCycleBtn.Font = Enum.Font.GothamBlack
+                            scaleCycleBtn.TextSize = 10.5
+                            scaleCycleBtn.AutoButtonColor = false
+                            Instance.new("UICorner", scaleCycleBtn).CornerRadius = UDim.new(0, 6)
+
+                            local scStroke = Instance.new("UIStroke", scaleCycleBtn)
+                            scStroke.Thickness = 1
+                            scStroke.Color = Color3.fromRGB(0, 225, 255)
+                            scStroke.Transparency = 0.40
+
+                            scaleCycleBtn.MouseButton1Click:Connect(function()
+                                scalePresetIdx = (scalePresetIdx % #scalePresets) + 1
+                                currentUiScaleValue = scalePresets[scalePresetIdx]
+                                scaleCycleBtn.Text = string.format("📐 %d%%", math.floor(currentUiScaleValue * 100 + 0.5))
+
+                                if uiScale and uiScale.Parent then
+                                    TweenService:Create(uiScale, TweenInfo.new(0.26, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                                        Scale = currentUiScaleValue
+                                    }):Play()
+                                end
+                            end)
+                        end
+                    end
+                end
+                task.wait(1.0)
             end
         end)
     end)
@@ -985,7 +1220,7 @@ local function applyTXRBranding(parent)
 
     for _, existing in ipairs(parent:GetChildren()) do
         if existing:IsA("ScreenGui") and existing.Name == "TXR_UI" then
-            installTopbarSizeButton(existing)
+            installTopbarAndSettingsControls(existing)
         end
     end
 
@@ -997,7 +1232,7 @@ local function applyTXRBranding(parent)
                 applyGlassyStyle(desc)
             end
             gui.DescendantAdded:Connect(applyGlassyStyle)
-            installTopbarSizeButton(gui)
+            installTopbarAndSettingsControls(gui)
         end
     end)
 end
@@ -1844,6 +2079,15 @@ local function postToGlobalServer(rawPayload, isHiddenFlag)
     }))
 end
 
+pushTagSelectionToServer = function(slotId)
+    local myIdStr = tostring(lp and lp.UserId or 0)
+    if myIdStr ~= "0" then
+        task.spawn(function()
+            postToGlobalServer(string.format("[EMP_TAGSEL_%s:%s:%s]", RANKING_SEASON_ID, myIdStr, tostring(slotId)), true)
+        end)
+    end
+end
+
 -- ========================================================
 -- TAB 4: COINBASE PRO LIVE TERMINAL (NATIVE SMOOTH TWEENS)
 -- ========================================================
@@ -2638,8 +2882,7 @@ task.spawn(function()
             if rkLabel.Visible then rkLabel.Visible = false end
         end)
 
-        -- Set outer card size cleanly so header + podium + scroll + footer never clip!
-        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 388)
+        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 396)
         card.BackgroundColor3 = Color3.fromRGB(7, 9, 15)
         card.BackgroundTransparency = 0.02
         card.ClipsDescendants = true
@@ -2727,7 +2970,6 @@ task.spawn(function()
             end
         end
 
-        -- Top Bar (Always Pinned Visible at Y = 8)
         local topBar = Instance.new("Frame", card)
         topBar.Size = UDim2.new(1, -16, 0, 28)
         topBar.Position = UDim2.new(0, 8, 0, 8)
@@ -3036,9 +3278,9 @@ task.spawn(function()
             TweenService:Create(inspScale, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
         end
 
-        -- 3D-Pedestal Champions Stage (Y = 42, Height = 132)
+        -- 3D-Pedestal Champions Stage (With Crisp High-Contrast RANK #1 / #2 / #3 Medallions)
         local podiumStage = Instance.new("Frame", card)
-        podiumStage.Size = UDim2.new(1, -16, 0, 132)
+        podiumStage.Size = UDim2.new(1, -16, 0, 140)
         podiumStage.Position = UDim2.new(0, 8, 0, 42)
         podiumStage.BackgroundTransparency = 1
         podiumStage.ZIndex = 6
@@ -3118,7 +3360,7 @@ task.spawn(function()
             local avRing = Instance.new("Frame", box)
             avRing.Size = UDim2.fromOffset(avSize + 4, avSize + 4)
             avRing.AnchorPoint = Vector2.new(0.5, 0)
-            avRing.Position = UDim2.new(0.5, 0, 0, 6)
+            avRing.Position = UDim2.new(0.5, 0, 0, 5)
             avRing.BackgroundColor3 = Color3.new(1, 1, 1)
             avRing.ZIndex = 9
             Instance.new("UICorner", avRing).CornerRadius = UDim.new(1, 0)
@@ -3136,25 +3378,42 @@ task.spawn(function()
             av.ZIndex = 10
             Instance.new("UICorner", av).CornerRadius = UDim.new(1, 0)
 
-            local medalBadge = Instance.new("TextLabel", box)
-            medalBadge.Size = UDim2.fromOffset(26, 13)
-            medalBadge.AnchorPoint = Vector2.new(0.5, 0.5)
-            medalBadge.Position = UDim2.new(0.5, 0, 0, 9 + avSize)
-            medalBadge.BackgroundColor3 = cfg.tagBg
-            medalBadge.Text = "#" .. tostring(placeNum)
-            medalBadge.TextColor3 = cfg.border
-            medalBadge.Font = Enum.Font.GothamBlack
-            medalBadge.TextSize = 7.5
-            medalBadge.ZIndex = 12
-            Instance.new("UICorner", medalBadge).CornerRadius = UDim.new(1, 0)
-            local mbStroke = Instance.new("UIStroke", medalBadge)
-            mbStroke.Thickness = 0.9
+            -- CRISP PREMIUM RANK #1 / #2 / #3 MEDALLION PILL (FIXED & SUPER READABLE!)
+            local medalPill = Instance.new("Frame", box)
+            medalPill.Size = UDim2.fromOffset(54, 15)
+            medalPill.AnchorPoint = Vector2.new(0.5, 0)
+            medalPill.Position = UDim2.new(0.5, 0, 0, 6 + avSize)
+            medalPill.BackgroundColor3 = Color3.fromRGB(10, 14, 24)
+            medalPill.ZIndex = 12
+            Instance.new("UICorner", medalPill).CornerRadius = UDim.new(1, 0)
+
+            local mbStroke = Instance.new("UIStroke", medalPill)
+            mbStroke.Thickness = 1.15
             mbStroke.Color = cfg.border
+
+            local medalGrad = Instance.new("UIGradient", medalPill)
+            medalGrad.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, cfg.cardTintA),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(14, 18, 30))
+            })
+
+            local medalBadge = Instance.new("TextLabel", medalPill)
+            medalBadge.Size = UDim2.fromScale(1, 1)
+            medalBadge.BackgroundTransparency = 1
+            medalBadge.Text = "RANK #" .. tostring(placeNum)
+            medalBadge.TextColor3 = Color3.new(1, 1, 1)
+            medalBadge.Font = Enum.Font.GothamBlack
+            medalBadge.TextSize = 8.2
+            medalBadge.ZIndex = 13
+
+            local mbTxtStroke = Instance.new("UIStroke", medalBadge)
+            mbTxtStroke.Thickness = 0.9
+            mbTxtStroke.Color = Color3.new(0, 0, 0)
 
             local tagPill = Instance.new("Frame", box)
             tagPill.Size = UDim2.new(1, -10, 0, 17)
             tagPill.AnchorPoint = Vector2.new(0.5, 0)
-            tagPill.Position = UDim2.new(0.5, 0, 0, 18 + avSize)
+            tagPill.Position = UDim2.new(0.5, 0, 0, 23 + avSize)
             tagPill.BackgroundColor3 = cfg.tagBg
             tagPill.BackgroundTransparency = 0.05
             tagPill.ZIndex = 10
@@ -3176,7 +3435,7 @@ task.spawn(function()
 
             local nameLbl = Instance.new("TextLabel", box)
             nameLbl.Size = UDim2.new(1, -8, 0, 14)
-            nameLbl.Position = UDim2.new(0, 4, 0, 36 + avSize)
+            nameLbl.Position = UDim2.new(0, 4, 0, 42 + avSize)
             nameLbl.BackgroundTransparency = 1
             nameLbl.Text = "OPEN SLOT"
             nameLbl.TextColor3 = Color3.new(1, 1, 1)
@@ -3211,6 +3470,8 @@ task.spawn(function()
                 sweepOverlay = sweepOverlay,
                 bottomBar = bottomPedestalBar,
                 ringGrad = ringGrad,
+                medalPill = medalPill,
+                medalGrad = medalGrad,
                 medalBadge = medalBadge,
                 mbStroke = mbStroke,
                 tagPill = tagPill,
@@ -3230,15 +3491,15 @@ task.spawn(function()
             return slotRef
         end
 
-        local pod2 = createPedestalSlot(2, 0.172, 0.33, 114)
-        local pod1 = createPedestalSlot(1, 0.500, 0.34, 128)
-        local pod3 = createPedestalSlot(3, 0.828, 0.33, 110)
+        local pod2 = createPedestalSlot(2, 0.172, 0.33, 122)
+        local pod1 = createPedestalSlot(1, 0.500, 0.34, 136)
+        local pod3 = createPedestalSlot(3, 0.828, 0.33, 118)
         local podiumSlots = {pod1, pod2, pod3}
 
         -- Ranked Glass Cards Scroll (#4 to #100)
         local rankScroll = Instance.new("ScrollingFrame", card)
         rankScroll.Size = UDim2.new(1, -16, 0, 166)
-        rankScroll.Position = UDim2.new(0, 8, 0, 180)
+        rankScroll.Position = UDim2.new(0, 8, 0, 188)
         rankScroll.BackgroundTransparency = 1
         rankScroll.ScrollBarThickness = 2.5
         rankScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 225, 255)
@@ -3250,7 +3511,7 @@ task.spawn(function()
         rankListLayout.Padding = UDim.new(0, 5)
         rankListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-        -- Sticky OLED Footer with Live Rank + Multi-Tag Selector Pill
+        -- Sticky OLED Footer with Live Rank + Equipped Tag
         local myRankBar = Instance.new("Frame", card)
         myRankBar.Size = UDim2.new(1, -16, 0, 31)
         myRankBar.AnchorPoint = Vector2.new(0.5, 1)
@@ -3266,7 +3527,7 @@ task.spawn(function()
         myRankStroke.Transparency = 0.25
 
         local myRankNumLbl = Instance.new("TextLabel", myRankBar)
-        myRankNumLbl.Size = UDim2.fromOffset(48, 31)
+        myRankNumLbl.Size = UDim2.fromOffset(52, 31)
         myRankNumLbl.Position = UDim2.fromOffset(8, 0)
         myRankNumLbl.BackgroundTransparency = 1
         myRankNumLbl.Text = "YOU #1"
@@ -3276,14 +3537,12 @@ task.spawn(function()
         myRankNumLbl.TextXAlignment = Enum.TextXAlignment.Left
         myRankNumLbl.ZIndex = 11
 
-        local myFooterTagPill = Instance.new("TextButton", myRankBar)
-        myFooterTagPill.Size = UDim2.fromOffset(118, 19)
+        local myFooterTagPill = Instance.new("Frame", myRankBar)
+        myFooterTagPill.Size = UDim2.fromOffset(124, 19)
         myFooterTagPill.AnchorPoint = Vector2.new(0, 0.5)
-        myFooterTagPill.Position = UDim2.new(0, 56, 0.5, 0)
+        myFooterTagPill.Position = UDim2.new(0, 62, 0.5, 0)
         myFooterTagPill.BackgroundColor3 = Color3.fromRGB(22, 28, 44)
         myFooterTagPill.BackgroundTransparency = 0.05
-        myFooterTagPill.Text = ""
-        myFooterTagPill.AutoButtonColor = false
         myFooterTagPill.ZIndex = 11
         Instance.new("UICorner", myFooterTagPill).CornerRadius = UDim.new(1, 0)
 
@@ -3301,26 +3560,8 @@ task.spawn(function()
             "👑 COM GOD"
         )
 
-        local switchTagHintBtn = Instance.new("TextButton", myRankBar)
-        switchTagHintBtn.Size = UDim2.fromOffset(46, 19)
-        switchTagHintBtn.AnchorPoint = Vector2.new(0, 0.5)
-        switchTagHintBtn.Position = UDim2.new(0, 178, 0.5, 0)
-        switchTagHintBtn.BackgroundColor3 = Color3.fromRGB(20, 32, 52)
-        switchTagHintBtn.Text = "🏷️ TAG"
-        switchTagHintBtn.TextColor3 = Color3.fromRGB(0, 240, 255)
-        switchTagHintBtn.Font = Enum.Font.GothamBlack
-        switchTagHintBtn.TextSize = 7.5
-        switchTagHintBtn.AutoButtonColor = false
-        switchTagHintBtn.ZIndex = 11
-        Instance.new("UICorner", switchTagHintBtn).CornerRadius = UDim.new(1, 0)
-
-        local swHintStroke = Instance.new("UIStroke", switchTagHintBtn)
-        swHintStroke.Thickness = 0.85
-        swHintStroke.Color = Color3.fromRGB(0, 240, 255)
-        swHintStroke.Transparency = 0.35
-
         local myRankRight = Instance.new("TextLabel", myRankBar)
-        myRankRight.Size = UDim2.new(1, -232, 1, 0)
+        myRankRight.Size = UDim2.new(1, -194, 1, 0)
         myRankRight.AnchorPoint = Vector2.new(1, 0)
         myRankRight.Position = UDim2.new(1, -8, 0, 0)
         myRankRight.BackgroundTransparency = 1
@@ -3330,62 +3571,6 @@ task.spawn(function()
         myRankRight.TextSize = 8.5
         myRankRight.TextXAlignment = Enum.TextXAlignment.Right
         myRankRight.ZIndex = 11
-
-        local pushTagSelectionToServer = nil
-
-        local function cycleMyEquippedTag()
-            local myId = lp and lp.UserId or 0
-            local avail = getPlayerAvailableTags(myId)
-            if #avail <= 1 then
-                TXR_Lib:Notify({
-                    Title = "🏷️ TAG SELECTOR",
-                    Content = "Unlock a 2nd tag by ranking Top 100 in both Spammers & Grinders!",
-                    Duration = 2.5,
-                    Image = 4483345998
-                })
-                return
-            end
-
-            local nextIdx = 1
-            for i, item in ipairs(avail) do
-                if item.id == myTagSelectionState.selectedMode then
-                    nextIdx = (i % #avail) + 1
-                    break
-                end
-            end
-
-            local chosen = avail[nextIdx]
-            myTagSelectionState.selectedMode = chosen.id
-            myTagSelectionState.equippedTitle = chosen.title
-            myTagSelectionState.equippedColor = chosen.theme.border
-
-            local uidStr = tostring(myId)
-            if globalPlayerMeta[uidStr] then
-                globalPlayerMeta[uidStr].selectedSlot = chosen.id
-            end
-
-            myFooterChromaCtrl.setText(chosen.title)
-            myFooterChromaCtrl.setTheme(chosen.theme)
-            myFooterTagPill.BackgroundColor3 = chosen.theme.tagBg
-            myFooterPillStroke.Color = chosen.theme.border
-
-            if refreshAllOverheadTags then
-                refreshAllOverheadTags()
-            end
-            if pushTagSelectionToServer then
-                pushTagSelectionToServer(chosen.id)
-            end
-
-            TXR_Lib:Notify({
-                Title = "🏷️ ACTIVE TAG CHANGED",
-                Content = "Equipped: " .. chosen.title .. " (Synced to Chat & Overhead)",
-                Duration = 2.2,
-                Image = 4483345998
-            })
-        end
-
-        myFooterTagPill.MouseButton1Click:Connect(cycleMyEquippedTag)
-        switchTagHintBtn.MouseButton1Click:Connect(cycleMyEquippedTag)
 
         locateMeBtn.MouseButton1Click:Connect(function()
             locScale.Scale = 0.85
@@ -3416,7 +3601,6 @@ task.spawn(function()
                 table.insert(allArr, entry)
             end
 
-            -- Compute Spam Ranks 1-100
             table.sort(allArr, function(a, b)
                 if (a.spam or 0) == (b.spam or 0) then
                     return tostring(a.name) < tostring(b.name)
@@ -3429,7 +3613,6 @@ task.spawn(function()
                 globalPlayerMeta[uStr].spamRank = (idx <= 100) and idx or nil
             end
 
-            -- Compute Grind Ranks 1-100
             table.sort(allArr, function(a, b)
                 if (a.grind or 0) == (b.grind or 0) then
                     return tostring(a.name) < tostring(b.name)
@@ -3442,6 +3625,9 @@ task.spawn(function()
                 globalPlayerMeta[uStr].grindRank = (idx <= 100) and idx or nil
             end
 
+            if updateAllTagPillDisplays then
+                updateAllTagPillDisplays()
+            end
             if refreshAllOverheadTags then
                 refreshAllOverheadTags()
             end
@@ -3487,7 +3673,6 @@ task.spawn(function()
                 leaderMaxScore = math.max(1, isSpam and (sorted[1].spam or 1) or (sorted[1].grind or 1))
             end
 
-            -- Update Top 3 Podiums with distinct Mode Colors
             for place = 1, 3 do
                 local slot = podiumSlots[place]
                 local cfg = modeThemeTbl[place]
@@ -3502,7 +3687,10 @@ task.spawn(function()
                 slot.sweepOverlay.BackgroundColor3 = cfg.border
                 slot.bottomBar.BackgroundColor3 = cfg.border
                 slot.ringGrad.Color = ColorSequence.new(cfg.colors)
-                slot.medalBadge.BackgroundColor3 = cfg.tagBg
+                slot.medalGrad.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, cfg.cardTintA),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(14, 18, 30))
+                })
                 slot.medalBadge.TextColor3 = cfg.border
                 slot.mbStroke.Color = cfg.border
                 slot.tagPill.BackgroundColor3 = cfg.tagBg
@@ -3547,7 +3735,6 @@ task.spawn(function()
             rankState.lastKnownMyRank = myRankNum
             rankState.myCurrentRankNum = myRankNum
 
-            -- Render Ranks #4 up to #100 with Crisp High-Contrast Visibility!
             local maxRowToDraw = math.min(100, math.max(5, #sorted))
             for idx = 4, maxRowToDraw do
                 local entry = sorted[idx]
@@ -3697,9 +3884,7 @@ task.spawn(function()
                 end)
             end
 
-            -- Sync Sticky Footer with Active Equipped Tag
             local myId = lp and lp.UserId or 0
-            local myAvailTags = getPlayerAvailableTags(myId)
             local myActiveBadge = resolveActiveBadgeForPlayer(myId, myTagSelectionState.selectedMode)
             local myCfg = (myActiveBadge and myActiveBadge.theme) or modeThemeTbl[myRankNum] or UNRANKED_CHROMA_CFG
             local myTitle = (myActiveBadge and myActiveBadge.title) or getTierForRank(myRankNum, rankState.activeMode)
@@ -3709,7 +3894,6 @@ task.spawn(function()
             myFooterChromaCtrl.setTheme(myCfg)
             myFooterTagPill.BackgroundColor3 = myCfg.tagBg
             myFooterPillStroke.Color = myCfg.border
-            switchTagHintBtn.Text = (#myAvailTags > 1) and string.format("🏷️ %d TAGS", #myAvailTags) or "🏷️ 1 TAG"
 
             if myRankNum > 1 and sorted[myRankNum - 1] then
                 local above = sorted[myRankNum - 1]
@@ -3744,13 +3928,6 @@ task.spawn(function()
             holoAura.ImageColor3 = Color3.fromRGB(255, 125, 35)
             renderLeaderboard()
         end)
-
-        pushTagSelectionToServer = function(slotId)
-            local myIdStr = tostring(lp and lp.UserId or 0)
-            if myIdStr ~= "0" then
-                postToGlobalServer(string.format("[EMP_TAGSEL_%s:%s:%s]", RANKING_SEASON_ID, myIdStr, tostring(slotId)), true)
-            end
-        end
 
         local function syncRankingsWithServer(shouldPushLocal)
             local myIdStr = tostring(lp and lp.UserId or 0)
@@ -3913,7 +4090,8 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- TAB 5: COMPACT NEXT-GEN POLL & LIVE CHAT CONSOLE (WITH RANK 1-100 & TAGS)
+-- TAB 5: COMPACT NEXT-GEN POLL & LIVE CHAT CONSOLE
+-- (LEFT-SIDE PREMIUM RANK BADGE + ADJACENT PREMIUM TAG)
 -- ========================================================
 local LIKE_TARGET_GOAL = 1000
 local LOCAL_LOCK_FILE = "txr_emp_vote_" .. UPDATE_CAMPAIGN_ID .. "_" .. tostring(lp and lp.UserId or 0) .. ".txt"
@@ -4334,25 +4512,30 @@ task.spawn(function()
             end)
         end
 
+        -- ====================================================
+        -- CHAT BUBBLE BUILDER (IMAGE 3 FIX):
+        -- [Avatar] -> [LEFT SIDE: #1 RANK MEDALLION] -> [@Name] -> [ADJACENT PREMIUM TAG]
+        -- ====================================================
         local function createFeedBubble(parentScroll, orderNum, uName, uId, msgStr, timeStr, isReportMode)
             local uidNum = tonumber(uId) or 0
             local isOwner = (uidNum == MODERATOR_USER_ID) or (uName == "TxR_AsHU")
             local badge = resolveActiveBadgeForPlayer(uidNum)
-            local hasRank = (badge and badge.rankNum >= 1 and badge.rankNum <= 100)
+            local bestR = getBestNumericRankForPlayer(uidNum)
+            local hasRank = (bestR and bestR >= 1 and bestR <= 100)
 
             local accentCol = isOwner and Color3.fromRGB(255, 205, 55)
                 or (badge and badge.theme.border)
                 or (isReportMode and Color3.fromRGB(185, 110, 255) or Color3.fromRGB(0, 235, 255))
 
             local row = Instance.new("TextButton", parentScroll)
-            row.Size = UDim2.new(1, -4, 0, 42)
+            row.Size = UDim2.new(1, -4, 0, 44)
             row.BackgroundColor3 = Color3.fromRGB(16, 21, 32)
             row.BackgroundTransparency = 0.08
             row.Text = ""
             row.AutoButtonColor = false
             row.LayoutOrder = orderNum
             row.ZIndex = 6
-            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
+            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
 
             local rStroke = Instance.new("UIStroke", row)
             rStroke.Thickness = (isOwner or hasRank) and 1.05 or 0.8
@@ -4360,7 +4543,7 @@ task.spawn(function()
             rStroke.Transparency = (isOwner or hasRank) and 0.25 or 0.60
 
             local avatar = Instance.new("ImageLabel", row)
-            avatar.Size = UDim2.fromOffset(25, 25)
+            avatar.Size = UDim2.fromOffset(26, 26)
             avatar.AnchorPoint = Vector2.new(0, 0.5)
             avatar.Position = UDim2.new(0, 6, 0.5, 0)
             avatar.BackgroundColor3 = Color3.fromRGB(10, 13, 20)
@@ -4368,52 +4551,95 @@ task.spawn(function()
             avatar.ZIndex = 7
             Instance.new("UICorner", avatar).CornerRadius = UDim.new(1, 0)
 
-            local headerPrefix = isOwner and "👑 @" or (isReportMode and "🛠️ @" or "@")
-            local uLbl = Instance.new("TextLabel", row)
-            uLbl.Size = UDim2.new(0.36, 0, 0, 13)
-            uLbl.Position = UDim2.new(0, 36, 0, 3)
+            -- Top Header Row Container using UIListLayout so [Rank] -> [@Name] -> [Tag] sit tightly together!
+            local headerFlow = Instance.new("Frame", row)
+            headerFlow.Size = UDim2.new(1, -82, 0, 15)
+            headerFlow.Position = UDim2.new(0, 37, 0, 3)
+            headerFlow.BackgroundTransparency = 1
+            headerFlow.ZIndex = 7
+
+            local hLayout = Instance.new("UIListLayout", headerFlow)
+            hLayout.FillDirection = Enum.FillDirection.Horizontal
+            hLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+            hLayout.Padding = UDim.new(0, 4)
+            hLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+            -- 1. LEFT SIDE OF NAME: PREMIUM TEXTURED RANK MEDALLION (#1 to #100)
+            if hasRank then
+                local rankMedallion = Instance.new("Frame", headerFlow)
+                rankMedallion.Size = UDim2.fromOffset((bestR >= 100) and 30 or 25, 14)
+                rankMedallion.BackgroundColor3 = Color3.new(1, 1, 1)
+                rankMedallion.LayoutOrder = 1
+                rankMedallion.ZIndex = 8
+                Instance.new("UICorner", rankMedallion).CornerRadius = UDim.new(0, 4)
+
+                local rmGrad = Instance.new("UIGradient", rankMedallion)
+                rmGrad.Rotation = 35
+                rmGrad.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(48, 34, 12)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(22, 30, 48)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 52, 68))
+                })
+
+                local rmStroke = Instance.new("UIStroke", rankMedallion)
+                rmStroke.Thickness = 0.95
+                rmStroke.Color = accentCol
+
+                local rmTxt = Instance.new("TextLabel", rankMedallion)
+                rmTxt.Size = UDim2.fromScale(1, 1)
+                rmTxt.BackgroundTransparency = 1
+                rmTxt.Text = "#" .. tostring(bestR)
+                rmTxt.TextColor3 = accentCol
+                rmTxt.Font = Enum.Font.GothamBlack
+                rmTxt.TextSize = 7.8
+                rmTxt.ZIndex = 9
+            end
+
+            -- 2. USERNAME LABEL (Auto-sized so the tag sits right beside it!)
+            local displayUserStr = (isOwner and "👑 @" or (isReportMode and "🛠️ @" or "@")) .. tostring(uName or "Player")
+            local uLbl = Instance.new("TextLabel", headerFlow)
+            uLbl.AutomaticSize = Enum.AutomaticSize.X
+            uLbl.Size = UDim2.new(0, 0, 1, 0)
             uLbl.BackgroundTransparency = 1
-            uLbl.Text = headerPrefix .. tostring(uName or "Player")
+            uLbl.Text = displayUserStr
             uLbl.TextColor3 = accentCol
             uLbl.Font = Enum.Font.GothamBlack
-            uLbl.TextSize = 8.3
-            uLbl.TextXAlignment = Enum.TextXAlignment.Left
-            uLbl.TextTruncate = Enum.TextTruncate.AtEnd
-            uLbl.ZIndex = 7
+            uLbl.TextSize = 8.5
+            uLbl.LayoutOrder = 2
+            uLbl.ZIndex = 8
 
-            -- Live Rank & Animated Tag Pill in Chat Bubble for Rank 1-100 & Developer!
-            if isOwner or hasRank then
-                local chatBadgePill = Instance.new("Frame", row)
-                chatBadgePill.Size = UDim2.fromOffset(108, 13)
-                chatBadgePill.Position = UDim2.new(0, 132, 0, 3)
-                chatBadgePill.BackgroundColor3 = badge and badge.theme.tagBg or Color3.fromRGB(32, 24, 8)
-                chatBadgePill.ZIndex = 7
+            -- 3. IMMEDIATELY RIGHT OF NAME: PREMIUM ANIMATED TAG PILL
+            if isOwner or badge then
+                local tagTheme = badge and badge.theme or DEV_SPECIAL_THEME
+                local tagTitleStr = badge and badge.title or "👑 DEVELOPER"
+
+                local chatBadgePill = Instance.new("Frame", headerFlow)
+                chatBadgePill.Size = UDim2.fromOffset(92, 14)
+                chatBadgePill.BackgroundColor3 = tagTheme.tagBg
+                chatBadgePill.LayoutOrder = 3
+                chatBadgePill.ZIndex = 8
                 Instance.new("UICorner", chatBadgePill).CornerRadius = UDim.new(1, 0)
 
                 local cbStroke = Instance.new("UIStroke", chatBadgePill)
-                cbStroke.Thickness = 0.85
-                cbStroke.Color = accentCol
-                cbStroke.Transparency = 0.25
-
-                local badgeLabelStr = isOwner
-                    and (hasRank and string.format("👑 DEV • #%d", badge.rankNum) or "👑 DEVELOPER")
-                    or string.format("%s • #%d", badge.title, badge.rankNum)
+                cbStroke.Thickness = 0.9
+                cbStroke.Color = tagTheme.border
+                cbStroke.Transparency = 0.20
 
                 local cbCtrl = buildPremiumChromaTag(
                     chatBadgePill,
                     UDim2.fromScale(0.5, 0.5),
                     Vector2.new(0.5, 0.5),
-                    6.4,
-                    badge and badge.theme or DEV_SPECIAL_THEME,
-                    badgeLabelStr
+                    6.6,
+                    tagTheme,
+                    tagTitleStr
                 )
                 cbCtrl.setAlignment(Enum.TextXAlignment.Center)
             end
 
             local tLbl = Instance.new("TextLabel", row)
-            tLbl.Size = UDim2.new(0.18, -6, 0, 13)
+            tLbl.Size = UDim2.fromOffset(36, 13)
             tLbl.AnchorPoint = Vector2.new(1, 0)
-            tLbl.Position = UDim2.new(1, -6, 0, 3)
+            tLbl.Position = UDim2.new(1, -6, 0, 4)
             tLbl.BackgroundTransparency = 1
             tLbl.Text = tostring(timeStr or os.date("%H:%M"))
             tLbl.TextColor3 = Color3.fromRGB(130, 145, 175)
@@ -4423,8 +4649,8 @@ task.spawn(function()
             tLbl.ZIndex = 7
 
             local mLbl = Instance.new("TextLabel", row)
-            mLbl.Size = UDim2.new(1, -42, 0, 18)
-            mLbl.Position = UDim2.new(0, 36, 0, 19)
+            mLbl.Size = UDim2.new(1, -43, 0, 18)
+            mLbl.Position = UDim2.new(0, 37, 0, 21)
             mLbl.BackgroundTransparency = 1
             mLbl.Text = tostring(msgStr or "")
             mLbl.TextColor3 = Color3.fromRGB(244, 248, 255)
