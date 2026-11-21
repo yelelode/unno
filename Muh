@@ -418,8 +418,11 @@ local function setLagFreeMode(enable)
 end
 
 -- ========================================================
--- PART 2: PURE RAYFIELD NATIVE SMOOTHNESS + LIGHTWEIGHT GLASS
+-- PART 2: PURE RAYFIELD NATIVE SMOOTHNESS + LIGHTWEIGHT GLASS + UI SCALER
 -- ========================================================
+local currentUiScaleValue = 1.0
+local applyGlobalUiScale = nil
+
 local function getSafeGuiRoot()
     local root
     if gethui then
@@ -595,8 +598,36 @@ local function applyGlassyStyle(obj)
     end
 end
 
+local function attachWindowScaler(gui)
+    local mainWin = gui:FindFirstChild("Main")
+    if not mainWin or not mainWin:IsA("Frame") then return end
+
+    local uiScale = mainWin:FindFirstChild("TXR_CustomScaler")
+    if not uiScale then
+        uiScale = Instance.new("UIScale")
+        uiScale.Name = "TXR_CustomScaler"
+        uiScale.Scale = currentUiScaleValue
+        uiScale.Parent = mainWin
+    end
+
+    applyGlobalUiScale = function(newScale)
+        currentUiScaleValue = math.clamp(newScale, 0.70, 1.25)
+        if uiScale and uiScale.Parent then
+            TweenService:Create(uiScale, TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                Scale = currentUiScaleValue
+            }):Play()
+        end
+    end
+end
+
 local function applyTXRBranding(parent)
     if not parent then return end
+
+    for _, existing in ipairs(parent:GetChildren()) do
+        if existing:IsA("ScreenGui") and existing.Name == "TXR_UI" then
+            attachWindowScaler(existing)
+        end
+    end
 
     parent.ChildAdded:Connect(function(gui)
         if gui:IsA("ScreenGui") and gui.Name == "Rayfield" then
@@ -606,6 +637,7 @@ local function applyTXRBranding(parent)
                 applyGlassyStyle(desc)
             end
             gui.DescendantAdded:Connect(applyGlassyStyle)
+            task.defer(function() attachWindowScaler(gui) end)
         end
     end)
 end
@@ -2103,7 +2135,7 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- TAB 4.5: NEXT-GEN GLOBAL RANKINGS ARENA (5-TIER PODIUM & FEED)
+-- TAB 4.5: COMPACT NEXT-GEN GLOBAL RANKINGS ARENA
 -- Mode 1: TOP SPAMMERS (COM GOD -> SPAM GOD -> FLOOD KING -> MESSAGE BEAST -> CHAT MACHINE)
 -- Mode 2: TOP GRINDERS (NO-LIFE GOD -> AFK KING -> SERVER GHOST -> GRIND DEMON -> NIGHT OWL)
 -- ========================================================
@@ -2154,9 +2186,9 @@ task.spawn(function()
             if rkLabel.Visible then rkLabel.Visible = false end
         end)
 
-        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 514)
-        card.BackgroundColor3 = Color3.fromRGB(6, 8, 13)
-        card.BackgroundTransparency = 0.03
+        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 336)
+        card.BackgroundColor3 = Color3.fromRGB(7, 9, 15)
+        card.BackgroundTransparency = 0.04
         card.ClipsDescendants = true
 
         for _, child in ipairs(card:GetChildren()) do
@@ -2165,71 +2197,61 @@ task.spawn(function()
             end
         end
 
-        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 15)
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 12)
 
         local rkStroke = Instance.new("UIStroke", card)
-        rkStroke.Thickness = 1.5
+        rkStroke.Thickness = 1.35
         rkStroke.Color = Color3.new(1, 1, 1)
-        rkStroke.Transparency = 0.25
+        rkStroke.Transparency = 0.28
 
         local rkStrokeGrad = Instance.new("UIGradient", rkStroke)
         rkStrokeGrad.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 205, 45)),
             ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 240, 255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 65, 255))
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(185, 65, 255))
         })
 
-        -- Header Banner
-        local topHeader = Instance.new("Frame", card)
-        topHeader.Size = UDim2.new(1, -20, 0, 28)
-        topHeader.Position = UDim2.new(0, 10, 0, 8)
-        topHeader.BackgroundTransparency = 1
+        -- Compact Header + Switcher Row
+        local topBar = Instance.new("Frame", card)
+        topBar.Size = UDim2.new(1, -16, 0, 24)
+        topBar.Position = UDim2.new(0, 8, 0, 6)
+        topBar.BackgroundTransparency = 1
 
-        local titleLbl = Instance.new("TextLabel", topHeader)
-        titleLbl.Size = UDim2.new(0.68, 0, 1, 0)
+        local titleLbl = Instance.new("TextLabel", topBar)
+        titleLbl.Size = UDim2.new(0.62, 0, 1, 0)
         titleLbl.BackgroundTransparency = 1
-        titleLbl.Text = "🏆 EMP HALL OF LEGENDS"
-        titleLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        titleLbl.Text = "🏆 EMP RANKINGS"
+        titleLbl.TextColor3 = Color3.new(1, 1, 1)
         titleLbl.Font = Enum.Font.GothamBlack
-        titleLbl.TextSize = 14
+        titleLbl.TextSize = 11.5
         titleLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-        local seasonBadge = Instance.new("Frame", topHeader)
-        seasonBadge.Size = UDim2.fromOffset(92, 18)
-        seasonBadge.AnchorPoint = Vector2.new(1, 0.5)
-        seasonBadge.Position = UDim2.new(1, 0, 0.5, 0)
-        seasonBadge.BackgroundColor3 = Color3.fromRGB(22, 28, 46)
-        Instance.new("UICorner", seasonBadge).CornerRadius = UDim.new(1, 0)
+        local seasonPill = Instance.new("Frame", topBar)
+        seasonPill.Size = UDim2.fromOffset(82, 16)
+        seasonPill.AnchorPoint = Vector2.new(1, 0.5)
+        seasonPill.Position = UDim2.new(1, 0, 0.5, 0)
+        seasonPill.BackgroundColor3 = Color3.fromRGB(20, 26, 42)
+        Instance.new("UICorner", seasonPill).CornerRadius = UDim.new(1, 0)
 
-        local sBadgeStroke = Instance.new("UIStroke", seasonBadge)
-        sBadgeStroke.Thickness = 0.9
-        sBadgeStroke.Color = Color3.fromRGB(255, 210, 65)
-        sBadgeStroke.Transparency = 0.45
-
-        local seasonTxt = Instance.new("TextLabel", seasonBadge)
+        local seasonTxt = Instance.new("TextLabel", seasonPill)
         seasonTxt.Size = UDim2.fromScale(1, 1)
         seasonTxt.BackgroundTransparency = 1
-        seasonTxt.Text = "● " .. RANKING_SEASON_ID
+        seasonTxt.Text = RANKING_SEASON_ID
         seasonTxt.TextColor3 = Color3.fromRGB(255, 210, 65)
         seasonTxt.Font = Enum.Font.GothamBlack
-        seasonTxt.TextSize = 8
+        seasonTxt.TextSize = 7.5
 
-        -- Mode Switcher (TOP SPAMMERS || TOP GRINDERS)
         local switchBar = Instance.new("Frame", card)
-        switchBar.Size = UDim2.new(1, -20, 0, 34)
-        switchBar.Position = UDim2.new(0, 10, 0, 40)
+        switchBar.Size = UDim2.new(1, -16, 0, 24)
+        switchBar.Position = UDim2.new(0, 8, 0, 32)
         switchBar.BackgroundColor3 = Color3.fromRGB(15, 20, 32)
-        Instance.new("UICorner", switchBar).CornerRadius = UDim.new(0, 10)
-
-        local swStroke = Instance.new("UIStroke", switchBar)
-        swStroke.Thickness = 1.0
-        swStroke.Color = Color3.fromRGB(38, 48, 74)
+        Instance.new("UICorner", switchBar).CornerRadius = UDim.new(0, 7)
 
         local modeSlider = Instance.new("Frame", switchBar)
-        modeSlider.Size = UDim2.new(0.5, -4, 1, -4)
+        modeSlider.Size = UDim2.new(0.5, -3, 1, -4)
         modeSlider.Position = UDim2.new(0, 2, 0, 2)
         modeSlider.BackgroundColor3 = Color3.fromRGB(0, 165, 255)
-        Instance.new("UICorner", modeSlider).CornerRadius = UDim.new(0, 8)
+        Instance.new("UICorner", modeSlider).CornerRadius = UDim.new(0, 6)
 
         local spamModeBtn = Instance.new("TextButton", switchBar)
         spamModeBtn.Size = UDim2.new(0.5, 0, 1, 0)
@@ -2237,7 +2259,7 @@ task.spawn(function()
         spamModeBtn.Text = "⚡ TOP SPAMMERS"
         spamModeBtn.TextColor3 = Color3.new(1, 1, 1)
         spamModeBtn.Font = Enum.Font.GothamBlack
-        spamModeBtn.TextSize = 10
+        spamModeBtn.TextSize = 8.5
         spamModeBtn.ZIndex = 3
 
         local grindModeBtn = Instance.new("TextButton", switchBar)
@@ -2247,172 +2269,138 @@ task.spawn(function()
         grindModeBtn.Text = "⏱️ TOP GRINDERS"
         grindModeBtn.TextColor3 = Color3.fromRGB(175, 195, 225)
         grindModeBtn.Font = Enum.Font.GothamBlack
-        grindModeBtn.TextSize = 10
+        grindModeBtn.TextSize = 8.5
         grindModeBtn.ZIndex = 3
 
-        -- Top-3 Champions Podium Stage
+        -- Compact Top-3 Podium Stage (Fits cleanly without clipping)
         local podiumStage = Instance.new("Frame", card)
-        podiumStage.Size = UDim2.new(1, -20, 0, 156)
-        podiumStage.Position = UDim2.new(0, 10, 0, 80)
+        podiumStage.Size = UDim2.new(1, -16, 0, 102)
+        podiumStage.Position = UDim2.new(0, 8, 0, 60)
         podiumStage.BackgroundColor3 = Color3.fromRGB(12, 16, 27)
-        podiumStage.BackgroundTransparency = 0.06
-        Instance.new("UICorner", podiumStage).CornerRadius = UDim.new(0, 12)
-
-        local podGrad = Instance.new("UIGradient", podiumStage)
-        podGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(22, 26, 44)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(12, 16, 27)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(26, 16, 38))
-        })
-        podGrad.Rotation = 30
+        podiumStage.BackgroundTransparency = 0.08
+        Instance.new("UICorner", podiumStage).CornerRadius = UDim.new(0, 9)
 
         local podStroke = Instance.new("UIStroke", podiumStage)
-        podStroke.Thickness = 1.15
-        podStroke.Color = Color3.fromRGB(45, 58, 86)
+        podStroke.Thickness = 1
+        podStroke.Color = Color3.fromRGB(38, 50, 76)
 
-        local function createPodiumSlot(placeNum, xScale, widthScale, heightPx, accentColor, medalTag)
+        local function createCompactPodium(placeNum, xScale, widthScale, heightPx, accentColor, rankTag)
             local box = Instance.new("Frame", podiumStage)
-            box.Size = UDim2.new(widthScale, -6, 0, heightPx)
+            box.Size = UDim2.new(widthScale, -4, 0, heightPx)
             box.AnchorPoint = Vector2.new(0.5, 1)
-            box.Position = UDim2.new(xScale, 0, 1, -8)
-            box.BackgroundColor3 = (placeNum == 1) and Color3.fromRGB(24, 28, 46) or Color3.fromRGB(17, 22, 35)
-            Instance.new("UICorner", box).CornerRadius = UDim.new(0, 10)
+            box.Position = UDim2.new(xScale, 0, 1, -4)
+            box.BackgroundColor3 = (placeNum == 1) and Color3.fromRGB(22, 27, 44) or Color3.fromRGB(16, 21, 34)
+            Instance.new("UICorner", box).CornerRadius = UDim.new(0, 8)
 
             local bs = Instance.new("UIStroke", box)
-            bs.Thickness = (placeNum == 1) and 1.5 or 1.05
+            bs.Thickness = (placeNum == 1) and 1.35 or 0.95
             bs.Color = accentColor
-            bs.Transparency = (placeNum == 1) and 0.18 or 0.42
+            bs.Transparency = (placeNum == 1) and 0.20 or 0.45
 
-            local medalPill = Instance.new("TextLabel", box)
-            medalPill.Size = UDim2.new(0.84, 0, 0, 13)
-            medalPill.AnchorPoint = Vector2.new(0.5, 0)
-            medalPill.Position = UDim2.new(0.5, 0, 0, 4)
-            medalPill.BackgroundColor3 = accentColor
-            medalPill.BackgroundTransparency = 0.80
-            medalPill.Text = medalTag
-            medalPill.TextColor3 = accentColor
-            medalPill.Font = Enum.Font.GothamBlack
-            medalPill.TextSize = 7.5
-            Instance.new("UICorner", medalPill).CornerRadius = UDim.new(1, 0)
-
-            local avSize = (placeNum == 1) and 42 or 34
+            local avSize = (placeNum == 1) and 28 or 24
             local av = Instance.new("ImageLabel", box)
             av.Size = UDim2.fromOffset(avSize, avSize)
             av.AnchorPoint = Vector2.new(0.5, 0)
-            av.Position = UDim2.new(0.5, 0, 0, 20)
+            av.Position = UDim2.new(0.5, 0, 0, 4)
             av.BackgroundColor3 = Color3.fromRGB(10, 13, 20)
             av.Image = "rbxthumb://type=AvatarHeadShot&id=9685785248&w=100&h=100"
             Instance.new("UICorner", av).CornerRadius = UDim.new(1, 0)
 
             local avStroke = Instance.new("UIStroke", av)
-            avStroke.Thickness = (placeNum == 1) and 1.8 or 1.35
+            avStroke.Thickness = 1.4
             avStroke.Color = accentColor
 
             local tierLbl = Instance.new("TextLabel", box)
-            tierLbl.Size = UDim2.new(1, -6, 0, 14)
-            tierLbl.Position = UDim2.new(0, 3, 0, 22 + avSize)
+            tierLbl.Size = UDim2.new(1, -4, 0, 12)
+            tierLbl.Position = UDim2.new(0, 2, 0, 5 + avSize)
             tierLbl.BackgroundTransparency = 1
-            tierLbl.Text = (placeNum == 1) and "👑 COM GOD" or ((placeNum == 2) and "⚡ SPAM GOD" or "🔥 FLOOD KING")
+            tierLbl.Text = rankTag
             tierLbl.TextColor3 = accentColor
             tierLbl.Font = Enum.Font.GothamBlack
-            tierLbl.TextSize = (placeNum == 1) and 8.5 or 7.5
+            tierLbl.TextSize = 7.5
             tierLbl.TextTruncate = Enum.TextTruncate.AtEnd
 
             local nameLbl = Instance.new("TextLabel", box)
-            nameLbl.Size = UDim2.new(1, -8, 0, 13)
-            nameLbl.Position = UDim2.new(0, 4, 0, 36 + avSize)
+            nameLbl.Size = UDim2.new(1, -6, 0, 12)
+            nameLbl.Position = UDim2.new(0, 3, 0, 17 + avSize)
             nameLbl.BackgroundTransparency = 1
             nameLbl.Text = "---"
             nameLbl.TextColor3 = Color3.new(1, 1, 1)
             nameLbl.Font = Enum.Font.GothamBold
-            nameLbl.TextSize = 9
+            nameLbl.TextSize = 8
             nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
 
             local scoreLbl = Instance.new("TextLabel", box)
-            scoreLbl.Size = UDim2.new(1, -8, 0, 13)
-            scoreLbl.Position = UDim2.new(0, 4, 0, 49 + avSize)
+            scoreLbl.Size = UDim2.new(1, -6, 0, 12)
+            scoreLbl.Position = UDim2.new(0, 3, 0, 29 + avSize)
             scoreLbl.BackgroundTransparency = 1
             scoreLbl.Text = "0 PKT"
-            scoreLbl.TextColor3 = Color3.fromRGB(185, 210, 245)
+            scoreLbl.TextColor3 = Color3.fromRGB(175, 200, 235)
             scoreLbl.Font = Enum.Font.Code
-            scoreLbl.TextSize = 8.5
+            scoreLbl.TextSize = 8
 
             return {avatar = av, tier = tierLbl, name = nameLbl, score = scoreLbl}
         end
 
-        local pod2 = createPodiumSlot(2, 0.175, 0.32, 122, Color3.fromRGB(0, 235, 255), "#2 SILVER")
-        local pod1 = createPodiumSlot(1, 0.500, 0.34, 140, Color3.fromRGB(255, 208, 48), "#1 GOLD")
-        local pod3 = createPodiumSlot(3, 0.825, 0.32, 116, Color3.fromRGB(190, 95, 255), "#3 BRONZE")
+        local pod2 = createCompactPodium(2, 0.175, 0.32, 84, Color3.fromRGB(0, 235, 255), "⚡ SPAM GOD")
+        local pod1 = createCompactPodium(1, 0.500, 0.34, 94, Color3.fromRGB(255, 208, 48), "👑 COM GOD")
+        local pod3 = createCompactPodium(3, 0.825, 0.32, 80, Color3.fromRGB(190, 95, 255), "🔥 FLOOD KING")
         local podiumSlots = {pod1, pod2, pod3}
 
-        -- Ranked Feed (#4 to #25)
+        -- Ranked List (#4 to #25)
         local rankScroll = Instance.new("ScrollingFrame", card)
-        rankScroll.Size = UDim2.new(1, -20, 0, 216)
-        rankScroll.Position = UDim2.new(0, 10, 0, 242)
+        rankScroll.Size = UDim2.new(1, -16, 0, 130)
+        rankScroll.Position = UDim2.new(0, 8, 0, 166)
         rankScroll.BackgroundColor3 = Color3.fromRGB(11, 14, 21)
         rankScroll.BackgroundTransparency = 0.12
         rankScroll.ScrollBarThickness = 2
         rankScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 225, 255)
         rankScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
         rankScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        Instance.new("UICorner", rankScroll).CornerRadius = UDim.new(0, 11)
-
-        local rScrollStroke = Instance.new("UIStroke", rankScroll)
-        rScrollStroke.Thickness = 0.9
-        rScrollStroke.Color = Color3.fromRGB(32, 42, 64)
+        Instance.new("UICorner", rankScroll).CornerRadius = UDim.new(0, 8)
 
         local rankListLayout = Instance.new("UIListLayout", rankScroll)
-        rankListLayout.Padding = UDim.new(0, 6)
+        rankListLayout.Padding = UDim.new(0, 4)
         rankListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
         local rankPad = Instance.new("UIPadding", rankScroll)
-        rankPad.PaddingTop = UDim.new(0, 6)
-        rankPad.PaddingBottom = UDim.new(0, 6)
-        rankPad.PaddingLeft = UDim.new(0, 6)
-        rankPad.PaddingRight = UDim.new(0, 6)
+        rankPad.PaddingTop = UDim.new(0, 4)
+        rankPad.PaddingBottom = UDim.new(0, 4)
+        rankPad.PaddingLeft = UDim.new(0, 5)
+        rankPad.PaddingRight = UDim.new(0, 5)
 
-        -- Sticky Footer: YOUR LIVE RANK + NEXT RANK GAP
+        -- Sticky Footer: YOUR LIVE RANK
         local myRankBar = Instance.new("Frame", card)
-        myRankBar.Size = UDim2.new(1, -20, 0, 40)
+        myRankBar.Size = UDim2.new(1, -16, 0, 28)
         myRankBar.AnchorPoint = Vector2.new(0.5, 1)
-        myRankBar.Position = UDim2.new(0.5, 0, 1, -8)
+        myRankBar.Position = UDim2.new(0.5, 0, 1, -6)
         myRankBar.BackgroundColor3 = Color3.fromRGB(18, 26, 44)
-        Instance.new("UICorner", myRankBar).CornerRadius = UDim.new(0, 10)
+        Instance.new("UICorner", myRankBar).CornerRadius = UDim.new(0, 8)
 
         local myRankStroke = Instance.new("UIStroke", myRankBar)
-        myRankStroke.Thickness = 1.2
+        myRankStroke.Thickness = 1.1
         myRankStroke.Color = Color3.fromRGB(0, 235, 255)
-        myRankStroke.Transparency = 0.30
+        myRankStroke.Transparency = 0.35
 
         local myRankLeft = Instance.new("TextLabel", myRankBar)
-        myRankLeft.Size = UDim2.new(0.66, 0, 0, 18)
-        myRankLeft.Position = UDim2.new(0, 12, 0, 3)
+        myRankLeft.Size = UDim2.new(0.68, 0, 1, 0)
+        myRankLeft.Position = UDim2.new(0, 8, 0, 0)
         myRankLeft.BackgroundTransparency = 1
-        myRankLeft.Text = "YOUR RANK: #1  •  👑 COM GOD"
-        myRankLeft.TextColor3 = Color3.fromRGB(255, 255, 255)
+        myRankLeft.Text = "RANK #1 • 👑 COM GOD"
+        myRankLeft.TextColor3 = Color3.new(1, 1, 1)
         myRankLeft.Font = Enum.Font.GothamBlack
-        myRankLeft.TextSize = 9.5
+        myRankLeft.TextSize = 8.5
         myRankLeft.TextXAlignment = Enum.TextXAlignment.Left
 
-        local myNextGoalLbl = Instance.new("TextLabel", myRankBar)
-        myNextGoalLbl.Size = UDim2.new(0.66, 0, 0, 14)
-        myNextGoalLbl.Position = UDim2.new(0, 12, 0, 21)
-        myNextGoalLbl.BackgroundTransparency = 1
-        myNextGoalLbl.Text = "★ APEX THRONE REACHED"
-        myNextGoalLbl.TextColor3 = Color3.fromRGB(155, 185, 225)
-        myNextGoalLbl.Font = Enum.Font.GothamBold
-        myNextGoalLbl.TextSize = 8
-        myNextGoalLbl.TextXAlignment = Enum.TextXAlignment.Left
-
         local myRankRight = Instance.new("TextLabel", myRankBar)
-        myRankRight.Size = UDim2.new(0.30, -12, 1, 0)
+        myRankRight.Size = UDim2.new(0.30, -8, 1, 0)
         myRankRight.AnchorPoint = Vector2.new(1, 0)
-        myRankRight.Position = UDim2.new(1, -12, 0, 0)
+        myRankRight.Position = UDim2.new(1, -8, 0, 0)
         myRankRight.BackgroundTransparency = 1
         myRankRight.Text = "0 PKT"
         myRankRight.TextColor3 = Color3.fromRGB(75, 245, 175)
         myRankRight.Font = Enum.Font.Code
-        myRankRight.TextSize = 10.5
+        myRankRight.TextSize = 9
         myRankRight.TextXAlignment = Enum.TextXAlignment.Right
 
         local function getTierForRank(rankNum, mode)
@@ -2458,16 +2446,15 @@ task.spawn(function()
             for place = 1, 3 do
                 local slot = podiumSlots[place]
                 local pData = sorted[place]
+                slot.tier.Text = getTierForRank(place, rankState.activeMode)
                 if pData then
                     local scoreVal = isSpam and (pData.spam or 0) or (pData.grind or 0)
                     slot.avatar.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", tonumber(pData.uid) or 9685785248)
-                    slot.tier.Text = getTierForRank(place, rankState.activeMode)
                     slot.name.Text = "@" .. tostring(pData.name or "Player")
                     slot.score.Text = string.format("%d %s", scoreVal, unitSuffix)
                 else
                     slot.avatar.Image = "rbxthumb://type=AvatarHeadShot&id=9685785248&w=100&h=100"
-                    slot.tier.Text = getTierForRank(place, rankState.activeMode)
-                    slot.name.Text = "OPEN SPOT"
+                    slot.name.Text = "---"
                     slot.score.Text = "0 " .. unitSuffix
                 end
             end
@@ -2492,86 +2479,73 @@ task.spawn(function()
                         or ((idx == 5) and Color3.fromRGB(0, 235, 165) or Color3.fromRGB(135, 165, 225))
 
                     local row = Instance.new("Frame", rankScroll)
-                    row.Size = UDim2.new(1, 0, 0, 42)
+                    row.Size = UDim2.new(1, 0, 0, 32)
                     row.BackgroundColor3 = isMe and Color3.fromRGB(24, 35, 56) or Color3.fromRGB(16, 21, 33)
                     row.LayoutOrder = idx
-                    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 9)
-
-                    local rScale = Instance.new("UIScale", row)
-                    rScale.Scale = 0.94
-                    TweenService:Create(rScale, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+                    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
 
                     local rStroke = Instance.new("UIStroke", row)
-                    rStroke.Thickness = (isTop5 or isMe) and 1.15 or 0.85
+                    rStroke.Thickness = (isTop5 or isMe) and 1.0 or 0.75
                     rStroke.Color = accentCol
                     rStroke.Transparency = (isTop5 or isMe) and 0.30 or 0.72
 
                     local rankNumLbl = Instance.new("TextLabel", row)
-                    rankNumLbl.Size = UDim2.fromOffset(32, 42)
+                    rankNumLbl.Size = UDim2.fromOffset(26, 32)
                     rankNumLbl.BackgroundTransparency = 1
                     rankNumLbl.Text = string.format("#%02d", idx)
                     rankNumLbl.TextColor3 = accentCol
                     rankNumLbl.Font = Enum.Font.GothamBlack
-                    rankNumLbl.TextSize = 10
+                    rankNumLbl.TextSize = 8.5
 
                     local av = Instance.new("ImageLabel", row)
-                    av.Size = UDim2.fromOffset(28, 28)
+                    av.Size = UDim2.fromOffset(22, 22)
                     av.AnchorPoint = Vector2.new(0, 0.5)
-                    av.Position = UDim2.new(0, 34, 0.5, 0)
+                    av.Position = UDim2.new(0, 28, 0.5, 0)
                     av.BackgroundColor3 = Color3.fromRGB(10, 13, 20)
                     av.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", tonumber(entry.uid) or 9685785248)
                     Instance.new("UICorner", av).CornerRadius = UDim.new(1, 0)
 
                     local uNameLbl = Instance.new("TextLabel", row)
-                    uNameLbl.Size = UDim2.new(0.46, 0, 0, 15)
-                    uNameLbl.Position = UDim2.new(0, 68, 0, 5)
+                    uNameLbl.Size = UDim2.new(0.46, 0, 0, 13)
+                    uNameLbl.Position = UDim2.new(0, 54, 0, 3)
                     uNameLbl.BackgroundTransparency = 1
-                    uNameLbl.Text = "@" .. tostring(entry.name or "Player") .. (isMe and " (YOU)" or "")
+                    uNameLbl.Text = "@" .. tostring(entry.name or "Player")
                     uNameLbl.TextColor3 = Color3.new(1, 1, 1)
                     uNameLbl.Font = Enum.Font.GothamBold
-                    uNameLbl.TextSize = 9.5
+                    uNameLbl.TextSize = 8.5
                     uNameLbl.TextXAlignment = Enum.TextXAlignment.Left
                     uNameLbl.TextTruncate = Enum.TextTruncate.AtEnd
 
                     local tierSubLbl = Instance.new("TextLabel", row)
-                    tierSubLbl.Size = UDim2.new(0.46, 0, 0, 13)
-                    tierSubLbl.Position = UDim2.new(0, 68, 0, 22)
+                    tierSubLbl.Size = UDim2.new(0.46, 0, 0, 12)
+                    tierSubLbl.Position = UDim2.new(0, 54, 0, 17)
                     tierSubLbl.BackgroundTransparency = 1
                     tierSubLbl.Text = getTierForRank(idx, rankState.activeMode)
                     tierSubLbl.TextColor3 = accentCol
                     tierSubLbl.Font = Enum.Font.GothamBlack
-                    tierSubLbl.TextSize = 8
+                    tierSubLbl.TextSize = 7.5
                     tierSubLbl.TextXAlignment = Enum.TextXAlignment.Left
 
                     local valLbl = Instance.new("TextLabel", row)
-                    valLbl.Size = UDim2.new(0.28, -10, 1, 0)
+                    valLbl.Size = UDim2.new(0.28, -8, 1, 0)
                     valLbl.AnchorPoint = Vector2.new(1, 0)
-                    valLbl.Position = UDim2.new(1, -10, 0, 0)
+                    valLbl.Position = UDim2.new(1, -8, 0, 0)
                     valLbl.BackgroundTransparency = 1
                     valLbl.Text = string.format("%d %s", isSpam and (entry.spam or 0) or (entry.grind or 0), unitSuffix)
                     valLbl.TextColor3 = Color3.fromRGB(220, 235, 255)
                     valLbl.Font = Enum.Font.Code
-                    valLbl.TextSize = 9.5
+                    valLbl.TextSize = 8.5
                     valLbl.TextXAlignment = Enum.TextXAlignment.Right
                 end
             end
 
-            myRankLeft.Text = string.format("YOUR RANK: #%d  •  %s", myRankNum, getTierForRank(myRankNum, rankState.activeMode))
+            myRankLeft.Text = string.format("RANK #%d • %s", myRankNum, getTierForRank(myRankNum, rankState.activeMode))
             myRankRight.Text = string.format("%d %s", myScoreVal, unitSuffix)
-
-            if myRankNum > 1 and sorted[myRankNum - 1] then
-                local aboveEntry = sorted[myRankNum - 1]
-                local aboveScore = isSpam and (aboveEntry.spam or 0) or (aboveEntry.grind or 0)
-                local diff = math.max(1, (aboveScore - myScoreVal) + 1)
-                myNextGoalLbl.Text = string.format("+%d %s to pass #%d (@%s)", diff, unitSuffix, myRankNum - 1, tostring(aboveEntry.name or "Player"))
-            else
-                myNextGoalLbl.Text = "👑 #1 THRONE HOLDER"
-            end
         end
 
         spamModeBtn.MouseButton1Click:Connect(function()
             rankState.activeMode = "SPAM"
-            TweenService:Create(modeSlider, TweenInfo.new(0.26, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            TweenService:Create(modeSlider, TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                 Position = UDim2.new(0, 2, 0, 2),
                 BackgroundColor3 = Color3.fromRGB(0, 165, 255)
             }):Play()
@@ -2582,7 +2556,7 @@ task.spawn(function()
 
         grindModeBtn.MouseButton1Click:Connect(function()
             rankState.activeMode = "GRIND"
-            TweenService:Create(modeSlider, TweenInfo.new(0.26, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            TweenService:Create(modeSlider, TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                 Position = UDim2.new(0.5, 2, 0, 2),
                 BackgroundColor3 = Color3.fromRGB(165, 65, 255)
             }):Play()
@@ -2659,7 +2633,7 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- TAB 5: NEXT-GEN CYBER CREATOR MILESTONE & LIVE ARENA
+-- TAB 5: COMPACT NEXT-GEN POLL & LIVE CHAT CONSOLE
 -- ========================================================
 local LIKE_TARGET_GOAL = 1000
 local LOCAL_LOCK_FILE = "txr_emp_vote_" .. UPDATE_CAMPAIGN_ID .. "_" .. tostring(lp and lp.UserId or 0) .. ".txt"
@@ -2723,9 +2697,9 @@ task.spawn(function()
             if hubLabel.Visible then hubLabel.Visible = false end
         end)
 
-        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 504)
-        card.BackgroundColor3 = Color3.fromRGB(6, 8, 13)
-        card.BackgroundTransparency = 0.03
+        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 336)
+        card.BackgroundColor3 = Color3.fromRGB(7, 9, 15)
+        card.BackgroundTransparency = 0.04
         card.ClipsDescendants = true
 
         for _, child in ipairs(card:GetChildren()) do
@@ -2734,19 +2708,18 @@ task.spawn(function()
             end
         end
 
-        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 15)
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 12)
 
         local masterStroke = Instance.new("UIStroke", card)
-        masterStroke.Thickness = 1.5
+        masterStroke.Thickness = 1.35
         masterStroke.Color = Color3.new(1, 1, 1)
-        masterStroke.Transparency = 0.25
+        masterStroke.Transparency = 0.28
 
         local masterStrokeGrad = Instance.new("UIGradient", masterStroke)
         masterStrokeGrad.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 245, 255)),
-            ColorSequenceKeypoint.new(0.35, Color3.fromRGB(165, 65, 255)),
-            ColorSequenceKeypoint.new(0.7, Color3.fromRGB(255, 45, 115)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 245, 255))
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(175, 65, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 45, 115))
         })
 
         local function spawnJuiceExplosion(parentObj, posUDim, count)
@@ -2754,12 +2727,11 @@ task.spawn(function()
                 Color3.fromRGB(0, 245, 255),
                 Color3.fromRGB(255, 65, 145),
                 Color3.fromRGB(175, 85, 255),
-                Color3.fromRGB(75, 255, 165),
-                Color3.fromRGB(255, 215, 65)
+                Color3.fromRGB(75, 255, 165)
             }
-            for i = 1, (count or 28) do
+            for i = 1, (count or 22) do
                 local dot = Instance.new("Frame", parentObj)
-                local sz = math.random(4, 8)
+                local sz = math.random(3, 6)
                 dot.Size = UDim2.fromOffset(sz, sz)
                 dot.AnchorPoint = Vector2.new(0.5, 0.5)
                 dot.Position = posUDim
@@ -2769,126 +2741,81 @@ task.spawn(function()
                 Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
 
                 local angle = math.rad(math.random(0, 360))
-                local dist = math.random(40, 130)
+                local dist = math.random(28, 85)
                 local dx = math.cos(angle) * dist
-                local dy = math.sin(angle) * dist * 0.65
+                local dy = math.sin(angle) * dist * 0.6
 
-                TweenService:Create(dot, TweenInfo.new(0.6 + math.random() * 0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                TweenService:Create(dot, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                     Position = UDim2.new(posUDim.X.Scale, posUDim.X.Offset + dx, posUDim.Y.Scale, posUDim.Y.Offset + dy),
                     Size = UDim2.fromOffset(0, 0),
                     BackgroundTransparency = 1
                 }):Play()
 
-                task.delay(0.9, function()
+                task.delay(0.75, function()
                     if dot and dot.Parent then dot:Destroy() end
                 end)
             end
-
-            local pop = Instance.new("TextLabel", parentObj)
-            pop.Size = UDim2.fromOffset(115, 24)
-            pop.AnchorPoint = Vector2.new(0.5, 0.5)
-            pop.Position = posUDim
-            pop.BackgroundTransparency = 1
-            pop.Text = "+1 LIKE! 🔥"
-            pop.TextColor3 = Color3.fromRGB(75, 255, 165)
-            pop.Font = Enum.Font.GothamBlack
-            pop.TextSize = 15
-            pop.ZIndex = 65
-
-            local pStroke = Instance.new("UIStroke", pop)
-            pStroke.Thickness = 1.5
-            pStroke.Color = Color3.new(0, 0, 0)
-
-            TweenService:Create(pop, TweenInfo.new(0.85, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                Position = UDim2.new(posUDim.X.Scale, posUDim.X.Offset, posUDim.Y.Scale, posUDim.Y.Offset - 45),
-                TextTransparency = 1
-            }):Play()
-            TweenService:Create(pStroke, TweenInfo.new(0.85), {Transparency = 1}):Play()
-            task.delay(0.9, function()
-                if pop and pop.Parent then pop:Destroy() end
-            end)
         end
 
+        -- 1. Compact Milestone Card (1000 Likes For Next Update)
         local goalBox = Instance.new("Frame", card)
-        goalBox.Size = UDim2.new(1, -20, 0, 142)
-        goalBox.Position = UDim2.new(0, 10, 0, 10)
+        goalBox.Size = UDim2.new(1, -16, 0, 96)
+        goalBox.Position = UDim2.new(0, 8, 0, 6)
         goalBox.BackgroundColor3 = Color3.fromRGB(13, 17, 28)
-        goalBox.BackgroundTransparency = 0.05
+        goalBox.BackgroundTransparency = 0.06
         goalBox.ClipsDescendants = true
-        Instance.new("UICorner", goalBox).CornerRadius = UDim.new(0, 12)
-
-        local goalGradBg = Instance.new("UIGradient", goalBox)
-        goalGradBg.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(22, 28, 48)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(13, 17, 28)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(26, 16, 40))
-        })
-        goalGradBg.Rotation = 25
+        Instance.new("UICorner", goalBox).CornerRadius = UDim.new(0, 9)
 
         local goalStroke = Instance.new("UIStroke", goalBox)
-        goalStroke.Thickness = 1.2
+        goalStroke.Thickness = 1.05
         goalStroke.Color = Color3.fromRGB(0, 235, 255)
         goalStroke.Transparency = 0.42
 
-        local goalTopBadge = Instance.new("TextLabel", goalBox)
-        goalTopBadge.Size = UDim2.new(0.68, 0, 0, 15)
-        goalTopBadge.Position = UDim2.new(0, 12, 0, 8)
-        goalTopBadge.BackgroundTransparency = 1
-        goalTopBadge.Text = "🎬 NEXT UPDATE MILESTONE  •  " .. UPDATE_CAMPAIGN_ID
-        goalTopBadge.TextColor3 = Color3.fromRGB(255, 85, 135)
-        goalTopBadge.Font = Enum.Font.GothamBlack
-        goalTopBadge.TextSize = 9
-        goalTopBadge.TextXAlignment = Enum.TextXAlignment.Left
+        local goalTitle = Instance.new("TextLabel", goalBox)
+        goalTitle.Size = UDim2.new(0.74, 0, 0, 16)
+        goalTitle.Position = UDim2.new(0, 8, 0, 5)
+        goalTitle.BackgroundTransparency = 1
+        goalTitle.Text = "🎬 1000 LIKES FOR NEXT UPDATE"
+        goalTitle.TextColor3 = Color3.new(1, 1, 1)
+        goalTitle.Font = Enum.Font.GothamBlack
+        goalTitle.TextSize = 11
+        goalTitle.TextXAlignment = Enum.TextXAlignment.Left
 
-        local statusPill = Instance.new("Frame", goalBox)
-        statusPill.Size = UDim2.fromOffset(78, 18)
-        statusPill.AnchorPoint = Vector2.new(1, 0)
-        statusPill.Position = UDim2.new(1, -10, 0, 8)
-        statusPill.BackgroundColor3 = Color3.fromRGB(16, 36, 30)
-        Instance.new("UICorner", statusPill).CornerRadius = UDim.new(1, 0)
-
-        local statusPillLbl = Instance.new("TextLabel", statusPill)
-        statusPillLbl.Size = UDim2.fromScale(1, 1)
-        statusPillLbl.BackgroundTransparency = 1
+        local statusPillLbl = Instance.new("TextLabel", goalBox)
+        statusPillLbl.Size = UDim2.fromOffset(66, 15)
+        statusPillLbl.AnchorPoint = Vector2.new(1, 0)
+        statusPillLbl.Position = UDim2.new(1, -8, 0, 5)
+        statusPillLbl.BackgroundColor3 = Color3.fromRGB(16, 36, 30)
         statusPillLbl.Text = "● LIVE GOAL"
         statusPillLbl.TextColor3 = Color3.fromRGB(75, 245, 165)
         statusPillLbl.Font = Enum.Font.GothamBlack
-        statusPillLbl.TextSize = 8.5
-
-        local goalTitle = Instance.new("TextLabel", goalBox)
-        goalTitle.Size = UDim2.new(1, -24, 0, 20)
-        goalTitle.Position = UDim2.new(0, 12, 0, 24)
-        goalTitle.BackgroundTransparency = 1
-        goalTitle.Text = "1000 LIKES FOR NEXT UPDATE"
-        goalTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-        goalTitle.Font = Enum.Font.GothamBlack
-        goalTitle.TextSize = 15
-        goalTitle.TextXAlignment = Enum.TextXAlignment.Left
+        statusPillLbl.TextSize = 7.5
+        Instance.new("UICorner", statusPillLbl).CornerRadius = UDim.new(1, 0)
 
         local counterRow = Instance.new("TextLabel", goalBox)
-        counterRow.Size = UDim2.new(0.68, 0, 0, 16)
-        counterRow.Position = UDim2.new(0, 12, 0, 46)
+        counterRow.Size = UDim2.new(0.65, 0, 0, 14)
+        counterRow.Position = UDim2.new(0, 8, 0, 22)
         counterRow.BackgroundTransparency = 1
         counterRow.Text = "0 / 1000 LIKES"
         counterRow.TextColor3 = Color3.fromRGB(0, 245, 255)
         counterRow.Font = Enum.Font.GothamBlack
-        counterRow.TextSize = 11.5
+        counterRow.TextSize = 9.5
         counterRow.TextXAlignment = Enum.TextXAlignment.Left
 
         local pctText = Instance.new("TextLabel", goalBox)
-        pctText.Size = UDim2.new(0.28, 0, 0, 16)
+        pctText.Size = UDim2.new(0.30, 0, 0, 14)
         pctText.AnchorPoint = Vector2.new(1, 0)
-        pctText.Position = UDim2.new(1, -12, 0, 46)
+        pctText.Position = UDim2.new(1, -8, 0, 22)
         pctText.BackgroundTransparency = 1
         pctText.Text = "0.0%"
         pctText.TextColor3 = Color3.fromRGB(175, 195, 225)
         pctText.Font = Enum.Font.Code
-        pctText.TextSize = 11
+        pctText.TextSize = 9
         pctText.TextXAlignment = Enum.TextXAlignment.Right
 
         local barTrack = Instance.new("Frame", goalBox)
-        barTrack.Size = UDim2.new(1, -24, 0, 12)
-        barTrack.Position = UDim2.new(0, 12, 0, 66)
+        barTrack.Size = UDim2.new(1, -16, 0, 8)
+        barTrack.Position = UDim2.new(0, 8, 0, 39)
         barTrack.BackgroundColor3 = Color3.fromRGB(7, 10, 16)
         barTrack.ClipsDescendants = true
         Instance.new("UICorner", barTrack).CornerRadius = UDim.new(1, 0)
@@ -2907,18 +2834,18 @@ task.spawn(function()
         })
 
         local likeBtn = Instance.new("TextButton", goalBox)
-        likeBtn.Size = UDim2.new(1, -24, 0, 44)
-        likeBtn.Position = UDim2.new(0, 12, 0, 86)
+        likeBtn.Size = UDim2.new(1, -16, 0, 32)
+        likeBtn.Position = UDim2.new(0, 8, 0, 54)
         likeBtn.BackgroundColor3 = Color3.new(1, 1, 1)
         likeBtn.Text = ""
         likeBtn.AutoButtonColor = false
         likeBtn.ClipsDescendants = true
-        Instance.new("UICorner", likeBtn).CornerRadius = UDim.new(0, 10)
+        Instance.new("UICorner", likeBtn).CornerRadius = UDim.new(0, 8)
 
         local likeBtnScale = Instance.new("UIScale", likeBtn)
 
         local btnStroke = Instance.new("UIStroke", likeBtn)
-        btnStroke.Thickness = 1.25
+        btnStroke.Thickness = 1.1
         btnStroke.Color = Color3.fromRGB(140, 235, 255)
         btnStroke.Transparency = 0.28
 
@@ -2935,7 +2862,7 @@ task.spawn(function()
         shineLayer.BackgroundTransparency = 0
         shineLayer.BorderSizePixel = 0
         shineLayer.ZIndex = 2
-        Instance.new("UICorner", shineLayer).CornerRadius = UDim.new(0, 10)
+        Instance.new("UICorner", shineLayer).CornerRadius = UDim.new(0, 8)
 
         local shineGrad = Instance.new("UIGradient", shineLayer)
         shineGrad.Rotation = 22
@@ -2954,89 +2881,89 @@ task.spawn(function()
         likeBtnText.Text = "👍  LIKE FOR NEXT UPDATE"
         likeBtnText.TextColor3 = Color3.new(1, 1, 1)
         likeBtnText.Font = Enum.Font.GothamBlack
-        likeBtnText.TextSize = 12.5
+        likeBtnText.TextSize = 10.5
         likeBtnText.ZIndex = 3
 
+        -- 2. Compact Console: CHAT || Report Bugs & Next Update Features
         local monitorBox = Instance.new("Frame", card)
-        monitorBox.Size = UDim2.new(1, -20, 0, 336)
-        monitorBox.Position = UDim2.new(0, 10, 0, 158)
+        monitorBox.Size = UDim2.new(1, -16, 0, 224)
+        monitorBox.Position = UDim2.new(0, 8, 0, 106)
         monitorBox.BackgroundColor3 = Color3.fromRGB(11, 14, 21)
-        monitorBox.BackgroundTransparency = 0.05
+        monitorBox.BackgroundTransparency = 0.06
         monitorBox.ClipsDescendants = true
-        Instance.new("UICorner", monitorBox).CornerRadius = UDim.new(0, 12)
+        Instance.new("UICorner", monitorBox).CornerRadius = UDim.new(0, 9)
 
         local monStroke = Instance.new("UIStroke", monitorBox)
-        monStroke.Thickness = 1.2
+        monStroke.Thickness = 1.05
         monStroke.Color = Color3.fromRGB(38, 48, 74)
 
         local switchBar = Instance.new("Frame", monitorBox)
-        switchBar.Size = UDim2.new(1, -12, 0, 32)
-        switchBar.Position = UDim2.new(0, 6, 0, 6)
+        switchBar.Size = UDim2.new(1, -8, 0, 24)
+        switchBar.Position = UDim2.new(0, 4, 0, 4)
         switchBar.BackgroundColor3 = Color3.fromRGB(16, 20, 32)
-        Instance.new("UICorner", switchBar).CornerRadius = UDim.new(0, 9)
+        Instance.new("UICorner", switchBar).CornerRadius = UDim.new(0, 7)
 
         local activePillSlider = Instance.new("Frame", switchBar)
-        activePillSlider.Size = UDim2.new(0.38, -4, 1, -4)
+        activePillSlider.Size = UDim2.new(0.36, -3, 1, -4)
         activePillSlider.Position = UDim2.new(0, 2, 0, 2)
         activePillSlider.BackgroundColor3 = Color3.fromRGB(0, 165, 255)
-        Instance.new("UICorner", activePillSlider).CornerRadius = UDim.new(0, 7)
+        Instance.new("UICorner", activePillSlider).CornerRadius = UDim.new(0, 5)
 
         local chatTabBtn = Instance.new("TextButton", switchBar)
-        chatTabBtn.Size = UDim2.new(0.38, 0, 1, 0)
-        chatTabBtn.Position = UDim2.new(0, 0, 0, 0)
+        chatTabBtn.Size = UDim2.new(0.36, 0, 1, 0)
         chatTabBtn.BackgroundTransparency = 1
         chatTabBtn.Text = "💬 CHAT"
         chatTabBtn.TextColor3 = Color3.new(1, 1, 1)
         chatTabBtn.Font = Enum.Font.GothamBlack
-        chatTabBtn.TextSize = 10
+        chatTabBtn.TextSize = 8.5
         chatTabBtn.ZIndex = 3
 
         local reportsTabBtn = Instance.new("TextButton", switchBar)
-        reportsTabBtn.Size = UDim2.new(0.62, 0, 1, 0)
-        reportsTabBtn.Position = UDim2.new(0.38, 0, 0, 0)
+        reportsTabBtn.Size = UDim2.new(0.64, 0, 1, 0)
+        reportsTabBtn.Position = UDim2.new(0.36, 0, 0, 0)
         reportsTabBtn.BackgroundTransparency = 1
         reportsTabBtn.Text = "🛠️ Report Bugs & Next Update Features"
         reportsTabBtn.TextColor3 = Color3.fromRGB(175, 195, 225)
         reportsTabBtn.Font = Enum.Font.GothamBlack
-        reportsTabBtn.TextSize = 8.5
+        reportsTabBtn.TextSize = 7.5
         reportsTabBtn.ZIndex = 3
 
         local liveStatusRow = Instance.new("Frame", monitorBox)
-        liveStatusRow.Size = UDim2.new(1, -14, 0, 18)
-        liveStatusRow.Position = UDim2.new(0, 7, 0, 41)
+        liveStatusRow.Size = UDim2.new(1, -10, 0, 14)
+        liveStatusRow.Position = UDim2.new(0, 5, 0, 30)
         liveStatusRow.BackgroundTransparency = 1
 
         local radarDot = Instance.new("Frame", liveStatusRow)
-        radarDot.Size = UDim2.fromOffset(6, 6)
+        radarDot.Size = UDim2.fromOffset(5, 5)
         radarDot.AnchorPoint = Vector2.new(0, 0.5)
-        radarDot.Position = UDim2.new(0, 4, 0.5, 0)
+        radarDot.Position = UDim2.new(0, 3, 0.5, 0)
         radarDot.BackgroundColor3 = Color3.fromRGB(0, 245, 145)
         Instance.new("UICorner", radarDot).CornerRadius = UDim.new(1, 0)
 
         local modeBannerLbl = Instance.new("TextLabel", liveStatusRow)
         modeBannerLbl.Size = UDim2.new(0.74, 0, 1, 0)
-        modeBannerLbl.Position = UDim2.new(0, 15, 0, 0)
+        modeBannerLbl.Position = UDim2.new(0, 12, 0, 0)
         modeBannerLbl.BackgroundTransparency = 1
-        modeBannerLbl.Text = "GLOBAL CHAT  •  TAP ANY MESSAGE TO @MENTION"
+        modeBannerLbl.Text = "LIVE CHAT • TAP TO @MENTION"
         modeBannerLbl.TextColor3 = Color3.fromRGB(0, 235, 255)
         modeBannerLbl.Font = Enum.Font.GothamBlack
-        modeBannerLbl.TextSize = 8
+        modeBannerLbl.TextSize = 7.5
         modeBannerLbl.TextXAlignment = Enum.TextXAlignment.Left
 
         local logCounterLbl = Instance.new("TextLabel", liveStatusRow)
         logCounterLbl.Size = UDim2.new(0.24, 0, 1, 0)
         logCounterLbl.AnchorPoint = Vector2.new(1, 0)
-        logCounterLbl.Position = UDim2.new(1, -4, 0, 0)
+        logCounterLbl.Position = UDim2.new(1, -3, 0, 0)
         logCounterLbl.BackgroundTransparency = 1
         logCounterLbl.Text = "0 LIVE"
         logCounterLbl.TextColor3 = Color3.fromRGB(130, 245, 175)
         logCounterLbl.Font = Enum.Font.Code
-        logCounterLbl.TextSize = 8.5
+        logCounterLbl.TextSize = 7.5
         logCounterLbl.TextXAlignment = Enum.TextXAlignment.Right
 
         local chatScroll = Instance.new("ScrollingFrame", monitorBox)
-        chatScroll.Size = UDim2.new(1, -14, 1, -124)
-        chatScroll.Position = UDim2.new(0, 7, 0, 62)
+        chatScroll.Size = UDim2.new(1, -10, 1, -92)
+        chatScroll.Position = UDim2.new(0, 5, 0, 46)
         chatScroll.BackgroundTransparency = 1
         chatScroll.ScrollBarThickness = 2
         chatScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 225, 255)
@@ -3045,12 +2972,12 @@ task.spawn(function()
         chatScroll.Visible = true
 
         local chatList = Instance.new("UIListLayout", chatScroll)
-        chatList.Padding = UDim.new(0, 6)
+        chatList.Padding = UDim.new(0, 4)
         chatList.SortOrder = Enum.SortOrder.LayoutOrder
 
         local reportScroll = Instance.new("ScrollingFrame", monitorBox)
-        reportScroll.Size = UDim2.new(1, -14, 1, -124)
-        reportScroll.Position = UDim2.new(0, 7, 0, 62)
+        reportScroll.Size = UDim2.new(1, -10, 1, -92)
+        reportScroll.Position = UDim2.new(0, 5, 0, 46)
         reportScroll.BackgroundTransparency = 1
         reportScroll.ScrollBarThickness = 2
         reportScroll.ScrollBarImageColor3 = Color3.fromRGB(185, 110, 255)
@@ -3059,13 +2986,13 @@ task.spawn(function()
         reportScroll.Visible = false
 
         local reportList = Instance.new("UIListLayout", reportScroll)
-        reportList.Padding = UDim.new(0, 6)
+        reportList.Padding = UDim.new(0, 4)
         reportList.SortOrder = Enum.SortOrder.LayoutOrder
 
         local typingStatusBar = Instance.new("Frame", monitorBox)
-        typingStatusBar.Size = UDim2.new(1, -18, 0, 16)
+        typingStatusBar.Size = UDim2.new(1, -12, 0, 13)
         typingStatusBar.AnchorPoint = Vector2.new(0.5, 1)
-        typingStatusBar.Position = UDim2.new(0.5, 0, 1, -43)
+        typingStatusBar.Position = UDim2.new(0.5, 0, 1, -33)
         typingStatusBar.BackgroundTransparency = 1
         typingStatusBar.Visible = false
 
@@ -3075,45 +3002,45 @@ task.spawn(function()
         typingStatusLbl.Text = ""
         typingStatusLbl.TextColor3 = Color3.fromRGB(90, 240, 255)
         typingStatusLbl.Font = Enum.Font.GothamBold
-        typingStatusLbl.TextSize = 9
+        typingStatusLbl.TextSize = 8
         typingStatusLbl.TextXAlignment = Enum.TextXAlignment.Left
 
         local inputDock = Instance.new("Frame", monitorBox)
-        inputDock.Size = UDim2.new(1, -14, 0, 36)
+        inputDock.Size = UDim2.new(1, -10, 0, 28)
         inputDock.AnchorPoint = Vector2.new(0.5, 1)
-        inputDock.Position = UDim2.new(0.5, 0, 1, -5)
+        inputDock.Position = UDim2.new(0.5, 0, 1, -4)
         inputDock.BackgroundColor3 = Color3.fromRGB(17, 22, 33)
-        Instance.new("UICorner", inputDock).CornerRadius = UDim.new(0, 9)
+        Instance.new("UICorner", inputDock).CornerRadius = UDim.new(0, 7)
 
         local dockStroke = Instance.new("UIStroke", inputDock)
-        dockStroke.Thickness = 1.1
+        dockStroke.Thickness = 1
         dockStroke.Color = Color3.fromRGB(0, 210, 255)
         dockStroke.Transparency = 0.45
 
         local inputBox = Instance.new("TextBox", inputDock)
-        inputBox.Size = UDim2.new(1, -84, 1, -4)
-        inputBox.Position = UDim2.new(0, 10, 0, 2)
+        inputBox.Size = UDim2.new(1, -66, 1, -2)
+        inputBox.Position = UDim2.new(0, 8, 0, 1)
         inputBox.BackgroundTransparency = 1
         inputBox.Text = ""
-        inputBox.PlaceholderText = "Say something in global chat..."
+        inputBox.PlaceholderText = "Type message..."
         inputBox.PlaceholderColor3 = Color3.fromRGB(125, 140, 165)
-        inputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+        inputBox.TextColor3 = Color3.new(1, 1, 1)
         inputBox.Font = Enum.Font.GothamMedium
-        inputBox.TextSize = 10.5
+        inputBox.TextSize = 9.5
         inputBox.TextXAlignment = Enum.TextXAlignment.Left
         inputBox.ClearTextOnFocus = false
 
         local sendBtn = Instance.new("TextButton", inputDock)
-        sendBtn.Size = UDim2.fromOffset(66, 28)
+        sendBtn.Size = UDim2.fromOffset(54, 22)
         sendBtn.AnchorPoint = Vector2.new(1, 0.5)
-        sendBtn.Position = UDim2.new(1, -4, 0.5, 0)
+        sendBtn.Position = UDim2.new(1, -3, 0.5, 0)
         sendBtn.BackgroundColor3 = Color3.fromRGB(0, 215, 145)
-        sendBtn.Text = "SEND ➤"
+        sendBtn.Text = "SEND"
         sendBtn.TextColor3 = Color3.fromRGB(10, 15, 20)
         sendBtn.Font = Enum.Font.GothamBlack
-        sendBtn.TextSize = 9.5
+        sendBtn.TextSize = 8.5
         sendBtn.AutoButtonColor = false
-        Instance.new("UICorner", sendBtn).CornerRadius = UDim.new(0, 7)
+        Instance.new("UICorner", sendBtn).CornerRadius = UDim.new(0, 6)
 
         local sendBtnScale = Instance.new("UIScale", sendBtn)
 
@@ -3122,7 +3049,7 @@ task.spawn(function()
                 task.wait(0.04)
                 if scrollFrame and scrollFrame.Parent then
                     local maxY = math.max(0, scrollFrame.AbsoluteCanvasSize.Y - scrollFrame.AbsoluteWindowSize.Y)
-                    TweenService:Create(scrollFrame, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                    TweenService:Create(scrollFrame, TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                         CanvasPosition = Vector2.new(0, maxY)
                     }):Play()
                 end
@@ -3131,80 +3058,65 @@ task.spawn(function()
 
         local function createFeedBubble(parentScroll, orderNum, uName, uId, msgStr, timeStr, isReportMode)
             local isOwner = (tonumber(uId) == MODERATOR_USER_ID) or (uName == "TxR_AsHU")
-            local isSelf = (lp and tostring(uId) == tostring(lp.UserId))
             local accentCol = isOwner and Color3.fromRGB(255, 205, 55)
                 or (isReportMode and Color3.fromRGB(185, 110, 255) or Color3.fromRGB(0, 235, 255))
 
             local row = Instance.new("TextButton", parentScroll)
-            row.Size = UDim2.new(1, -6, 0, 48)
-            row.BackgroundColor3 = isSelf and Color3.fromRGB(22, 31, 48) or Color3.fromRGB(16, 21, 32)
-            row.BackgroundTransparency = 0.10
+            row.Size = UDim2.new(1, -4, 0, 36)
+            row.BackgroundColor3 = Color3.fromRGB(16, 21, 32)
+            row.BackgroundTransparency = 0.12
             row.Text = ""
             row.AutoButtonColor = false
             row.LayoutOrder = orderNum
-            row.ClipsDescendants = true
-            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 9)
-
-            local rScale = Instance.new("UIScale", row)
-            rScale.Scale = 0.90
-            TweenService:Create(rScale, TweenInfo.new(0.26, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
 
             local rStroke = Instance.new("UIStroke", row)
-            rStroke.Thickness = isOwner and 1.25 or 0.95
+            rStroke.Thickness = isOwner and 1.1 or 0.8
             rStroke.Color = accentCol
-            rStroke.Transparency = isOwner and 0.25 or 0.58
-
-            local leftBar = Instance.new("Frame", row)
-            leftBar.Size = UDim2.new(0, 3, 1, -12)
-            leftBar.Position = UDim2.new(0, 4, 0, 6)
-            leftBar.BackgroundColor3 = accentCol
-            leftBar.BorderSizePixel = 0
-            Instance.new("UICorner", leftBar).CornerRadius = UDim.new(1, 0)
+            rStroke.Transparency = isOwner and 0.25 or 0.62
 
             local avatar = Instance.new("ImageLabel", row)
-            avatar.Size = UDim2.fromOffset(30, 30)
+            avatar.Size = UDim2.fromOffset(22, 22)
             avatar.AnchorPoint = Vector2.new(0, 0.5)
-            avatar.Position = UDim2.new(0, 12, 0.5, 0)
+            avatar.Position = UDim2.new(0, 6, 0.5, 0)
             avatar.BackgroundColor3 = Color3.fromRGB(10, 13, 20)
             avatar.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", tonumber(uId) or 9685785248)
             Instance.new("UICorner", avatar).CornerRadius = UDim.new(1, 0)
 
-            local tagPrefix = isOwner and "👑 OWNER • " or (isReportMode and "🛠️ IDEA • " or "")
+            local tagPrefix = isOwner and "👑 " or (isReportMode and "🛠️ " or "")
             local uLbl = Instance.new("TextLabel", row)
-            uLbl.Size = UDim2.new(0.72, 0, 0, 14)
-            uLbl.Position = UDim2.new(0, 49, 0, 5)
+            uLbl.Size = UDim2.new(0.72, 0, 0, 12)
+            uLbl.Position = UDim2.new(0, 33, 0, 3)
             uLbl.BackgroundTransparency = 1
             uLbl.Text = tagPrefix .. "@" .. tostring(uName or "Player")
             uLbl.TextColor3 = accentCol
             uLbl.Font = Enum.Font.GothamBlack
-            uLbl.TextSize = 9.5
+            uLbl.TextSize = 8.5
             uLbl.TextXAlignment = Enum.TextXAlignment.Left
 
             local tLbl = Instance.new("TextLabel", row)
-            tLbl.Size = UDim2.new(0.24, -8, 0, 14)
+            tLbl.Size = UDim2.new(0.24, -6, 0, 12)
             tLbl.AnchorPoint = Vector2.new(1, 0)
-            tLbl.Position = UDim2.new(1, -8, 0, 5)
+            tLbl.Position = UDim2.new(1, -6, 0, 3)
             tLbl.BackgroundTransparency = 1
             tLbl.Text = tostring(timeStr or os.date("%H:%M"))
             tLbl.TextColor3 = Color3.fromRGB(120, 135, 160)
             tLbl.Font = Enum.Font.Code
-            tLbl.TextSize = 8
+            tLbl.TextSize = 7.5
             tLbl.TextXAlignment = Enum.TextXAlignment.Right
 
             local mLbl = Instance.new("TextLabel", row)
-            mLbl.Size = UDim2.new(1, -55, 0, 20)
-            mLbl.Position = UDim2.new(0, 49, 0, 21)
+            mLbl.Size = UDim2.new(1, -38, 0, 15)
+            mLbl.Position = UDim2.new(0, 33, 0, 17)
             mLbl.BackgroundTransparency = 1
             mLbl.Text = tostring(msgStr or "")
             mLbl.TextColor3 = Color3.fromRGB(244, 248, 255)
             mLbl.Font = Enum.Font.GothamMedium
-            mLbl.TextSize = 10
+            mLbl.TextSize = 9
             mLbl.TextTruncate = Enum.TextTruncate.AtEnd
             mLbl.TextXAlignment = Enum.TextXAlignment.Left
 
             row.MouseButton1Click:Connect(function()
-                rScale.Scale = 0.96
-                TweenService:Create(rScale, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Scale = 1}):Play()
                 if uName and uName ~= "" then
                     inputBox.Text = "@" .. tostring(uName) .. " " .. inputBox.Text
                     inputBox:CaptureFocus()
@@ -3215,16 +3127,16 @@ task.spawn(function()
         local function switchPanel(targetPanel)
             pollState.activePanel = targetPanel
             if targetPanel == "CHAT" then
-                TweenService:Create(activePillSlider, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                TweenService:Create(activePillSlider, TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                     Position = UDim2.new(0, 2, 0, 2),
-                    Size = UDim2.new(0.38, -4, 1, -4),
+                    Size = UDim2.new(0.36, -3, 1, -4),
                     BackgroundColor3 = Color3.fromRGB(0, 165, 255)
                 }):Play()
                 chatTabBtn.TextColor3 = Color3.new(1, 1, 1)
                 reportsTabBtn.TextColor3 = Color3.fromRGB(175, 195, 225)
-                modeBannerLbl.Text = "GLOBAL CHAT  •  TAP ANY MESSAGE TO @MENTION"
-                inputBox.PlaceholderText = "Say something in global chat..."
-                sendBtn.Text = "SEND ➤"
+                modeBannerLbl.Text = "LIVE CHAT • TAP TO @MENTION"
+                inputBox.PlaceholderText = "Type message..."
+                sendBtn.Text = "SEND"
                 sendBtn.BackgroundColor3 = Color3.fromRGB(0, 215, 145)
                 dockStroke.Color = Color3.fromRGB(0, 210, 255)
                 chatScroll.Visible = true
@@ -3232,16 +3144,16 @@ task.spawn(function()
                 logCounterLbl.Text = string.format("%d LIVE", pollState.chatOrderCounter)
                 smoothScrollDown(chatScroll)
             else
-                TweenService:Create(activePillSlider, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                    Position = UDim2.new(0.38, 2, 0, 2),
-                    Size = UDim2.new(0.62, -4, 1, -4),
+                TweenService:Create(activePillSlider, TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                    Position = UDim2.new(0.36, 2, 0, 2),
+                    Size = UDim2.new(0.64, -4, 1, -4),
                     BackgroundColor3 = Color3.fromRGB(165, 65, 255)
                 }):Play()
                 reportsTabBtn.TextColor3 = Color3.new(1, 1, 1)
                 chatTabBtn.TextColor3 = Color3.fromRGB(175, 195, 225)
-                modeBannerLbl.Text = "REPORT BUGS & NEXT UPDATE FEATURES"
-                inputBox.PlaceholderText = "Report a bug or next update feature..."
-                sendBtn.Text = "POST ➤"
+                modeBannerLbl.Text = "BUGS & NEXT UPDATE FEATURES"
+                inputBox.PlaceholderText = "Bug or next update idea..."
+                sendBtn.Text = "POST"
                 sendBtn.BackgroundColor3 = Color3.fromRGB(175, 85, 255)
                 dockStroke.Color = Color3.fromRGB(175, 85, 255)
                 chatScroll.Visible = false
@@ -3267,7 +3179,7 @@ task.spawn(function()
                 statusPillLbl.TextColor3 = Color3.fromRGB(75, 245, 165)
             end
 
-            TweenService:Create(likeBarFill, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            TweenService:Create(likeBarFill, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                 Size = UDim2.new(ratio, 0, 1, 0)
             }):Play()
 
@@ -3279,7 +3191,6 @@ task.spawn(function()
                 })
                 btnStroke.Color = Color3.fromRGB(75, 245, 175)
                 likeBtnText.Text = "✓  ALREADY REGISTERED"
-                likeBtnText.TextColor3 = Color3.new(1, 1, 1)
             else
                 btnGrad.Color = ColorSequence.new({
                     ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 175, 255)),
@@ -3288,7 +3199,6 @@ task.spawn(function()
                 })
                 btnStroke.Color = Color3.fromRGB(140, 235, 255)
                 likeBtnText.Text = "👍  LIKE FOR NEXT UPDATE"
-                likeBtnText.TextColor3 = Color3.new(1, 1, 1)
             end
         end
 
@@ -3435,7 +3345,7 @@ task.spawn(function()
         local likeBusy = false
         likeBtn.MouseButton1Click:Connect(function()
             likeBtnScale.Scale = 0.93
-            TweenService:Create(likeBtnScale, TweenInfo.new(0.35, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {Scale = 1}):Play()
+            TweenService:Create(likeBtnScale, TweenInfo.new(0.32, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
             if pollState.hasLiked or likeBusy then
                 pollState.hasLiked = true
@@ -3460,7 +3370,7 @@ task.spawn(function()
                 pollState.totalLikes += 1
             end
 
-            spawnJuiceExplosion(goalBox, UDim2.new(0.5, 0, 0.72, 0), 30)
+            spawnJuiceExplosion(goalBox, UDim2.new(0.5, 0, 0.72, 0), 22)
             updateLikeUI()
 
             local currentCount = pollState.totalLikes
@@ -3500,7 +3410,7 @@ task.spawn(function()
 
             sendingItem = true
             sendBtnScale.Scale = 0.88
-            TweenService:Create(sendBtnScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+            TweenService:Create(sendBtnScale, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
             local uName = lp and lp.Name or "Player"
             local uId = tostring(lp and lp.UserId or 0)
@@ -3540,7 +3450,7 @@ task.spawn(function()
 
             task.delay(1.0, function()
                 if sendBtn and sendBtn.Parent then
-                    sendBtn.Text = (pollState.activePanel == "CHAT") and "SEND ➤" or "POST ➤"
+                    sendBtn.Text = (pollState.activePanel == "CHAT") and "SEND" or "POST"
                 end
             end)
         end
@@ -3594,13 +3504,14 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- TAB 6: CUSTOM PORTRAIT DEVELOPER & EMP CLAN CARDS
+-- TAB 6: CUSTOM UI SIZE SCALER + DEV & EMP CLAN CARDS
 -- ========================================================
 local DEV_USER_ID = 9685785248
 local DEV_CUSTOM_IMAGE = "rbxassetid://79059905046105"
 local DISCORD_LINK = "https://discord.gg/8aE54JJ8Rp"
 local copyClip = setclipboard or toclipboard or (syn and syn.write_clipboard) or function() end
 
+local uiScalerPlaceholder = DevTab:CreateLabel("TXR_UI_SIZE_SCALER_CARD")
 local devCardPlaceholder = DevTab:CreateLabel("TXR_DEV_PROFILE_CARD")
 local discordCardPlaceholder = DevTab:CreateLabel("TXR_DISCORD_INVITE_CARD")
 
@@ -3608,11 +3519,13 @@ task.spawn(function()
     task.wait(0.35)
     local guiRoot = getSafeGuiRoot()
     if not guiRoot then return end
-    local profileLabel, discordLabel
+    local scalerLabel, profileLabel, discordLabel
 
     for _, obj in ipairs(guiRoot:GetDescendants()) do
         if obj:IsA("TextLabel") then
-            if obj.Text == "TXR_DEV_PROFILE_CARD" then
+            if obj.Text == "TXR_UI_SIZE_SCALER_CARD" then
+                scalerLabel = obj
+            elseif obj.Text == "TXR_DEV_PROFILE_CARD" then
                 profileLabel = obj
             elseif obj.Text == "TXR_DISCORD_INVITE_CARD" then
                 discordLabel = obj
@@ -3634,6 +3547,113 @@ task.spawn(function()
     end
 
     local cardStrokeGrad, portraitRingGrad, verifiedRingGrad, dStrokeGrad, srvIconGrad
+
+    -- Interactive Custom UI Size Bar (75% / 85% / 100% / 115% + - / +)
+    if scalerLabel and scalerLabel.Parent and scalerLabel.Parent:IsA("Frame") then
+        local sCard = scalerLabel.Parent
+        sCard:SetAttribute("TXR_CustomCard", true)
+        lockHideLabel(scalerLabel, uiScalerPlaceholder)
+
+        sCard.Size = UDim2.new(sCard.Size.X.Scale, sCard.Size.X.Offset, 0, 74)
+        sCard.BackgroundColor3 = Color3.fromRGB(13, 17, 27)
+        sCard.BackgroundTransparency = 0.08
+        sCard.ClipsDescendants = true
+
+        for _, child in ipairs(sCard:GetChildren()) do
+            if child:IsA("UIStroke") or child:IsA("UIGradient") then
+                child:Destroy()
+            end
+        end
+
+        Instance.new("UICorner", sCard).CornerRadius = UDim.new(0, 11)
+        local scStroke = Instance.new("UIStroke", sCard)
+        scStroke.Thickness = 1.15
+        scStroke.Color = Color3.fromRGB(0, 235, 255)
+        scStroke.Transparency = 0.45
+
+        local scTitle = Instance.new("TextLabel", sCard)
+        scTitle.Size = UDim2.new(0.65, 0, 0, 18)
+        scTitle.Position = UDim2.new(0, 10, 0, 6)
+        scTitle.BackgroundTransparency = 1
+        scTitle.Text = "📐 CUSTOM UI SIZE"
+        scTitle.TextColor3 = Color3.new(1, 1, 1)
+        scTitle.Font = Enum.Font.GothamBlack
+        scTitle.TextSize = 10.5
+        scTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+        local sizeValueLbl = Instance.new("TextLabel", sCard)
+        sizeValueLbl.Size = UDim2.new(0.30, -10, 0, 18)
+        sizeValueLbl.AnchorPoint = Vector2.new(1, 0)
+        sizeValueLbl.Position = UDim2.new(1, -10, 0, 6)
+        sizeValueLbl.BackgroundTransparency = 1
+        sizeValueLbl.Text = string.format("%d%%", math.floor(currentUiScaleValue * 100 + 0.5))
+        sizeValueLbl.TextColor3 = Color3.fromRGB(0, 245, 255)
+        sizeValueLbl.Font = Enum.Font.Code
+        sizeValueLbl.TextSize = 10.5
+        sizeValueLbl.TextXAlignment = Enum.TextXAlignment.Right
+
+        local function syncSizeLabel()
+            sizeValueLbl.Text = string.format("%d%%", math.floor(currentUiScaleValue * 100 + 0.5))
+        end
+
+        local btnRow = Instance.new("Frame", sCard)
+        btnRow.Size = UDim2.new(1, -20, 0, 32)
+        btnRow.Position = UDim2.new(0, 10, 0, 30)
+        btnRow.BackgroundTransparency = 1
+
+        local minusBtn = Instance.new("TextButton", btnRow)
+        minusBtn.Size = UDim2.new(0.14, 0, 1, 0)
+        minusBtn.BackgroundColor3 = Color3.fromRGB(28, 34, 52)
+        minusBtn.Text = "-"
+        minusBtn.TextColor3 = Color3.new(1, 1, 1)
+        minusBtn.Font = Enum.Font.GothamBlack
+        minusBtn.TextSize = 14
+        Instance.new("UICorner", minusBtn).CornerRadius = UDim.new(0, 7)
+
+        local presets = {0.75, 0.85, 1.00, 1.15}
+        for idx, pVal in ipairs(presets) do
+            local pBtn = Instance.new("TextButton", btnRow)
+            pBtn.Size = UDim2.new(0.17, -3, 1, 0)
+            pBtn.Position = UDim2.new(0.15 + ((idx - 1) * 0.17), 2, 0, 0)
+            pBtn.BackgroundColor3 = (idx == 3) and Color3.fromRGB(0, 155, 255) or Color3.fromRGB(20, 26, 40)
+            pBtn.Text = string.format("%d%%", math.floor(pVal * 100))
+            pBtn.TextColor3 = Color3.new(1, 1, 1)
+            pBtn.Font = Enum.Font.GothamBold
+            pBtn.TextSize = 8.5
+            Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 7)
+
+            pBtn.MouseButton1Click:Connect(function()
+                if applyGlobalUiScale then
+                    applyGlobalUiScale(pVal)
+                    syncSizeLabel()
+                end
+            end)
+        end
+
+        local plusBtn = Instance.new("TextButton", btnRow)
+        plusBtn.Size = UDim2.new(0.14, 0, 1, 0)
+        plusBtn.Position = UDim2.new(0.86, 2, 0, 0)
+        plusBtn.BackgroundColor3 = Color3.fromRGB(28, 34, 52)
+        plusBtn.Text = "+"
+        plusBtn.TextColor3 = Color3.new(1, 1, 1)
+        plusBtn.Font = Enum.Font.GothamBlack
+        plusBtn.TextSize = 14
+        Instance.new("UICorner", plusBtn).CornerRadius = UDim.new(0, 7)
+
+        minusBtn.MouseButton1Click:Connect(function()
+            if applyGlobalUiScale then
+                applyGlobalUiScale(currentUiScaleValue - 0.05)
+                syncSizeLabel()
+            end
+        end)
+
+        plusBtn.MouseButton1Click:Connect(function()
+            if applyGlobalUiScale then
+                applyGlobalUiScale(currentUiScaleValue + 0.05)
+                syncSizeLabel()
+            end
+        end)
+    end
 
     if profileLabel and profileLabel.Parent and profileLabel.Parent:IsA("Frame") then
         local card = profileLabel.Parent
