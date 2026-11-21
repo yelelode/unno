@@ -2,7 +2,7 @@
 -- PART 0: UNIVERSAL EXECUTOR SHIM & AUTO MAX-FPS ENGINE
 -- (Works on iOS, Android, PC & All Executors / Low-End Devices)
 -- ========================================================
-local GLOBAL_CHAT_SERVER = "https://my-roblox-private-chat.onrender.com"
+local GLOBAL_CHAT_SERVER = "https://my-roblox-private-chat.onrender.com" --[span_1](start_span)[span_1](end_span)
 local DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1573276829048119307/tyJAzblu_3LU0vK-akPNwJaRTFM5aDORLYs9BxduE22fUT_LiLfli6ggqVljopH6cOsW"
 
 pcall(function()
@@ -2524,7 +2524,7 @@ task.spawn(function()
         end
 
         local function postToGlobalServer(rawPayload)
-            rawHttp("POST", GLOBAL_CHAT_SERVER .. "/send", HttpService:JSONEncode({
+            return rawHttp("POST", GLOBAL_CHAT_SERVER .. "/send", HttpService:JSONEncode({
                 user = (lp and lp.Name or "Player") .. "::" .. tostring(lp and lp.UserId or 0),
                 msg = rawPayload,
                 jobId = game.JobId or "global",
@@ -2534,7 +2534,13 @@ task.spawn(function()
 
         local function ingestServerMessages(dataList)
             if type(dataList) ~= "table" then return end
-            local newTicketsAdded = false
+
+            local freshLikers = {}
+            local freshLikeCount = 0
+            local myIdStr = tostring(lp and lp.UserId or 0)
+
+            local freshTickets = {}
+            local seenKeys = {}
 
             for _, item in ipairs(dataList) do
                 local mText = tostring(item.msg or "")
@@ -2543,46 +2549,46 @@ task.spawn(function()
                 uName = uName or rawU
                 local uId = tonumber(uIdStr) or 0
 
-                -- Parse persistent global like vote: [EMP_LIKE_V206:UID:USERNAME]
+                -- Parse unique global like votes: [EMP_LIKE_V206:UID:USERNAME]
                 local vUid, vUser = mText:match("^%[EMP_LIKE_V206:(.-):(.-)%]$")
                 if vUid and vUid ~= "" then
                     local uidKey = tostring(vUid)
-                    if not pollState.likersMap[uidKey] then
-                        pollState.likersMap[uidKey] = vUser or uName
-                        pollState.totalLikes += 1
+                    if not freshLikers[uidKey] then
+                        freshLikers[uidKey] = (vUser ~= "" and vUser) or uName
+                        freshLikeCount += 1
                     end
-                    if uidKey == tostring(lp and lp.UserId or 0) then
+                    if uidKey == myIdStr then
                         pollState.hasLiked = true
                         lockLikeLocally()
                     end
                     continue
                 end
 
-                -- Parse persistent global feedback ticket: [EMP_TICKET_V206:TAG:UID:USER] MSG
+                -- Parse persistent global feedback tickets: [EMP_TICKET_V206:TAG:UID:USER] MSG
                 local tTag, tUid, tUser, tMsg = mText:match("^%[EMP_TICKET_V206:(.-):(.-):(.-)%]%s*(.*)$")
                 if tTag and tMsg then
                     local uniq = tostring(item.id or (tUid .. "_" .. tostring(item.time or "") .. "_" .. tMsg))
-                    if not pollState.seenTicketKeys[uniq] then
-                        pollState.seenTicketKeys[uniq] = true
-                        newTicketsAdded = true
-                        local tNum = string.format("#%03d", #pollState.tickets + 1)
-                        table.insert(pollState.tickets, 1, {
-                            id = tNum,
+                    if not seenKeys[uniq] then
+                        seenKeys[uniq] = true
+                        table.insert(freshTickets, 1, {
+                            id = string.format("#%03d", #freshTickets + 1),
                             tag = tTag,
                             user = (tUser ~= "" and tUser) or uName,
                             uid = tonumber(tUid) or uId,
                             msg = tMsg
                         })
-                        while #pollState.tickets > 30 do
-                            table.remove(pollState.tickets)
+                        if #freshTickets > 30 then
+                            table.remove(freshTickets)
                         end
                     end
                 end
             end
 
-            if newTicketsAdded or pollState.totalLikes >= 0 then
-                renderMonitor()
-            end
+            pollState.likersMap = freshLikers
+            pollState.totalLikes = freshLikeCount
+            pollState.seenTicketKeys = seenKeys
+            pollState.tickets = freshTickets
+            renderMonitor()
         end
 
         local function syncFromGlobalServer()
@@ -2590,10 +2596,6 @@ task.spawn(function()
             if ok and raw and raw ~= "" then
                 local decOk, decoded = pcall(function() return HttpService:JSONDecode(raw) end)
                 if decOk and type(decoded) == "table" then
-                    pollState.totalLikes = 0
-                    pollState.likersMap = {}
-                    pollState.seenTicketKeys = {}
-                    pollState.tickets = {}
                     ingestServerMessages(decoded)
                     return
                 end
@@ -2627,18 +2629,19 @@ task.spawn(function()
             end
             renderMonitor()
 
+            local projectedCount = pollState.totalLikes
+            notifyWebhookAction(string.format("**@%s** (`%s`) ne **+1 Like** lock kiya (**%d / %d**)", uName, uId, projectedCount, LIKE_TARGET_GOAL))
+
             task.spawn(function()
                 postToGlobalServer(string.format("[EMP_LIKE_V206:%s:%s]", uId, uName))
-                task.wait(0.6)
+                task.wait(0.7)
                 syncFromGlobalServer()
                 likeBusy = false
             end)
 
-            notifyWebhookAction(string.format("**@%s** (`%s`) ne **+1 Like** lock kiya (**%d / %d**)", uName, uId, pollState.totalLikes, LIKE_TARGET_GOAL))
-
             TXR_Lib:Notify({
                 Title = "⚡ ʟɪᴋᴇ ʟᴏᴄᴋᴇᴅ",
-                Content = string.format("%d / %d Likes for Next Update", pollState.totalLikes, LIKE_TARGET_GOAL),
+                Content = string.format("%d / %d Likes for Next Update", projectedCount, LIKE_TARGET_GOAL),
                 Duration = 2.5,
                 Image = 4483345998
             })
@@ -2678,14 +2681,14 @@ task.spawn(function()
             })
             renderMonitor()
 
+            notifyWebhookAction(string.format("**@%s** (`%s`) ne `[%s]` feedback diya: **%s**", uName, uId, tagChoice, trimmed))
+
             task.spawn(function()
                 postToGlobalServer(string.format("[EMP_TICKET_V206:%s:%s:%s] %s", tagChoice, uId, uName, trimmed))
-                task.wait(0.6)
+                task.wait(0.7)
                 syncFromGlobalServer()
                 sendingTicket = false
             end)
-
-            notifyWebhookAction(string.format("**@%s** (`%s`) ne `[%s]` feedback diya: **%s**", uName, uId, tagChoice, trimmed))
 
             TXR_Lib:Notify({
                 Title = "📋 ᴛɪᴄᴋᴇᴛ ʟᴏɢɢᴇᴅ",
