@@ -46,6 +46,283 @@ local HttpService = game:GetService("HttpService")
 local lp = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
 -- ========================================================
+-- SHARED GLOBAL PLAYER IDENTITY, RANK & MULTI-TAG REGISTRY
+-- ========================================================
+local MODERATOR_USER_ID = 9685785248
+
+local globalPlayerMeta = {
+    -- [uidStr] = { spamRank = 1, grindRank = 2, selectedSlot = "AUTO", customTag = nil }
+}
+
+local myTagSelectionState = {
+    selectedMode = "AUTO", -- "AUTO", "SPAM", "GRIND", "DEV"
+    equippedTitle = nil,
+    equippedColor = Color3.fromRGB(0, 245, 255)
+}
+
+local SPAM_TOP5_THEMES = {
+    [1] = {
+        title     = "👑 COM GOD",
+        shortTag  = "COM GOD",
+        speed     = 1.30,
+        border    = Color3.fromRGB(255, 215, 55),
+        cardTintA = Color3.fromRGB(58, 38, 10),
+        cardTintB = Color3.fromRGB(10, 12, 20),
+        tagBg     = Color3.fromRGB(38, 24, 6),
+        colors    = {
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 45, 95)),
+            ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 215, 45)),
+            ColorSequenceKeypoint.new(0.50, Color3.fromRGB(255, 255, 205)),
+            ColorSequenceKeypoint.new(0.75, Color3.fromRGB(255, 145, 25)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 45, 95))
+        }
+    },
+    [2] = {
+        title     = "⚡ SPAM GOD",
+        shortTag  = "SPAM GOD",
+        speed     = 1.24,
+        border    = Color3.fromRGB(0, 245, 255),
+        cardTintA = Color3.fromRGB(8, 44, 66),
+        cardTintB = Color3.fromRGB(10, 12, 20),
+        tagBg     = Color3.fromRGB(6, 26, 40),
+        colors    = {
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0, 245, 255)),
+            ColorSequenceKeypoint.new(0.35, Color3.fromRGB(65, 160, 255)),
+            ColorSequenceKeypoint.new(0.70, Color3.fromRGB(195, 255, 245)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0, 245, 255))
+        }
+    },
+    [3] = {
+        title     = "🔥 FLOOD KING",
+        shortTag  = "FLOOD KING",
+        speed     = 1.20,
+        border    = Color3.fromRGB(195, 80, 255),
+        cardTintA = Color3.fromRGB(44, 14, 68),
+        cardTintB = Color3.fromRGB(10, 12, 20),
+        tagBg     = Color3.fromRGB(26, 8, 42),
+        colors    = {
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(195, 65, 255)),
+            ColorSequenceKeypoint.new(0.35, Color3.fromRGB(255, 60, 195)),
+            ColorSequenceKeypoint.new(0.70, Color3.fromRGB(100, 140, 255)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(195, 65, 255))
+        }
+    },
+    [4] = {
+        title     = "💀 MESSAGE BEAST",
+        shortTag  = "MSG BEAST",
+        speed     = 1.25,
+        border    = Color3.fromRGB(255, 50, 95),
+        cardTintA = Color3.fromRGB(54, 12, 28),
+        cardTintB = Color3.fromRGB(10, 12, 20),
+        tagBg     = Color3.fromRGB(34, 6, 18),
+        colors    = {
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 25, 80)),
+            ColorSequenceKeypoint.new(0.50, Color3.fromRGB(255, 130, 45)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 25, 80))
+        }
+    },
+    [5] = {
+        title     = "🚀 CHAT MACHINE",
+        shortTag  = "CHAT MACHINE",
+        speed     = 1.22,
+        border    = Color3.fromRGB(15, 255, 175),
+        cardTintA = Color3.fromRGB(8, 48, 34),
+        cardTintB = Color3.fromRGB(10, 12, 20),
+        tagBg     = Color3.fromRGB(6, 28, 20),
+        colors    = {
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(10, 255, 165)),
+            ColorSequenceKeypoint.new(0.50, Color3.fromRGB(15, 220, 255)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(10, 255, 165))
+        }
+    }
+}
+
+-- DISTINCT COLOR PALETTE FOR GRINDERS MODE (NO MORE DUPLICATE COLORS!)
+local GRIND_TOP5_THEMES = {
+    [1] = {
+        title     = "👑 NO-LIFE GOD",
+        shortTag  = "NO-LIFE GOD",
+        speed     = 1.32,
+        border    = Color3.fromRGB(255, 130, 25),
+        cardTintA = Color3.fromRGB(62, 26, 6),
+        cardTintB = Color3.fromRGB(10, 12, 20),
+        tagBg     = Color3.fromRGB(40, 16, 4),
+        colors    = {
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 95, 15)),
+            ColorSequenceKeypoint.new(0.35, Color3.fromRGB(255, 210, 55)),
+            ColorSequenceKeypoint.new(0.70, Color3.fromRGB(255, 65, 35)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 95, 15))
+        }
+    },
+    [2] = {
+        title     = "❄️ AFK KING",
+        shortTag  = "AFK KING",
+        speed     = 1.24,
+        border    = Color3.fromRGB(145, 235, 255),
+        cardTintA = Color3.fromRGB(18, 42, 58),
+        cardTintB = Color3.fromRGB(10, 12, 20),
+        tagBg     = Color3.fromRGB(12, 26, 38),
+        colors    = {
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(145, 235, 255)),
+            ColorSequenceKeypoint.new(0.50, Color3.fromRGB(255, 255, 255)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(115, 195, 255))
+        }
+    },
+    [3] = {
+        title     = "👻 SERVER GHOST",
+        shortTag  = "SERVER GHOST",
+        speed     = 1.20,
+        border    = Color3.fromRGB(255, 55, 175),
+        cardTintA = Color3.fromRGB(54, 10, 42),
+        cardTintB = Color3.fromRGB(10, 12, 20),
+        tagBg     = Color3.fromRGB(34, 6, 26),
+        colors    = {
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 45, 170)),
+            ColorSequenceKeypoint.new(0.50, Color3.fromRGB(185, 95, 255)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 45, 170))
+        }
+    },
+    [4] = {
+        title     = "🔥 GRIND DEMON",
+        shortTag  = "GRIND DEMON",
+        speed     = 1.25,
+        border    = Color3.fromRGB(255, 185, 35),
+        cardTintA = Color3.fromRGB(52, 34, 8),
+        cardTintB = Color3.fromRGB(10, 12, 20),
+        tagBg     = Color3.fromRGB(32, 20, 4),
+        colors    = {
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 175, 25)),
+            ColorSequenceKeypoint.new(0.50, Color3.fromRGB(255, 85, 25)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 175, 25))
+        }
+    },
+    [5] = {
+        title     = "🦉 NIGHT OWL",
+        shortTag  = "NIGHT OWL",
+        speed     = 1.22,
+        border    = Color3.fromRGB(145, 255, 55),
+        cardTintA = Color3.fromRGB(24, 48, 10),
+        cardTintB = Color3.fromRGB(10, 12, 20),
+        tagBg     = Color3.fromRGB(14, 30, 6),
+        colors    = {
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(145, 255, 45)),
+            ColorSequenceKeypoint.new(0.50, Color3.fromRGB(35, 235, 145)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(145, 255, 45))
+        }
+    }
+}
+
+local DEV_SPECIAL_THEME = {
+    title     = "👑 DEVELOPER",
+    shortTag  = "DEVELOPER",
+    speed     = 1.35,
+    border    = Color3.fromRGB(0, 245, 255),
+    cardTintA = Color3.fromRGB(10, 38, 58),
+    cardTintB = Color3.fromRGB(10, 12, 20),
+    tagBg     = Color3.fromRGB(8, 24, 38),
+    colors    = {
+        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0, 245, 255)),
+        ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 215, 55)),
+        ColorSequenceKeypoint.new(0.66, Color3.fromRGB(255, 45, 125)),
+        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0, 245, 255))
+    }
+}
+
+local UNRANKED_CHROMA_CFG = {
+    title  = "⚔️ EMP MEMBER",
+    speed  = 1.05,
+    border = Color3.fromRGB(95, 175, 255),
+    tagBg  = Color3.fromRGB(16, 24, 38),
+    colors = {
+        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(95, 175, 255)),
+        ColorSequenceKeypoint.new(0.50, Color3.fromRGB(185, 225, 255)),
+        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(95, 175, 255))
+    }
+}
+
+local function getPlayerAvailableTags(uidNum)
+    local uidStr = tostring(uidNum or 0)
+    local meta = globalPlayerMeta[uidStr]
+    local options = {}
+
+    if uidNum == MODERATOR_USER_ID then
+        table.insert(options, {
+            id = "DEV",
+            title = "👑 DEVELOPER",
+            rankNum = 0,
+            theme = DEV_SPECIAL_THEME
+        })
+    end
+
+    if meta and meta.spamRank and meta.spamRank >= 1 and meta.spamRank <= 100 then
+        local r = meta.spamRank
+        local cfg = SPAM_TOP5_THEMES[r] or {
+            title = string.format("⚡ SPAMMER #%d", r),
+            speed = 1.08,
+            border = Color3.fromRGB(0, 215, 255),
+            tagBg = Color3.fromRGB(10, 24, 38),
+            colors = UNRANKED_CHROMA_CFG.colors
+        }
+        table.insert(options, {
+            id = "SPAM",
+            title = cfg.title,
+            rankNum = r,
+            theme = cfg
+        })
+    end
+
+    if meta and meta.grindRank and meta.grindRank >= 1 and meta.grindRank <= 100 then
+        local r = meta.grindRank
+        local cfg = GRIND_TOP5_THEMES[r] or {
+            title = string.format("⏱️ GRINDER #%d", r),
+            speed = 1.08,
+            border = Color3.fromRGB(195, 95, 255),
+            tagBg = Color3.fromRGB(24, 12, 38),
+            colors = UNRANKED_CHROMA_CFG.colors
+        }
+        table.insert(options, {
+            id = "GRIND",
+            title = cfg.title,
+            rankNum = r,
+            theme = cfg
+        })
+    end
+
+    return options
+end
+
+local function resolveActiveBadgeForPlayer(uidNum, preferredSlot)
+    local uidStr = tostring(uidNum or 0)
+    local meta = globalPlayerMeta[uidStr]
+    local slot = preferredSlot or (meta and meta.selectedSlot) or "AUTO"
+    local tags = getPlayerAvailableTags(uidNum)
+
+    if #tags == 0 then
+        return nil
+    end
+
+    if slot ~= "AUTO" then
+        for _, t in ipairs(tags) do
+            if t.id == slot then
+                return t
+            end
+        end
+    end
+
+    -- Default priority: DEV > Highest Rank (lowest rank number)
+    local best = tags[1]
+    for _, t in ipairs(tags) do
+        if t.id == "DEV" then
+            return t
+        end
+        if t.rankNum > 0 and (best.rankNum == 0 or t.rankNum < best.rankNum) then
+            best = t
+        end
+    end
+    return best
+end
+
+-- ========================================================
 -- PART 1: Brookhaven Auto Name, Bio & Chat Sender (Non-Blocking)
 -- ========================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -59,7 +336,6 @@ local Stats = game:GetService("Stats")
 local TextService = game:GetService("TextService")
 local ChatService = game:GetService("Chat")
 
-local MODERATOR_USER_ID = 9685785248
 local playerName = lp and lp.Name or "UNKNOWN"
 
 local myRPName = (lp.UserId == MODERATOR_USER_ID) and "A  S  H  U" or "ᴇ ᴍ ᴩ  ꜱ ᴩ ᴀ ᴍ ᴍ ᴇ ʀ"
@@ -120,17 +396,30 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- ✅ BULLETPROOF ROBLOX CHAT VERIFIED BADGE FOR ASHU
+-- ✅ ROBLOX IN-GAME CHAT VERIFIED BADGE & LIVE RANK 1-100 PREFIX
 -- ========================================================
 pcall(function()
     if TextChatService then
         local prevCallback = TextChatService.OnIncomingMessage
         TextChatService.OnIncomingMessage = function(message)
             local props = (prevCallback and prevCallback(message)) or Instance.new("TextChatMessageProperties")
-            if message and message.TextSource and message.TextSource.UserId == MODERATOR_USER_ID then
+            if message and message.TextSource then
+                local senderId = message.TextSource.UserId
                 local basePrefix = (props.PrefixText and props.PrefixText ~= "") and props.PrefixText or message.PrefixText
-                if basePrefix and not basePrefix:find("☑️", 1, true) then
-                    props.PrefixText = "☑️ " .. basePrefix
+                if basePrefix then
+                    if senderId == MODERATOR_USER_ID then
+                        if not basePrefix:find("☑️", 1, true) then
+                            props.PrefixText = "☑️ [👑 DEV] " .. basePrefix
+                        end
+                    else
+                        local badge = resolveActiveBadgeForPlayer(senderId)
+                        if badge and badge.rankNum >= 1 and badge.rankNum <= 100 then
+                            local tagStr = string.format("[%s • #%d] ", badge.title, badge.rankNum)
+                            if not basePrefix:find(badge.title, 1, true) then
+                                props.PrefixText = tagStr .. basePrefix
+                            end
+                        end
+                    end
                 end
             end
             return props
@@ -139,8 +428,10 @@ pcall(function()
 end)
 
 -- ========================================================
--- 🛡️ MODERATOR OVERHEAD TAG & REAL-TIME JOIN/PRESENCE DETECT
+-- 🛡️ MODERATOR & TOP 1-100 OVERHEAD CROWN/RANK TAG ENGINE
 -- ========================================================
+local refreshAllOverheadTags = nil
+
 task.spawn(function()
     local function showAshuPapaNotification(textMsg)
         pcall(function()
@@ -185,78 +476,110 @@ task.spawn(function()
         end)
     end
 
-    local function applyModeratorTag(character)
-        if not character then return end
+    local function applyCharacterOverheadTag(plr, character)
+        if not plr or not character then return end
         local head = character:WaitForChild("Head", 5)
         if not head then return end
-        if head:FindFirstChild("AshuModeratorCrown") then return end
 
-        local billboard = Instance.new("BillboardGui")
-        billboard.Name = "AshuModeratorCrown"
-        billboard.Size = UDim2.new(0, 165, 0, 40)
-        billboard.StudsOffset = Vector3.new(0, 2.75, 0)
-        billboard.AlwaysOnTop = true
-        billboard.MaxDistance = 260
-        billboard.Adornee = head
-        billboard.Parent = head
+        local isMod = (plr.UserId == MODERATOR_USER_ID)
+        local badge = resolveActiveBadgeForPlayer(plr.UserId)
 
-        local modLabel = Instance.new("TextLabel", billboard)
-        modLabel.Size = UDim2.fromScale(1, 1)
-        modLabel.BackgroundTransparency = 1
-        modLabel.Text = "ᴍᴏᴅᴇʀᴀᴛᴏʀ"
-        modLabel.Font = Enum.Font.GothamBlack
-        modLabel.TextSize = 24
-        modLabel.TextColor3 = Color3.fromRGB(0, 240, 255)
+        if not isMod and (not badge or badge.rankNum < 1 or badge.rankNum > 100) then
+            local old = head:FindFirstChild("AshuModeratorCrown")
+            if old then old:Destroy() end
+            return
+        end
 
-        local mStroke = Instance.new("UIStroke", modLabel)
-        mStroke.Thickness = 2.5
-        mStroke.Color = Color3.new(0, 0, 0)
+        local billboard = head:FindFirstChild("AshuModeratorCrown")
+        if not billboard then
+            billboard = Instance.new("BillboardGui")
+            billboard.Name = "AshuModeratorCrown"
+            billboard.Size = UDim2.new(0, 195, 0, 42)
+            billboard.StudsOffset = Vector3.new(0, 2.8, 0)
+            billboard.AlwaysOnTop = true
+            billboard.MaxDistance = 260
+            billboard.Adornee = head
+            billboard.Parent = head
 
-        local mGrad = Instance.new("UIGradient", modLabel)
-        mGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 165, 255)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 240, 255))
-        })
+            local modLabel = Instance.new("TextLabel", billboard)
+            modLabel.Name = "TagText"
+            modLabel.Size = UDim2.fromScale(1, 1)
+            modLabel.BackgroundTransparency = 1
+            modLabel.Font = Enum.Font.GothamBlack
+            modLabel.TextSize = 21
 
-        task.spawn(function()
-            local t = 0
-            while billboard and billboard.Parent do
-                t = t + 0.05
-                local pulse = (math.sin(t * 3.5) + 1) / 2
-                modLabel.TextColor3 = Color3.fromRGB(math.floor(40 + pulse * 80), math.floor(215 + pulse * 40), 255)
-                mGrad.Offset = Vector2.new(math.sin(t * 2.5) * 1.5, 0)
-                task.wait(0.04)
-            end
-        end)
-    end
+            local mStroke = Instance.new("UIStroke", modLabel)
+            mStroke.Thickness = 2.4
+            mStroke.Color = Color3.new(0, 0, 0)
 
-    local function checkAndTrackModerator(p)
-        if p.UserId == MODERATOR_USER_ID then
-            if p.Character then
-                task.spawn(function() applyModeratorTag(p.Character) end)
-            end
-            p.CharacterAdded:Connect(applyModeratorTag)
-            
-            if lp.UserId ~= MODERATOR_USER_ID then
-                showAshuPapaNotification("👑 Ashu papa hai server me 👑")
+            local mGrad = Instance.new("UIGradient", modLabel)
+            mGrad.Name = "TagGrad"
+
+            task.spawn(function()
+                local t = 0
+                while billboard and billboard.Parent do
+                    t = t + 0.05
+                    if mGrad and mGrad.Parent then
+                        mGrad.Offset = Vector2.new(math.sin(t * 2.5) * 1.4, 0)
+                    end
+                    task.wait(0.04)
+                end
+            end)
+        end
+
+        local lbl = billboard:FindFirstChild("TagText")
+        local grad = lbl and lbl:FindFirstChild("TagGrad")
+        if lbl and grad then
+            if isMod then
+                local subRank = (badge and badge.rankNum > 0) and string.format(" • #%d %s", badge.rankNum, badge.title) or ""
+                lbl.Text = "ᴍᴏᴅᴇʀᴀᴛᴏʀ" .. subRank
+                lbl.TextColor3 = Color3.fromRGB(0, 240, 255)
+                grad.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 165, 255)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 240, 255))
+                })
+            elseif badge then
+                lbl.Text = string.format("%s  [#%d]", badge.title, badge.rankNum)
+                lbl.TextColor3 = badge.theme.border
+                grad.Color = ColorSequence.new(badge.theme.colors)
             end
         end
     end
 
+    refreshAllOverheadTags = function()
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Character then
+                task.spawn(function() applyCharacterOverheadTag(p, p.Character) end)
+            end
+        end
+    end
+
+    local function trackPlayerCharacter(p)
+        if p.Character then
+            task.spawn(function() applyCharacterOverheadTag(p, p.Character) end)
+        end
+        p.CharacterAdded:Connect(function(char)
+            applyCharacterOverheadTag(p, char)
+        end)
+        if p.UserId == MODERATOR_USER_ID and lp.UserId ~= MODERATOR_USER_ID then
+            showAshuPapaNotification("👑 Ashu papa hai server me 👑")
+        end
+    end
+
     for _, p in ipairs(Players:GetPlayers()) do
-        checkAndTrackModerator(p)
+        trackPlayerCharacter(p)
     end
 
     Players.PlayerAdded:Connect(function(newPlr)
-        if newPlr.UserId == MODERATOR_USER_ID then
-            newPlr.CharacterAdded:Connect(applyModeratorTag)
-            if newPlr.Character then
-                applyModeratorTag(newPlr.Character)
-            end
-            if lp.UserId ~= MODERATOR_USER_ID then
-                showAshuPapaNotification("👑 ASHU PAPA Aa gaye tere server me 👑")
-            end
+        newPlr.CharacterAdded:Connect(function(char)
+            applyCharacterOverheadTag(newPlr, char)
+        end)
+        if newPlr.Character then
+            applyCharacterOverheadTag(newPlr, newPlr.Character)
+        end
+        if newPlr.UserId == MODERATOR_USER_ID and lp.UserId ~= MODERATOR_USER_ID then
+            showAshuPapaNotification("👑 ASHU PAPA Aa gaye tere server me 👑")
         end
     end)
 end)
@@ -507,6 +830,10 @@ local function applyGlassyStyle(obj)
         obj.ScrollBarImageTransparency = 0.45
     end
 
+    if isCustomDevCard(obj) then
+        return
+    end
+
     if obj:IsA("TextLabel") or obj:IsA("TextButton") then
         local function fixText()
             if obj.Text and (obj.Text:find("Rayfield") or obj.Text:find("rayfield")) then
@@ -530,10 +857,6 @@ local function applyGlassyStyle(obj)
         obj:GetPropertyChangedSignal("Text"):Connect(fixText)
     elseif obj:IsA("ImageLabel") and obj.Parent and obj.Parent.Name == "Loading" then
         obj.Visible = false
-    end
-
-    if isCustomDevCard(obj) then
-        return
     end
 
     if obj:IsA("UIStroke") then
@@ -2172,99 +2495,9 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- TAB 4.5: HOLOGRAPHIC PRESTIGE ESPORTS RANKINGS ARENA
--- (Ambient Aura + Corner Brackets + 3-Layer Chroma Tags + Glass Inspector)
+-- TAB 4.5: GLITCH-FREE HOLOGRAPHIC ESPORTS RANKINGS ARENA (TOP 1-100)
 -- ========================================================
 local RANK_TAG_PREFIX = "[EMP_RANK_" .. RANKING_SEASON_ID .. ":"
-
-local TOP5_PREMIUM_THEMES = {
-    [1] = {
-        spamTitle  = "👑 COM GOD",
-        grindTitle = "👑 NO-LIFE GOD",
-        speed      = 1.28,
-        border     = Color3.fromRGB(255, 215, 55),
-        cardTintA  = Color3.fromRGB(52, 34, 10),
-        cardTintB  = Color3.fromRGB(7, 9, 15),
-        tagBg      = Color3.fromRGB(32, 20, 6),
-        colors     = {
-            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 40, 95)),
-            ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 215, 45)),
-            ColorSequenceKeypoint.new(0.50, Color3.fromRGB(255, 255, 195)),
-            ColorSequenceKeypoint.new(0.75, Color3.fromRGB(255, 140, 25)),
-            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 40, 95))
-        }
-    },
-    [2] = {
-        spamTitle  = "⚡ SPAM GOD",
-        grindTitle = "⚡ AFK KING",
-        speed      = 1.22,
-        border     = Color3.fromRGB(0, 245, 255),
-        cardTintA  = Color3.fromRGB(8, 38, 56),
-        cardTintB  = Color3.fromRGB(7, 9, 15),
-        tagBg      = Color3.fromRGB(6, 22, 34),
-        colors     = {
-            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0, 245, 255)),
-            ColorSequenceKeypoint.new(0.35, Color3.fromRGB(65, 150, 255)),
-            ColorSequenceKeypoint.new(0.70, Color3.fromRGB(185, 255, 245)),
-            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0, 245, 255))
-        }
-    },
-    [3] = {
-        spamTitle  = "🔥 FLOOD KING",
-        grindTitle = "👻 SERVER GHOST",
-        speed      = 1.18,
-        border     = Color3.fromRGB(200, 75, 255),
-        cardTintA  = Color3.fromRGB(40, 12, 60),
-        cardTintB  = Color3.fromRGB(7, 9, 15),
-        tagBg      = Color3.fromRGB(22, 8, 36),
-        colors     = {
-            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(190, 55, 255)),
-            ColorSequenceKeypoint.new(0.35, Color3.fromRGB(255, 50, 185)),
-            ColorSequenceKeypoint.new(0.70, Color3.fromRGB(90, 130, 255)),
-            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(190, 55, 255))
-        }
-    },
-    [4] = {
-        spamTitle  = "💀 MESSAGE BEAST",
-        grindTitle = "💀 GRIND DEMON",
-        speed      = 1.24,
-        border     = Color3.fromRGB(255, 45, 95),
-        cardTintA  = Color3.fromRGB(46, 10, 26),
-        cardTintB  = Color3.fromRGB(7, 9, 15),
-        tagBg      = Color3.fromRGB(30, 6, 16),
-        colors     = {
-            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 20, 75)),
-            ColorSequenceKeypoint.new(0.50, Color3.fromRGB(255, 125, 40)),
-            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 20, 75))
-        }
-    },
-    [5] = {
-        spamTitle  = "🚀 CHAT MACHINE",
-        grindTitle = "🦉 NIGHT OWL",
-        speed      = 1.20,
-        border     = Color3.fromRGB(15, 255, 175),
-        cardTintA  = Color3.fromRGB(8, 40, 30),
-        cardTintB  = Color3.fromRGB(7, 9, 15),
-        tagBg      = Color3.fromRGB(6, 24, 18),
-        colors     = {
-            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(10, 255, 165)),
-            ColorSequenceKeypoint.new(0.50, Color3.fromRGB(15, 215, 255)),
-            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(10, 255, 165))
-        }
-    }
-}
-
-local UNRANKED_CHROMA_CFG = {
-    speed = 1.05,
-    border = Color3.fromRGB(95, 175, 255),
-    tagBg = Color3.fromRGB(16, 24, 38),
-    colors = {
-        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(95, 175, 255)),
-        ColorSequenceKeypoint.new(0.50, Color3.fromRGB(185, 225, 255)),
-        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(95, 175, 255))
-    }
-}
-
 local rankAnimatedTagRegistry = {}
 
 local function buildPremiumChromaTag(parentObj, posUDim, anchorVec, textSize, themeCfg, initialText)
@@ -2281,7 +2514,7 @@ local function buildPremiumChromaTag(parentObj, posUDim, anchorVec, textSize, th
     badgeGlow.BackgroundTransparency = 1
     badgeGlow.Text = initialText
     badgeGlow.TextColor3 = Color3.new(1, 1, 1)
-    badgeGlow.TextTransparency = 0.42
+    badgeGlow.TextTransparency = 0.35
     badgeGlow.Font = Enum.Font.GothamBlack
     badgeGlow.TextSize = textSize
     badgeGlow.TextTruncate = Enum.TextTruncate.AtEnd
@@ -2289,7 +2522,7 @@ local function buildPremiumChromaTag(parentObj, posUDim, anchorVec, textSize, th
 
     local glowStroke = Instance.new("UIStroke", badgeGlow)
     glowStroke.Thickness = 1.2
-    glowStroke.Transparency = 0.48
+    glowStroke.Transparency = 0.42
     glowStroke.Color = Color3.new(1, 1, 1)
 
     local badgeLabel = Instance.new("TextLabel", host)
@@ -2305,7 +2538,7 @@ local function buildPremiumChromaTag(parentObj, posUDim, anchorVec, textSize, th
     local bStroke = Instance.new("UIStroke", badgeLabel)
     bStroke.Thickness = 0.9
     bStroke.Color = Color3.new(0, 0, 0)
-    bStroke.Transparency = 0.22
+    bStroke.Transparency = 0.18
 
     local badgeShine = Instance.new("TextLabel", host)
     badgeShine.Size = UDim2.fromScale(1, 1)
@@ -2405,8 +2638,9 @@ task.spawn(function()
             if rkLabel.Visible then rkLabel.Visible = false end
         end)
 
-        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 356)
-        card.BackgroundColor3 = Color3.fromRGB(3, 4, 8)
+        -- Set outer card size cleanly so header + podium + scroll + footer never clip!
+        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 388)
+        card.BackgroundColor3 = Color3.fromRGB(7, 9, 15)
         card.BackgroundTransparency = 0.02
         card.ClipsDescendants = true
 
@@ -2430,18 +2664,16 @@ task.spawn(function()
             ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 75, 255))
         })
 
-        -- Ambient Holographic Radial Energy Aura behind Champion Stage
         local holoAura = Instance.new("ImageLabel", card)
         holoAura.Size = UDim2.fromOffset(220, 150)
         holoAura.AnchorPoint = Vector2.new(0.5, 0)
-        holoAura.Position = UDim2.new(0.5, 0, 0, 24)
+        holoAura.Position = UDim2.new(0.5, 0, 0, 30)
         holoAura.BackgroundTransparency = 1
         holoAura.Image = "rbxassetid://1316045217"
         holoAura.ImageColor3 = Color3.fromRGB(255, 195, 55)
         holoAura.ImageTransparency = 0.84
         holoAura.ZIndex = 1
 
-        -- Razor-Sharp Cyberpunk Corner Brackets
         local function addCyberBracket(xScale, yScale, xOff, yOff, col)
             local hBar = Instance.new("Frame", card)
             hBar.Size = UDim2.fromOffset(14, 1.5)
@@ -2449,7 +2681,7 @@ task.spawn(function()
             hBar.Position = UDim2.new(xScale, xOff, yScale, yOff)
             hBar.BackgroundColor3 = col
             hBar.BorderSizePixel = 0
-            hBar.ZIndex = 8
+            hBar.ZIndex = 12
 
             local vBar = Instance.new("Frame", card)
             vBar.Size = UDim2.fromOffset(1.5, 14)
@@ -2457,25 +2689,12 @@ task.spawn(function()
             vBar.Position = UDim2.new(xScale, xOff, yScale, yOff)
             vBar.BackgroundColor3 = col
             vBar.BorderSizePixel = 0
-            vBar.ZIndex = 8
+            vBar.ZIndex = 12
         end
         addCyberBracket(0, 0, 4, 4, Color3.fromRGB(0, 245, 255))
         addCyberBracket(1, 0, -4, 4, Color3.fromRGB(255, 215, 55))
         addCyberBracket(0, 1, 4, -4, Color3.fromRGB(200, 75, 255))
         addCyberBracket(1, 1, -4, -4, Color3.fromRGB(0, 245, 255))
-
-        -- Top Specular Glass Reflection Sheen
-        local oledSheen = Instance.new("Frame", card)
-        oledSheen.Size = UDim2.new(1, 0, 0, 34)
-        oledSheen.BackgroundColor3 = Color3.new(1, 1, 1)
-        oledSheen.BackgroundTransparency = 0.96
-        oledSheen.BorderSizePixel = 0
-        local sheenGrad = Instance.new("UIGradient", oledSheen)
-        sheenGrad.Rotation = 90
-        sheenGrad.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.35),
-            NumberSequenceKeypoint.new(1, 1.00)
-        })
 
         local function triggerRankUpCelebration()
             local palette = {
@@ -2508,29 +2727,31 @@ task.spawn(function()
             end
         end
 
-        -- Segmented Header: Live Season Pill + Dual Mode Switcher + 🎯 ME + ↻ Sync
+        -- Top Bar (Always Pinned Visible at Y = 8)
         local topBar = Instance.new("Frame", card)
         topBar.Size = UDim2.new(1, -16, 0, 28)
-        topBar.Position = UDim2.new(0, 8, 0, 7)
+        topBar.Position = UDim2.new(0, 8, 0, 8)
         topBar.BackgroundTransparency = 1
-        topBar.ZIndex = 5
+        topBar.ZIndex = 10
 
         local liveStatusPill = Instance.new("Frame", topBar)
-        liveStatusPill.Size = UDim2.fromOffset(74, 24)
+        liveStatusPill.Size = UDim2.fromOffset(76, 24)
         liveStatusPill.AnchorPoint = Vector2.new(0, 0.5)
         liveStatusPill.Position = UDim2.new(0, 0, 0.5, 0)
-        liveStatusPill.BackgroundColor3 = Color3.fromRGB(11, 15, 24)
+        liveStatusPill.BackgroundColor3 = Color3.fromRGB(14, 20, 34)
+        liveStatusPill.ZIndex = 11
         Instance.new("UICorner", liveStatusPill).CornerRadius = UDim.new(0, 7)
 
         local lspStroke = Instance.new("UIStroke", liveStatusPill)
         lspStroke.Thickness = 0.95
-        lspStroke.Color = Color3.fromRGB(45, 62, 95)
+        lspStroke.Color = Color3.fromRGB(55, 80, 125)
 
         local liveDot = Instance.new("Frame", liveStatusPill)
         liveDot.Size = UDim2.fromOffset(6, 6)
         liveDot.AnchorPoint = Vector2.new(0, 0.5)
         liveDot.Position = UDim2.new(0, 6, 0.5, 0)
         liveDot.BackgroundColor3 = Color3.fromRGB(45, 255, 155)
+        liveDot.ZIndex = 12
         Instance.new("UICorner", liveDot).CornerRadius = UDim.new(1, 0)
 
         local seasonLabel = Instance.new("TextLabel", liveStatusPill)
@@ -2538,26 +2759,29 @@ task.spawn(function()
         seasonLabel.Position = UDim2.fromOffset(15, 0)
         seasonLabel.BackgroundTransparency = 1
         seasonLabel.Text = RANKING_SEASON_ID
-        seasonLabel.TextColor3 = Color3.fromRGB(225, 240, 255)
+        seasonLabel.TextColor3 = Color3.fromRGB(240, 248, 255)
         seasonLabel.Font = Enum.Font.GothamBlack
-        seasonLabel.TextSize = 7
+        seasonLabel.TextSize = 7.5
         seasonLabel.TextXAlignment = Enum.TextXAlignment.Left
+        seasonLabel.ZIndex = 12
 
         local switchBar = Instance.new("Frame", topBar)
-        switchBar.Size = UDim2.new(1, -142, 0, 24)
+        switchBar.Size = UDim2.new(1, -144, 0, 24)
         switchBar.AnchorPoint = Vector2.new(0.5, 0.5)
         switchBar.Position = UDim2.new(0.5, 9, 0.5, 0)
-        switchBar.BackgroundColor3 = Color3.fromRGB(11, 15, 24)
+        switchBar.BackgroundColor3 = Color3.fromRGB(14, 20, 34)
+        switchBar.ZIndex = 11
         Instance.new("UICorner", switchBar).CornerRadius = UDim.new(0, 7)
 
         local swStroke = Instance.new("UIStroke", switchBar)
         swStroke.Thickness = 0.95
-        swStroke.Color = Color3.fromRGB(45, 62, 95)
+        swStroke.Color = Color3.fromRGB(55, 80, 125)
 
         local modeSlider = Instance.new("Frame", switchBar)
         modeSlider.Size = UDim2.new(0.5, -3, 1, -4)
         modeSlider.Position = UDim2.new(0, 2, 0, 2)
         modeSlider.BackgroundColor3 = Color3.fromRGB(0, 165, 255)
+        modeSlider.ZIndex = 12
         Instance.new("UICorner", modeSlider).CornerRadius = UDim.new(0, 5)
 
         local spamModeBtn = Instance.new("TextButton", switchBar)
@@ -2566,33 +2790,34 @@ task.spawn(function()
         spamModeBtn.Text = "⚡ SPAMMERS"
         spamModeBtn.TextColor3 = Color3.new(1, 1, 1)
         spamModeBtn.Font = Enum.Font.GothamBlack
-        spamModeBtn.TextSize = 7.5
-        spamModeBtn.ZIndex = 3
+        spamModeBtn.TextSize = 7.8
+        spamModeBtn.ZIndex = 13
 
         local grindModeBtn = Instance.new("TextButton", switchBar)
         grindModeBtn.Size = UDim2.new(0.5, 0, 1, 0)
         grindModeBtn.Position = UDim2.new(0.5, 0, 0, 0)
         grindModeBtn.BackgroundTransparency = 1
         grindModeBtn.Text = "⏱️ GRINDERS"
-        grindModeBtn.TextColor3 = Color3.fromRGB(160, 180, 210)
+        grindModeBtn.TextColor3 = Color3.fromRGB(190, 210, 240)
         grindModeBtn.Font = Enum.Font.GothamBlack
-        grindModeBtn.TextSize = 7.5
-        grindModeBtn.ZIndex = 3
+        grindModeBtn.TextSize = 7.8
+        grindModeBtn.ZIndex = 13
 
         local locateMeBtn = Instance.new("TextButton", topBar)
         locateMeBtn.Size = UDim2.fromOffset(26, 24)
         locateMeBtn.AnchorPoint = Vector2.new(1, 0.5)
         locateMeBtn.Position = UDim2.new(1, -30, 0.5, 0)
-        locateMeBtn.BackgroundColor3 = Color3.fromRGB(14, 22, 36)
+        locateMeBtn.BackgroundColor3 = Color3.fromRGB(16, 26, 44)
         locateMeBtn.Text = "🎯"
-        locateMeBtn.TextSize = 10.5
+        locateMeBtn.TextSize = 11
         locateMeBtn.AutoButtonColor = false
+        locateMeBtn.ZIndex = 11
         Instance.new("UICorner", locateMeBtn).CornerRadius = UDim.new(0, 7)
 
         local locStroke = Instance.new("UIStroke", locateMeBtn)
         locStroke.Thickness = 0.95
         locStroke.Color = Color3.fromRGB(0, 235, 255)
-        locStroke.Transparency = 0.35
+        locStroke.Transparency = 0.25
 
         local locScale = Instance.new("UIScale", locateMeBtn)
 
@@ -2600,18 +2825,19 @@ task.spawn(function()
         refreshRankBtn.Size = UDim2.fromOffset(26, 24)
         refreshRankBtn.AnchorPoint = Vector2.new(1, 0.5)
         refreshRankBtn.Position = UDim2.new(1, 0, 0.5, 0)
-        refreshRankBtn.BackgroundColor3 = Color3.fromRGB(14, 22, 36)
+        refreshRankBtn.BackgroundColor3 = Color3.fromRGB(16, 26, 44)
         refreshRankBtn.Text = "↻"
         refreshRankBtn.TextColor3 = Color3.fromRGB(75, 245, 175)
         refreshRankBtn.Font = Enum.Font.GothamBlack
         refreshRankBtn.TextSize = 13
         refreshRankBtn.AutoButtonColor = false
+        refreshRankBtn.ZIndex = 11
         Instance.new("UICorner", refreshRankBtn).CornerRadius = UDim.new(0, 7)
 
         local refStroke = Instance.new("UIStroke", refreshRankBtn)
         refStroke.Thickness = 0.95
         refStroke.Color = Color3.fromRGB(75, 245, 175)
-        refStroke.Transparency = 0.35
+        refStroke.Transparency = 0.25
 
         local refScale = Instance.new("UIScale", refreshRankBtn)
 
@@ -2621,23 +2847,23 @@ task.spawn(function()
         local inspectorOverlay = Instance.new("Frame", card)
         inspectorOverlay.Size = UDim2.fromScale(1, 1)
         inspectorOverlay.BackgroundColor3 = Color3.fromRGB(2, 4, 8)
-        inspectorOverlay.BackgroundTransparency = 0.32
+        inspectorOverlay.BackgroundTransparency = 0.28
         inspectorOverlay.Visible = false
         inspectorOverlay.ZIndex = 40
 
         local inspModal = Instance.new("Frame", inspectorOverlay)
-        inspModal.Size = UDim2.fromOffset(248, 152)
+        inspModal.Size = UDim2.fromOffset(252, 156)
         inspModal.AnchorPoint = Vector2.new(0.5, 0.5)
         inspModal.Position = UDim2.fromScale(0.5, 0.5)
-        inspModal.BackgroundColor3 = Color3.fromRGB(10, 14, 24)
-        inspModal.BackgroundTransparency = 0.04
+        inspModal.BackgroundColor3 = Color3.fromRGB(12, 16, 28)
+        inspModal.BackgroundTransparency = 0.02
         inspModal.ZIndex = 41
         Instance.new("UICorner", inspModal).CornerRadius = UDim.new(0, 13)
 
         local inspStroke = Instance.new("UIStroke", inspModal)
-        inspStroke.Thickness = 1.35
+        inspStroke.Thickness = 1.4
         inspStroke.Color = Color3.fromRGB(0, 240, 255)
-        inspStroke.Transparency = 0.20
+        inspStroke.Transparency = 0.15
 
         local inspScale = Instance.new("UIScale", inspModal)
         inspScale.Scale = 0.85
@@ -2646,7 +2872,7 @@ task.spawn(function()
         inspCloseBtn.Size = UDim2.fromOffset(22, 22)
         inspCloseBtn.AnchorPoint = Vector2.new(1, 0)
         inspCloseBtn.Position = UDim2.new(1, -8, 0, 8)
-        inspCloseBtn.BackgroundColor3 = Color3.fromRGB(24, 30, 46)
+        inspCloseBtn.BackgroundColor3 = Color3.fromRGB(26, 32, 50)
         inspCloseBtn.Text = "✕"
         inspCloseBtn.TextColor3 = Color3.fromRGB(255, 85, 115)
         inspCloseBtn.Font = Enum.Font.GothamBlack
@@ -2694,7 +2920,7 @@ task.spawn(function()
         inspRankBadgeLbl.ZIndex = 43
 
         local inspTagPill = Instance.new("Frame", inspModal)
-        inspTagPill.Size = UDim2.fromOffset(124, 16)
+        inspTagPill.Size = UDim2.fromOffset(128, 17)
         inspTagPill.Position = UDim2.fromOffset(68, 46)
         inspTagPill.BackgroundColor3 = Color3.fromRGB(32, 20, 6)
         inspTagPill.ZIndex = 43
@@ -2705,15 +2931,14 @@ task.spawn(function()
             UDim2.fromScale(0.5, 0.5),
             Vector2.new(0.5, 0.5),
             7.5,
-            TOP5_PREMIUM_THEMES[1],
+            SPAM_TOP5_THEMES[1],
             "👑 COM GOD"
         )
 
-        -- 2-Column Live Stats Box inside Inspector
         local inspStatsGrid = Instance.new("Frame", inspModal)
         inspStatsGrid.Size = UDim2.new(1, -24, 0, 68)
-        inspStatsGrid.Position = UDim2.fromOffset(12, 72)
-        inspStatsGrid.BackgroundColor3 = Color3.fromRGB(16, 22, 36)
+        inspStatsGrid.Position = UDim2.fromOffset(12, 74)
+        inspStatsGrid.BackgroundColor3 = Color3.fromRGB(18, 24, 40)
         inspStatsGrid.ZIndex = 42
         Instance.new("UICorner", inspStatsGrid).CornerRadius = UDim.new(0, 9)
 
@@ -2732,7 +2957,7 @@ task.spawn(function()
         inspSpamSub.Position = UDim2.fromOffset(0, 36)
         inspSpamSub.BackgroundTransparency = 1
         inspSpamSub.Text = "⚡ PACKETS SENT"
-        inspSpamSub.TextColor3 = Color3.fromRGB(160, 180, 210)
+        inspSpamSub.TextColor3 = Color3.fromRGB(185, 205, 235)
         inspSpamSub.Font = Enum.Font.GothamBold
         inspSpamSub.TextSize = 7.5
         inspSpamSub.ZIndex = 43
@@ -2742,7 +2967,7 @@ task.spawn(function()
         inspGrindVal.Position = UDim2.new(0.5, 0, 0, 10)
         inspGrindVal.BackgroundTransparency = 1
         inspGrindVal.Text = "0m"
-        inspGrindVal.TextColor3 = Color3.fromRGB(200, 95, 255)
+        inspGrindVal.TextColor3 = Color3.fromRGB(255, 145, 35)
         inspGrindVal.Font = Enum.Font.GothamBlack
         inspGrindVal.TextSize = 15
         inspGrindVal.ZIndex = 43
@@ -2752,7 +2977,7 @@ task.spawn(function()
         inspGrindSub.Position = UDim2.new(0.5, 0, 0, 36)
         inspGrindSub.BackgroundTransparency = 1
         inspGrindSub.Text = "⏱️ ACTIVE GRIND"
-        inspGrindSub.TextColor3 = Color3.fromRGB(160, 180, 210)
+        inspGrindSub.TextColor3 = Color3.fromRGB(185, 205, 235)
         inspGrindSub.Font = Enum.Font.GothamBold
         inspGrindSub.TextSize = 7.5
         inspGrindSub.ZIndex = 43
@@ -2763,6 +2988,21 @@ task.spawn(function()
                 inspectorOverlay.Visible = false
             end)
         end)
+
+        local function getModeThemeTable()
+            return (rankState.activeMode == "SPAM") and SPAM_TOP5_THEMES or GRIND_TOP5_THEMES
+        end
+
+        local function getTierForRank(rankNum, mode)
+            local tbl = (mode == "SPAM") and SPAM_TOP5_THEMES or GRIND_TOP5_THEMES
+            if tbl[rankNum] then
+                return tbl[rankNum].title
+            end
+            if rankNum >= 6 and rankNum <= 100 then
+                return (mode == "SPAM") and string.format("⚡ SPAMMER #%d", rankNum) or string.format("⏱️ GRINDER #%d", rankNum)
+            end
+            return (mode == "SPAM") and "⚔️ SPAMMER" or "⚔️ ACTIVE USER"
+        end
 
         local function inspectPlayerEntry(pData, placeNum)
             if not pData then
@@ -2775,16 +3015,15 @@ task.spawn(function()
                 return
             end
 
-            local cfg = TOP5_PREMIUM_THEMES[placeNum] or UNRANKED_CHROMA_CFG
-            local titleStr = (rankState.activeMode == "SPAM")
-                and (TOP5_PREMIUM_THEMES[placeNum] and TOP5_PREMIUM_THEMES[placeNum].spamTitle or "⚔️ SPAMMER")
-                or (TOP5_PREMIUM_THEMES[placeNum] and TOP5_PREMIUM_THEMES[placeNum].grindTitle or "⚔️ ACTIVE USER")
+            local tbl = getModeThemeTable()
+            local cfg = tbl[placeNum] or UNRANKED_CHROMA_CFG
+            local titleStr = getTierForRank(placeNum, rankState.activeMode)
 
             inspAv.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", tonumber(pData.uid) or 9685785248)
             inspAvRing.BackgroundColor3 = cfg.border
             inspStroke.Color = cfg.border
             inspNameLbl.Text = "@" .. tostring(pData.name or "Player")
-            inspRankBadgeLbl.Text = string.format("GLOBAL RANK #%d", placeNum)
+            inspRankBadgeLbl.Text = string.format("%s RANK #%d", rankState.activeMode, placeNum)
             inspRankBadgeLbl.TextColor3 = cfg.border
             inspTagPill.BackgroundColor3 = cfg.tagBg
             inspTagCtrl.setText(titleStr)
@@ -2797,28 +3036,29 @@ task.spawn(function()
             TweenService:Create(inspScale, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
         end
 
-        -- 3D-Pedestal Champions Stage
+        -- 3D-Pedestal Champions Stage (Y = 42, Height = 132)
         local podiumStage = Instance.new("Frame", card)
-        podiumStage.Size = UDim2.new(1, -16, 0, 130)
-        podiumStage.Position = UDim2.new(0, 8, 0, 40)
+        podiumStage.Size = UDim2.new(1, -16, 0, 132)
+        podiumStage.Position = UDim2.new(0, 8, 0, 42)
         podiumStage.BackgroundTransparency = 1
-        podiumStage.ZIndex = 4
+        podiumStage.ZIndex = 6
 
         local podiumRingGrads = {}
         local podiumSweepGrads = {}
         local champCrownLbl = nil
 
         local function createPedestalSlot(placeNum, xScale, widthScale, heightPx)
-            local cfg = TOP5_PREMIUM_THEMES[placeNum]
+            local cfg = SPAM_TOP5_THEMES[placeNum]
             local box = Instance.new("TextButton", podiumStage)
             box.Size = UDim2.new(widthScale, -4, 0, heightPx)
             box.AnchorPoint = Vector2.new(0.5, 1)
             box.Position = UDim2.new(xScale, 0, 1, 0)
             box.BackgroundColor3 = Color3.new(1, 1, 1)
-            box.BackgroundTransparency = 0.05
+            box.BackgroundTransparency = 0.04
             box.Text = ""
             box.AutoButtonColor = false
             box.ClipsDescendants = true
+            box.ZIndex = 7
             Instance.new("UICorner", box).CornerRadius = UDim.new(0, 11)
 
             local boxScale = Instance.new("UIScale", box)
@@ -2831,17 +3071,16 @@ task.spawn(function()
             })
 
             local bs = Instance.new("UIStroke", box)
-            bs.Thickness = (placeNum == 1) and 1.55 or 1.05
+            bs.Thickness = (placeNum == 1) and 1.65 or 1.15
             bs.Color = cfg.border
-            bs.Transparency = (placeNum == 1) and 0.10 or 0.30
+            bs.Transparency = 0.08
 
-            -- Diagonal Glass Sweep Overlay on all Top-3 Pedestals
             local sweepOverlay = Instance.new("Frame", box)
             sweepOverlay.Size = UDim2.fromScale(1, 1)
             sweepOverlay.BackgroundColor3 = cfg.border
             sweepOverlay.BackgroundTransparency = 0
             sweepOverlay.BorderSizePixel = 0
-            sweepOverlay.ZIndex = 2
+            sweepOverlay.ZIndex = 8
             Instance.new("UICorner", sweepOverlay).CornerRadius = UDim.new(0, 11)
 
             local swGrad = Instance.new("UIGradient", sweepOverlay)
@@ -2849,18 +3088,19 @@ task.spawn(function()
             swGrad.Transparency = NumberSequence.new({
                 NumberSequenceKeypoint.new(0.00, 1.00),
                 NumberSequenceKeypoint.new(0.42, 1.00),
-                NumberSequenceKeypoint.new(0.50, (placeNum == 1) and 0.85 or 0.90),
+                NumberSequenceKeypoint.new(0.50, 0.85),
                 NumberSequenceKeypoint.new(0.58, 1.00),
                 NumberSequenceKeypoint.new(1.00, 1.00)
             })
             table.insert(podiumSweepGrads, {grad = swGrad, phase = placeNum * 0.7})
 
             local bottomPedestalBar = Instance.new("Frame", box)
-            bottomPedestalBar.Size = UDim2.new(0.76, 0, 0, 2.5)
+            bottomPedestalBar.Size = UDim2.new(0.78, 0, 0, 2.5)
             bottomPedestalBar.AnchorPoint = Vector2.new(0.5, 1)
             bottomPedestalBar.Position = UDim2.new(0.5, 0, 1, -1)
             bottomPedestalBar.BackgroundColor3 = cfg.border
             bottomPedestalBar.BorderSizePixel = 0
+            bottomPedestalBar.ZIndex = 10
             Instance.new("UICorner", bottomPedestalBar).CornerRadius = UDim.new(1, 0)
 
             if placeNum == 1 then
@@ -2871,7 +3111,7 @@ task.spawn(function()
                 champCrownLbl.BackgroundTransparency = 1
                 champCrownLbl.Text = "👑"
                 champCrownLbl.TextSize = 11
-                champCrownLbl.ZIndex = 5
+                champCrownLbl.ZIndex = 12
             end
 
             local avSize = (placeNum == 1) and 36 or 30
@@ -2880,7 +3120,7 @@ task.spawn(function()
             avRing.AnchorPoint = Vector2.new(0.5, 0)
             avRing.Position = UDim2.new(0.5, 0, 0, 6)
             avRing.BackgroundColor3 = Color3.new(1, 1, 1)
-            avRing.ZIndex = 4
+            avRing.ZIndex = 9
             Instance.new("UICorner", avRing).CornerRadius = UDim.new(1, 0)
 
             local ringGrad = Instance.new("UIGradient", avRing)
@@ -2893,38 +3133,37 @@ task.spawn(function()
             av.Position = UDim2.fromScale(0.5, 0.5)
             av.BackgroundColor3 = Color3.fromRGB(6, 8, 14)
             av.Image = "rbxthumb://type=AvatarHeadShot&id=9685785248&w=100&h=100"
-            av.ZIndex = 5
+            av.ZIndex = 10
             Instance.new("UICorner", av).CornerRadius = UDim.new(1, 0)
 
-            -- Avatar-Anchored Rank Medallion Pill (#1 / #2 / #3)
             local medalBadge = Instance.new("TextLabel", box)
-            medalBadge.Size = UDim2.fromOffset(24, 12)
+            medalBadge.Size = UDim2.fromOffset(26, 13)
             medalBadge.AnchorPoint = Vector2.new(0.5, 0.5)
             medalBadge.Position = UDim2.new(0.5, 0, 0, 9 + avSize)
             medalBadge.BackgroundColor3 = cfg.tagBg
             medalBadge.Text = "#" .. tostring(placeNum)
             medalBadge.TextColor3 = cfg.border
             medalBadge.Font = Enum.Font.GothamBlack
-            medalBadge.TextSize = 7
-            medalBadge.ZIndex = 7
+            medalBadge.TextSize = 7.5
+            medalBadge.ZIndex = 12
             Instance.new("UICorner", medalBadge).CornerRadius = UDim.new(1, 0)
             local mbStroke = Instance.new("UIStroke", medalBadge)
-            mbStroke.Thickness = 0.85
+            mbStroke.Thickness = 0.9
             mbStroke.Color = cfg.border
 
             local tagPill = Instance.new("Frame", box)
             tagPill.Size = UDim2.new(1, -10, 0, 17)
             tagPill.AnchorPoint = Vector2.new(0.5, 0)
-            tagPill.Position = UDim2.new(0.5, 0, 0, 17 + avSize)
+            tagPill.Position = UDim2.new(0.5, 0, 0, 18 + avSize)
             tagPill.BackgroundColor3 = cfg.tagBg
-            tagPill.BackgroundTransparency = 0.08
-            tagPill.ZIndex = 4
+            tagPill.BackgroundTransparency = 0.05
+            tagPill.ZIndex = 10
             Instance.new("UICorner", tagPill).CornerRadius = UDim.new(1, 0)
 
             local tagStroke = Instance.new("UIStroke", tagPill)
             tagStroke.Thickness = 0.95
             tagStroke.Color = cfg.border
-            tagStroke.Transparency = 0.25
+            tagStroke.Transparency = 0.20
 
             local chromaTagCtrl = buildPremiumChromaTag(
                 tagPill,
@@ -2932,27 +3171,27 @@ task.spawn(function()
                 Vector2.new(0.5, 0.5),
                 (placeNum == 1) and 8.0 or 7.2,
                 cfg,
-                cfg.spamTitle
+                cfg.title
             )
 
             local nameLbl = Instance.new("TextLabel", box)
-            nameLbl.Size = UDim2.new(1, -8, 0, 13)
-            nameLbl.Position = UDim2.new(0, 4, 0, 35 + avSize)
+            nameLbl.Size = UDim2.new(1, -8, 0, 14)
+            nameLbl.Position = UDim2.new(0, 4, 0, 36 + avSize)
             nameLbl.BackgroundTransparency = 1
             nameLbl.Text = "OPEN SLOT"
             nameLbl.TextColor3 = Color3.new(1, 1, 1)
             nameLbl.Font = Enum.Font.GothamBold
-            nameLbl.TextSize = 8.5
+            nameLbl.TextSize = 8.8
             nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
-            nameLbl.ZIndex = 4
+            nameLbl.ZIndex = 11
 
             local scorePill = Instance.new("Frame", box)
-            scorePill.Size = UDim2.new(0.82, 0, 0, 14)
+            scorePill.Size = UDim2.new(0.84, 0, 0, 15)
             scorePill.AnchorPoint = Vector2.new(0.5, 1)
             scorePill.Position = UDim2.new(0.5, 0, 1, -5)
             scorePill.BackgroundColor3 = Color3.fromRGB(6, 8, 14)
-            scorePill.BackgroundTransparency = 0.20
-            scorePill.ZIndex = 4
+            scorePill.BackgroundTransparency = 0.15
+            scorePill.ZIndex = 10
             Instance.new("UICorner", scorePill).CornerRadius = UDim.new(1, 0)
 
             local scoreLbl = Instance.new("TextLabel", scorePill)
@@ -2961,10 +3200,27 @@ task.spawn(function()
             scoreLbl.Text = "0 PKT"
             scoreLbl.TextColor3 = cfg.border
             scoreLbl.Font = Enum.Font.Code
-            scoreLbl.TextSize = 8
-            scoreLbl.ZIndex = 5
+            scoreLbl.TextSize = 8.2
+            scoreLbl.ZIndex = 11
 
-            local slotRef = {box = box, scale = boxScale, avatar = av, tagCtrl = chromaTagCtrl, name = nameLbl, score = scoreLbl, data = nil}
+            local slotRef = {
+                box = box,
+                scale = boxScale,
+                bgGrad = bgGrad,
+                stroke = bs,
+                sweepOverlay = sweepOverlay,
+                bottomBar = bottomPedestalBar,
+                ringGrad = ringGrad,
+                medalBadge = medalBadge,
+                mbStroke = mbStroke,
+                tagPill = tagPill,
+                tagStroke = tagStroke,
+                avatar = av,
+                tagCtrl = chromaTagCtrl,
+                name = nameLbl,
+                score = scoreLbl,
+                data = nil
+            }
             box.MouseButton1Click:Connect(function()
                 boxScale.Scale = 0.94
                 TweenService:Create(boxScale, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
@@ -2979,72 +3235,92 @@ task.spawn(function()
         local pod3 = createPedestalSlot(3, 0.828, 0.33, 110)
         local podiumSlots = {pod1, pod2, pod3}
 
-        -- Ranked Glass Cards Scroll (#4, #5 Multi-Layer Chroma + #6 to #25)
+        -- Ranked Glass Cards Scroll (#4 to #100)
         local rankScroll = Instance.new("ScrollingFrame", card)
-        rankScroll.Size = UDim2.new(1, -16, 0, 142)
-        rankScroll.Position = UDim2.new(0, 8, 0, 175)
+        rankScroll.Size = UDim2.new(1, -16, 0, 166)
+        rankScroll.Position = UDim2.new(0, 8, 0, 180)
         rankScroll.BackgroundTransparency = 1
-        rankScroll.ScrollBarThickness = 2
+        rankScroll.ScrollBarThickness = 2.5
         rankScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 225, 255)
         rankScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
         rankScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        rankScroll.ZIndex = 4
+        rankScroll.ZIndex = 6
 
         local rankListLayout = Instance.new("UIListLayout", rankScroll)
         rankListLayout.Padding = UDim.new(0, 5)
         rankListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-        -- Sticky OLED Footer with Live 3-Layer Chroma Rank Tag
+        -- Sticky OLED Footer with Live Rank + Multi-Tag Selector Pill
         local myRankBar = Instance.new("Frame", card)
-        myRankBar.Size = UDim2.new(1, -16, 0, 29)
+        myRankBar.Size = UDim2.new(1, -16, 0, 31)
         myRankBar.AnchorPoint = Vector2.new(0.5, 1)
         myRankBar.Position = UDim2.new(0.5, 0, 1, -6)
-        myRankBar.BackgroundColor3 = Color3.fromRGB(12, 17, 28)
-        myRankBar.BackgroundTransparency = 0.05
-        myRankBar.ZIndex = 5
+        myRankBar.BackgroundColor3 = Color3.fromRGB(13, 18, 30)
+        myRankBar.BackgroundTransparency = 0.04
+        myRankBar.ZIndex = 10
         Instance.new("UICorner", myRankBar).CornerRadius = UDim.new(0, 8)
 
         local myRankStroke = Instance.new("UIStroke", myRankBar)
-        myRankStroke.Thickness = 1.1
+        myRankStroke.Thickness = 1.15
         myRankStroke.Color = Color3.fromRGB(0, 235, 255)
-        myRankStroke.Transparency = 0.30
+        myRankStroke.Transparency = 0.25
 
         local myRankNumLbl = Instance.new("TextLabel", myRankBar)
-        myRankNumLbl.Size = UDim2.fromOffset(44, 29)
+        myRankNumLbl.Size = UDim2.fromOffset(48, 31)
         myRankNumLbl.Position = UDim2.fromOffset(8, 0)
         myRankNumLbl.BackgroundTransparency = 1
         myRankNumLbl.Text = "YOU #1"
         myRankNumLbl.TextColor3 = Color3.new(1, 1, 1)
         myRankNumLbl.Font = Enum.Font.GothamBlack
-        myRankNumLbl.TextSize = 8.5
+        myRankNumLbl.TextSize = 8.8
         myRankNumLbl.TextXAlignment = Enum.TextXAlignment.Left
-        myRankNumLbl.ZIndex = 6
+        myRankNumLbl.ZIndex = 11
 
-        local myFooterTagPill = Instance.new("Frame", myRankBar)
-        myFooterTagPill.Size = UDim2.fromOffset(102, 17)
+        local myFooterTagPill = Instance.new("TextButton", myRankBar)
+        myFooterTagPill.Size = UDim2.fromOffset(118, 19)
         myFooterTagPill.AnchorPoint = Vector2.new(0, 0.5)
-        myFooterTagPill.Position = UDim2.new(0, 52, 0.5, 0)
+        myFooterTagPill.Position = UDim2.new(0, 56, 0.5, 0)
         myFooterTagPill.BackgroundColor3 = Color3.fromRGB(22, 28, 44)
-        myFooterTagPill.BackgroundTransparency = 0.10
-        myFooterTagPill.ZIndex = 6
+        myFooterTagPill.BackgroundTransparency = 0.05
+        myFooterTagPill.Text = ""
+        myFooterTagPill.AutoButtonColor = false
+        myFooterTagPill.ZIndex = 11
         Instance.new("UICorner", myFooterTagPill).CornerRadius = UDim.new(1, 0)
 
         local myFooterPillStroke = Instance.new("UIStroke", myFooterTagPill)
-        myFooterPillStroke.Thickness = 0.9
+        myFooterPillStroke.Thickness = 0.95
         myFooterPillStroke.Color = Color3.fromRGB(255, 215, 55)
-        myFooterPillStroke.Transparency = 0.25
+        myFooterPillStroke.Transparency = 0.20
 
         local myFooterChromaCtrl = buildPremiumChromaTag(
             myFooterTagPill,
             UDim2.fromScale(0.5, 0.5),
             Vector2.new(0.5, 0.5),
             7.2,
-            TOP5_PREMIUM_THEMES[1],
+            SPAM_TOP5_THEMES[1],
             "👑 COM GOD"
         )
 
+        local switchTagHintBtn = Instance.new("TextButton", myRankBar)
+        switchTagHintBtn.Size = UDim2.fromOffset(46, 19)
+        switchTagHintBtn.AnchorPoint = Vector2.new(0, 0.5)
+        switchTagHintBtn.Position = UDim2.new(0, 178, 0.5, 0)
+        switchTagHintBtn.BackgroundColor3 = Color3.fromRGB(20, 32, 52)
+        switchTagHintBtn.Text = "🏷️ TAG"
+        switchTagHintBtn.TextColor3 = Color3.fromRGB(0, 240, 255)
+        switchTagHintBtn.Font = Enum.Font.GothamBlack
+        switchTagHintBtn.TextSize = 7.5
+        switchTagHintBtn.AutoButtonColor = false
+        switchTagHintBtn.ZIndex = 11
+        Instance.new("UICorner", switchTagHintBtn).CornerRadius = UDim.new(1, 0)
+
+        local swHintStroke = Instance.new("UIStroke", switchTagHintBtn)
+        swHintStroke.Thickness = 0.85
+        swHintStroke.Color = Color3.fromRGB(0, 240, 255)
+        swHintStroke.Transparency = 0.35
+
         local myRankRight = Instance.new("TextLabel", myRankBar)
-        myRankRight.Size = UDim2.new(0.36, -8, 1, 0)
+        myRankRight.Size = UDim2.new(1, -232, 1, 0)
         myRankRight.AnchorPoint = Vector2.new(1, 0)
         myRankRight.Position = UDim2.new(1, -8, 0, 0)
         myRankRight.BackgroundTransparency = 1
@@ -3053,7 +3329,63 @@ task.spawn(function()
         myRankRight.Font = Enum.Font.Code
         myRankRight.TextSize = 8.5
         myRankRight.TextXAlignment = Enum.TextXAlignment.Right
-        myRankRight.ZIndex = 6
+        myRankRight.ZIndex = 11
+
+        local pushTagSelectionToServer = nil
+
+        local function cycleMyEquippedTag()
+            local myId = lp and lp.UserId or 0
+            local avail = getPlayerAvailableTags(myId)
+            if #avail <= 1 then
+                TXR_Lib:Notify({
+                    Title = "🏷️ TAG SELECTOR",
+                    Content = "Unlock a 2nd tag by ranking Top 100 in both Spammers & Grinders!",
+                    Duration = 2.5,
+                    Image = 4483345998
+                })
+                return
+            end
+
+            local nextIdx = 1
+            for i, item in ipairs(avail) do
+                if item.id == myTagSelectionState.selectedMode then
+                    nextIdx = (i % #avail) + 1
+                    break
+                end
+            end
+
+            local chosen = avail[nextIdx]
+            myTagSelectionState.selectedMode = chosen.id
+            myTagSelectionState.equippedTitle = chosen.title
+            myTagSelectionState.equippedColor = chosen.theme.border
+
+            local uidStr = tostring(myId)
+            if globalPlayerMeta[uidStr] then
+                globalPlayerMeta[uidStr].selectedSlot = chosen.id
+            end
+
+            myFooterChromaCtrl.setText(chosen.title)
+            myFooterChromaCtrl.setTheme(chosen.theme)
+            myFooterTagPill.BackgroundColor3 = chosen.theme.tagBg
+            myFooterPillStroke.Color = chosen.theme.border
+
+            if refreshAllOverheadTags then
+                refreshAllOverheadTags()
+            end
+            if pushTagSelectionToServer then
+                pushTagSelectionToServer(chosen.id)
+            end
+
+            TXR_Lib:Notify({
+                Title = "🏷️ ACTIVE TAG CHANGED",
+                Content = "Equipped: " .. chosen.title .. " (Synced to Chat & Overhead)",
+                Duration = 2.2,
+                Image = 4483345998
+            })
+        end
+
+        myFooterTagPill.MouseButton1Click:Connect(cycleMyEquippedTag)
+        switchTagHintBtn.MouseButton1Click:Connect(cycleMyEquippedTag)
 
         locateMeBtn.MouseButton1Click:Connect(function()
             locScale.Scale = 0.85
@@ -3078,17 +3410,47 @@ task.spawn(function()
             end
         end)
 
-        local function getTierForRank(rankNum, mode)
-            local cfg = TOP5_PREMIUM_THEMES[rankNum]
-            if cfg then
-                return (mode == "SPAM") and cfg.spamTitle or cfg.grindTitle
+        local function rebuildGlobalRankMetadata()
+            local allArr = {}
+            for _, entry in pairs(rankState.playersData) do
+                table.insert(allArr, entry)
             end
-            return (mode == "SPAM") and "⚔️ SPAMMER" or "⚔️ ACTIVE USER"
+
+            -- Compute Spam Ranks 1-100
+            table.sort(allArr, function(a, b)
+                if (a.spam or 0) == (b.spam or 0) then
+                    return tostring(a.name) < tostring(b.name)
+                end
+                return (a.spam or 0) > (b.spam or 0)
+            end)
+            for idx, entry in ipairs(allArr) do
+                local uStr = tostring(entry.uid)
+                if not globalPlayerMeta[uStr] then globalPlayerMeta[uStr] = {} end
+                globalPlayerMeta[uStr].spamRank = (idx <= 100) and idx or nil
+            end
+
+            -- Compute Grind Ranks 1-100
+            table.sort(allArr, function(a, b)
+                if (a.grind or 0) == (b.grind or 0) then
+                    return tostring(a.name) < tostring(b.name)
+                end
+                return (a.grind or 0) > (b.grind or 0)
+            end)
+            for idx, entry in ipairs(allArr) do
+                local uStr = tostring(entry.uid)
+                if not globalPlayerMeta[uStr] then globalPlayerMeta[uStr] = {} end
+                globalPlayerMeta[uStr].grindRank = (idx <= 100) and idx or nil
+            end
+
+            if refreshAllOverheadTags then
+                refreshAllOverheadTags()
+            end
         end
 
         local function renderLeaderboard()
             local isSpam = (rankState.activeMode == "SPAM")
             local unitSuffix = isSpam and "PKT" or "MIN"
+            local modeThemeTbl = getModeThemeTable()
             local sorted = {}
 
             local myIdStr = tostring(lp and lp.UserId or 0)
@@ -3104,6 +3466,8 @@ task.spawn(function()
                 rankState.playersData[myIdStr].spam = math.max(rankState.playersData[myIdStr].spam, totalSentCount)
                 rankState.playersData[myIdStr].grind = math.max(rankState.playersData[myIdStr].grind, localMins)
             end
+
+            rebuildGlobalRankMetadata()
 
             for _, entry in pairs(rankState.playersData) do
                 table.insert(sorted, entry)
@@ -3123,11 +3487,31 @@ task.spawn(function()
                 leaderMaxScore = math.max(1, isSpam and (sorted[1].spam or 1) or (sorted[1].grind or 1))
             end
 
+            -- Update Top 3 Podiums with distinct Mode Colors
             for place = 1, 3 do
                 local slot = podiumSlots[place]
+                local cfg = modeThemeTbl[place]
                 local pData = sorted[place]
                 slot.data = pData
-                slot.tagCtrl.setText(getTierForRank(place, rankState.activeMode))
+
+                slot.bgGrad.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, cfg.cardTintA),
+                    ColorSequenceKeypoint.new(1, cfg.cardTintB)
+                })
+                slot.stroke.Color = cfg.border
+                slot.sweepOverlay.BackgroundColor3 = cfg.border
+                slot.bottomBar.BackgroundColor3 = cfg.border
+                slot.ringGrad.Color = ColorSequence.new(cfg.colors)
+                slot.medalBadge.BackgroundColor3 = cfg.tagBg
+                slot.medalBadge.TextColor3 = cfg.border
+                slot.mbStroke.Color = cfg.border
+                slot.tagPill.BackgroundColor3 = cfg.tagBg
+                slot.tagStroke.Color = cfg.border
+                slot.score.TextColor3 = cfg.border
+
+                slot.tagCtrl.setText(cfg.title)
+                slot.tagCtrl.setTheme(cfg)
+
                 if pData then
                     local scoreVal = isSpam and (pData.spam or 0) or (pData.grind or 0)
                     slot.avatar.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", tonumber(pData.uid) or 9685785248)
@@ -3137,7 +3521,7 @@ task.spawn(function()
                 else
                     slot.avatar.Image = "rbxthumb://type=AvatarHeadShot&id=9685785248&w=100&h=100"
                     slot.name.Text = "OPEN SLOT"
-                    slot.name.TextColor3 = Color3.fromRGB(145, 165, 195)
+                    slot.name.TextColor3 = Color3.fromRGB(205, 220, 245)
                     slot.score.Text = "0 " .. unitSuffix
                 end
             end
@@ -3163,27 +3547,29 @@ task.spawn(function()
             rankState.lastKnownMyRank = myRankNum
             rankState.myCurrentRankNum = myRankNum
 
-            local maxRowToDraw = math.min(25, math.max(5, #sorted))
+            -- Render Ranks #4 up to #100 with Crisp High-Contrast Visibility!
+            local maxRowToDraw = math.min(100, math.max(5, #sorted))
             for idx = 4, maxRowToDraw do
                 local entry = sorted[idx]
-                local cfg = TOP5_PREMIUM_THEMES[idx]
-                local accentCol = cfg and cfg.border or Color3.fromRGB(125, 155, 210)
-                local tagBgCol = cfg and cfg.tagBg or Color3.fromRGB(18, 22, 34)
-                local tintA = cfg and cfg.cardTintA or Color3.fromRGB(14, 19, 30)
-                local tintB = cfg and cfg.cardTintB or Color3.fromRGB(7, 9, 15)
+                local cfg = modeThemeTbl[idx]
+                local defaultAccent = isSpam and Color3.fromRGB(0, 215, 255) or Color3.fromRGB(215, 110, 255)
+                local accentCol = cfg and cfg.border or defaultAccent
+                local tagBgCol = cfg and cfg.tagBg or Color3.fromRGB(18, 24, 38)
+                local tintA = cfg and cfg.cardTintA or Color3.fromRGB(16, 22, 36)
+                local tintB = cfg and cfg.cardTintB or Color3.fromRGB(10, 12, 20)
                 local isMe = entry and (tostring(entry.uid) == myIdStr)
                 local eScore = entry and (isSpam and (entry.spam or 0) or (entry.grind or 0)) or 0
-                local relRatio = entry and math.clamp(eScore / leaderMaxScore, 0.05, 1) or 0.04
+                local relRatio = entry and math.clamp(eScore / leaderMaxScore, 0.06, 1) or 0.04
 
                 local row = Instance.new("TextButton", rankScroll)
-                row.Size = UDim2.new(1, -4, 0, 42)
+                row.Size = UDim2.new(1, -4, 0, 44)
                 row.BackgroundColor3 = Color3.new(1, 1, 1)
-                row.BackgroundTransparency = 0.06
+                row.BackgroundTransparency = 0.04
                 row.Text = ""
                 row.AutoButtonColor = false
                 row.LayoutOrder = idx
                 row.ClipsDescendants = true
-                row.ZIndex = 5
+                row.ZIndex = 7
                 Instance.new("UICorner", row).CornerRadius = UDim.new(0, 9)
 
                 if isMe then
@@ -3195,69 +3581,73 @@ task.spawn(function()
                 local rowGrad = Instance.new("UIGradient", row)
                 rowGrad.Rotation = 15
                 rowGrad.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, isMe and Color3.fromRGB(22, 34, 56) or tintA),
+                    ColorSequenceKeypoint.new(0, isMe and Color3.fromRGB(24, 38, 64) or tintA),
                     ColorSequenceKeypoint.new(1, tintB)
                 })
 
                 local rStroke = Instance.new("UIStroke", row)
-                rStroke.Thickness = (cfg or isMe) and 1.15 or 0.8
+                rStroke.Thickness = (cfg or isMe) and 1.2 or 0.9
                 rStroke.Color = accentCol
-                rStroke.Transparency = (cfg or isMe) and 0.22 or 0.65
+                rStroke.Transparency = (cfg or isMe) and 0.15 or 0.45
 
                 local leftAccent = Instance.new("Frame", row)
                 leftAccent.Size = UDim2.new(0, 3, 1, -10)
                 leftAccent.Position = UDim2.new(0, 3, 0, 5)
                 leftAccent.BackgroundColor3 = accentCol
                 leftAccent.BorderSizePixel = 0
+                leftAccent.ZIndex = 9
                 Instance.new("UICorner", leftAccent).CornerRadius = UDim.new(1, 0)
 
                 local rankNumLbl = Instance.new("TextLabel", row)
-                rankNumLbl.Size = UDim2.fromOffset(24, 38)
-                rankNumLbl.Position = UDim2.fromOffset(6, 0)
+                rankNumLbl.Size = UDim2.fromOffset(28, 38)
+                rankNumLbl.Position = UDim2.fromOffset(7, 1)
                 rankNumLbl.BackgroundTransparency = 1
                 rankNumLbl.Text = string.format("#%d", idx)
                 rankNumLbl.TextColor3 = accentCol
                 rankNumLbl.Font = Enum.Font.GothamBlack
-                rankNumLbl.TextSize = 9.5
+                rankNumLbl.TextSize = (idx >= 100) and 8.5 or 10
+                rankNumLbl.ZIndex = 10
 
                 local av = Instance.new("ImageLabel", row)
-                av.Size = UDim2.fromOffset(25, 25)
+                av.Size = UDim2.fromOffset(26, 26)
                 av.AnchorPoint = Vector2.new(0, 0.5)
-                av.Position = UDim2.new(0, 31, 0.5, -1)
+                av.Position = UDim2.new(0, 36, 0.5, -1)
                 av.BackgroundColor3 = Color3.fromRGB(6, 8, 14)
                 av.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", entry and tonumber(entry.uid) or 9685785248)
+                av.ZIndex = 10
                 Instance.new("UICorner", av).CornerRadius = UDim.new(1, 0)
 
                 local uNameLbl = Instance.new("TextLabel", row)
-                uNameLbl.Size = UDim2.new(0.42, 0, 0, 13)
-                uNameLbl.Position = UDim2.new(0, 61, 0, 4)
+                uNameLbl.Size = UDim2.new(0.42, 0, 0, 14)
+                uNameLbl.Position = UDim2.new(0, 67, 0, 4)
                 uNameLbl.BackgroundTransparency = 1
                 uNameLbl.Text = entry and ("@" .. tostring(entry.name or "Player")) or "OPEN SLOT"
-                uNameLbl.TextColor3 = entry and Color3.new(1, 1, 1) or Color3.fromRGB(145, 165, 195)
+                uNameLbl.TextColor3 = entry and Color3.new(1, 1, 1) or Color3.fromRGB(205, 220, 245)
                 uNameLbl.Font = Enum.Font.GothamBold
-                uNameLbl.TextSize = 8.5
+                uNameLbl.TextSize = 9
                 uNameLbl.TextXAlignment = Enum.TextXAlignment.Left
                 uNameLbl.TextTruncate = Enum.TextTruncate.AtEnd
+                uNameLbl.ZIndex = 10
 
                 local tagPill = Instance.new("Frame", row)
-                tagPill.Size = UDim2.fromOffset(110, 15)
-                tagPill.Position = UDim2.new(0, 61, 0, 19)
+                tagPill.Size = UDim2.fromOffset(116, 16)
+                tagPill.Position = UDim2.new(0, 67, 0, 20)
                 tagPill.BackgroundColor3 = tagBgCol
-                tagPill.BackgroundTransparency = 0.08
-                tagPill.ZIndex = 6
+                tagPill.BackgroundTransparency = 0.05
+                tagPill.ZIndex = 9
                 Instance.new("UICorner", tagPill).CornerRadius = UDim.new(1, 0)
 
                 local tPillStroke = Instance.new("UIStroke", tagPill)
                 tPillStroke.Thickness = 0.9
                 tPillStroke.Color = accentCol
-                tPillStroke.Transparency = 0.25
+                tPillStroke.Transparency = 0.20
 
                 if cfg then
                     local rowTagCtrl = buildPremiumChromaTag(
                         tagPill,
                         UDim2.fromScale(0.5, 0.5),
                         Vector2.new(0.5, 0.5),
-                        7.1,
+                        7.2,
                         cfg,
                         getTierForRank(idx, rankState.activeMode)
                     )
@@ -3269,20 +3659,23 @@ task.spawn(function()
                     tierSubLbl.Text = getTierForRank(idx, rankState.activeMode)
                     tierSubLbl.TextColor3 = accentCol
                     tierSubLbl.Font = Enum.Font.GothamBlack
-                    tierSubLbl.TextSize = 6.8
+                    tierSubLbl.TextSize = 7.0
+                    tierSubLbl.ZIndex = 10
                 end
 
                 local pTrack = Instance.new("Frame", row)
-                pTrack.Size = UDim2.new(1, -69, 0, 2.5)
-                pTrack.Position = UDim2.new(0, 61, 1, -4)
+                pTrack.Size = UDim2.new(1, -75, 0, 2.5)
+                pTrack.Position = UDim2.new(0, 67, 1, -4)
                 pTrack.BackgroundColor3 = Color3.fromRGB(6, 8, 14)
                 pTrack.BorderSizePixel = 0
+                pTrack.ZIndex = 9
                 Instance.new("UICorner", pTrack).CornerRadius = UDim.new(1, 0)
 
                 local pFill = Instance.new("Frame", pTrack)
                 pFill.Size = UDim2.new(relRatio, 0, 1, 0)
                 pFill.BackgroundColor3 = accentCol
                 pFill.BorderSizePixel = 0
+                pFill.ZIndex = 10
                 Instance.new("UICorner", pFill).CornerRadius = UDim.new(1, 0)
 
                 local valLbl = Instance.new("TextLabel", row)
@@ -3291,10 +3684,11 @@ task.spawn(function()
                 valLbl.Position = UDim2.new(1, -8, 0, 0)
                 valLbl.BackgroundTransparency = 1
                 valLbl.Text = string.format("%d %s", eScore, unitSuffix)
-                valLbl.TextColor3 = Color3.fromRGB(225, 238, 255)
+                valLbl.TextColor3 = Color3.fromRGB(240, 248, 255)
                 valLbl.Font = Enum.Font.Code
-                valLbl.TextSize = 9
+                valLbl.TextSize = 9.2
                 valLbl.TextXAlignment = Enum.TextXAlignment.Right
+                valLbl.ZIndex = 10
 
                 row.MouseButton1Click:Connect(function()
                     rScale.Scale = 0.96
@@ -3303,12 +3697,19 @@ task.spawn(function()
                 end)
             end
 
-            local myCfg = TOP5_PREMIUM_THEMES[myRankNum] or UNRANKED_CHROMA_CFG
+            -- Sync Sticky Footer with Active Equipped Tag
+            local myId = lp and lp.UserId or 0
+            local myAvailTags = getPlayerAvailableTags(myId)
+            local myActiveBadge = resolveActiveBadgeForPlayer(myId, myTagSelectionState.selectedMode)
+            local myCfg = (myActiveBadge and myActiveBadge.theme) or modeThemeTbl[myRankNum] or UNRANKED_CHROMA_CFG
+            local myTitle = (myActiveBadge and myActiveBadge.title) or getTierForRank(myRankNum, rankState.activeMode)
+
             myRankNumLbl.Text = string.format("YOU #%d", myRankNum)
-            myFooterChromaCtrl.setText(getTierForRank(myRankNum, rankState.activeMode))
+            myFooterChromaCtrl.setText(myTitle)
             myFooterChromaCtrl.setTheme(myCfg)
             myFooterTagPill.BackgroundColor3 = myCfg.tagBg
             myFooterPillStroke.Color = myCfg.border
+            switchTagHintBtn.Text = (#myAvailTags > 1) and string.format("🏷️ %d TAGS", #myAvailTags) or "🏷️ 1 TAG"
 
             if myRankNum > 1 and sorted[myRankNum - 1] then
                 local above = sorted[myRankNum - 1]
@@ -3327,7 +3728,8 @@ task.spawn(function()
                 BackgroundColor3 = Color3.fromRGB(0, 165, 255)
             }):Play()
             spamModeBtn.TextColor3 = Color3.new(1, 1, 1)
-            grindModeBtn.TextColor3 = Color3.fromRGB(160, 180, 210)
+            grindModeBtn.TextColor3 = Color3.fromRGB(190, 210, 240)
+            holoAura.ImageColor3 = Color3.fromRGB(255, 200, 55)
             renderLeaderboard()
         end)
 
@@ -3335,12 +3737,20 @@ task.spawn(function()
             rankState.activeMode = "GRIND"
             TweenService:Create(modeSlider, TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                 Position = UDim2.new(0.5, 2, 0, 2),
-                BackgroundColor3 = Color3.fromRGB(165, 65, 255)
+                BackgroundColor3 = Color3.fromRGB(255, 115, 25)
             }):Play()
             grindModeBtn.TextColor3 = Color3.new(1, 1, 1)
-            spamModeBtn.TextColor3 = Color3.fromRGB(160, 180, 210)
+            spamModeBtn.TextColor3 = Color3.fromRGB(190, 210, 240)
+            holoAura.ImageColor3 = Color3.fromRGB(255, 125, 35)
             renderLeaderboard()
         end)
+
+        pushTagSelectionToServer = function(slotId)
+            local myIdStr = tostring(lp and lp.UserId or 0)
+            if myIdStr ~= "0" then
+                postToGlobalServer(string.format("[EMP_TAGSEL_%s:%s:%s]", RANKING_SEASON_ID, myIdStr, tostring(slotId)), true)
+            end
+        end
 
         local function syncRankingsWithServer(shouldPushLocal)
             local myIdStr = tostring(lp and lp.UserId or 0)
@@ -3359,6 +3769,7 @@ task.spawn(function()
                 local decOk, decoded = pcall(function() return HttpService:JSONDecode(raw) end)
                 if decOk and type(decoded) == "table" then
                     local aggregated = {}
+                    local tagSelPrefix = "[EMP_TAGSEL_" .. RANKING_SEASON_ID .. ":"
                     for _, item in ipairs(decoded) do
                         local mText = tostring(item.msg or "")
                         if mText:sub(1, #RANK_TAG_PREFIX) == RANK_TAG_PREFIX then
@@ -3380,6 +3791,13 @@ task.spawn(function()
                                     prev.grind = math.max(prev.grind, gNum)
                                     if rName and rName ~= "" then prev.name = rName end
                                 end
+                            end
+                        elseif mText:sub(1, #tagSelPrefix) == tagSelPrefix then
+                            local inner = mText:sub(#tagSelPrefix + 1, -2)
+                            local tUid, tSlot = inner:match("^(.-):(.-)$")
+                            if tUid and tUid ~= "" and tSlot and tSlot ~= "" then
+                                if not globalPlayerMeta[tUid] then globalPlayerMeta[tUid] = {} end
+                                globalPlayerMeta[tUid].selectedSlot = tSlot
                             end
                         end
                     end
@@ -3436,9 +3854,9 @@ task.spawn(function()
                 sp.Size = UDim2.fromOffset(sz, sz)
                 sp.AnchorPoint = Vector2.new(0.5, 0.5)
                 sp.Position = UDim2.new(math.random(15, 85) / 100, 0, 0.92, 0)
-                sp.BackgroundColor3 = Color3.fromRGB(255, 220, 75)
+                sp.BackgroundColor3 = (rankState.activeMode == "SPAM") and Color3.fromRGB(255, 220, 75) or Color3.fromRGB(255, 130, 35)
                 sp.BorderSizePixel = 0
-                sp.ZIndex = 3
+                sp.ZIndex = 9
                 Instance.new("UICorner", sp).CornerRadius = UDim.new(1, 0)
 
                 TweenService:Create(sp, TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
@@ -3474,8 +3892,8 @@ task.spawn(function()
 
                     local pulse = (math.sin(rkClock * 2.4 * sSpeed) + 1) / 2
                     item.glowStroke.Thickness = 0.95 + (pulse * 0.45)
-                    item.glowStroke.Transparency = 0.48 + (pulse * 0.22)
-                    item.badgeGlow.TextTransparency = 0.42 + (pulse * 0.22)
+                    item.glowStroke.Transparency = 0.42 + (pulse * 0.22)
+                    item.badgeGlow.TextTransparency = 0.35 + (pulse * 0.22)
                 else
                     table.remove(rankAnimatedTagRegistry, i)
                 end
@@ -3484,10 +3902,10 @@ task.spawn(function()
 
         renderLeaderboard()
         task.spawn(function()
-            task.wait(1.2)
+            task.wait(1.0)
             syncRankingsWithServer(true)
             while card and card.Parent do
-                task.wait(18.0)
+                task.wait(15.0)
                 syncRankingsWithServer(true)
             end
         end)
@@ -3495,7 +3913,7 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- TAB 5: COMPACT NEXT-GEN POLL & LIVE CHAT CONSOLE
+-- TAB 5: COMPACT NEXT-GEN POLL & LIVE CHAT CONSOLE (WITH RANK 1-100 & TAGS)
 -- ========================================================
 local LIKE_TARGET_GOAL = 1000
 local LOCAL_LOCK_FILE = "txr_emp_vote_" .. UPDATE_CAMPAIGN_ID .. "_" .. tostring(lp and lp.UserId or 0) .. ".txt"
@@ -3559,7 +3977,7 @@ task.spawn(function()
             if hubLabel.Visible then hubLabel.Visible = false end
         end)
 
-        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 336)
+        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 344)
         card.BackgroundColor3 = Color3.fromRGB(7, 9, 15)
         card.BackgroundTransparency = 0.04
         card.ClipsDescendants = true
@@ -3746,7 +4164,7 @@ task.spawn(function()
         likeBtnText.ZIndex = 3
 
         local monitorBox = Instance.new("Frame", card)
-        monitorBox.Size = UDim2.new(1, -16, 0, 224)
+        monitorBox.Size = UDim2.new(1, -16, 0, 232)
         monitorBox.Position = UDim2.new(0, 8, 0, 106)
         monitorBox.BackgroundColor3 = Color3.fromRGB(11, 14, 21)
         monitorBox.BackgroundTransparency = 0.06
@@ -3804,7 +4222,7 @@ task.spawn(function()
         modeBannerLbl.Size = UDim2.new(0.74, 0, 1, 0)
         modeBannerLbl.Position = UDim2.new(0, 12, 0, 0)
         modeBannerLbl.BackgroundTransparency = 1
-        modeBannerLbl.Text = "LIVE CHAT • TAP TO @MENTION"
+        modeBannerLbl.Text = "LIVE CHAT • RANKS 1-100 & TAGS ACTIVE"
         modeBannerLbl.TextColor3 = Color3.fromRGB(0, 235, 255)
         modeBannerLbl.Font = Enum.Font.GothamBlack
         modeBannerLbl.TextSize = 7.5
@@ -3917,64 +4335,104 @@ task.spawn(function()
         end
 
         local function createFeedBubble(parentScroll, orderNum, uName, uId, msgStr, timeStr, isReportMode)
-            local isOwner = (tonumber(uId) == MODERATOR_USER_ID) or (uName == "TxR_AsHU")
+            local uidNum = tonumber(uId) or 0
+            local isOwner = (uidNum == MODERATOR_USER_ID) or (uName == "TxR_AsHU")
+            local badge = resolveActiveBadgeForPlayer(uidNum)
+            local hasRank = (badge and badge.rankNum >= 1 and badge.rankNum <= 100)
+
             local accentCol = isOwner and Color3.fromRGB(255, 205, 55)
+                or (badge and badge.theme.border)
                 or (isReportMode and Color3.fromRGB(185, 110, 255) or Color3.fromRGB(0, 235, 255))
 
             local row = Instance.new("TextButton", parentScroll)
-            row.Size = UDim2.new(1, -4, 0, 36)
+            row.Size = UDim2.new(1, -4, 0, 42)
             row.BackgroundColor3 = Color3.fromRGB(16, 21, 32)
-            row.BackgroundTransparency = 0.12
+            row.BackgroundTransparency = 0.08
             row.Text = ""
             row.AutoButtonColor = false
             row.LayoutOrder = orderNum
+            row.ZIndex = 6
             Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
 
             local rStroke = Instance.new("UIStroke", row)
-            rStroke.Thickness = isOwner and 1.1 or 0.8
+            rStroke.Thickness = (isOwner or hasRank) and 1.05 or 0.8
             rStroke.Color = accentCol
-            rStroke.Transparency = isOwner and 0.25 or 0.62
+            rStroke.Transparency = (isOwner or hasRank) and 0.25 or 0.60
 
             local avatar = Instance.new("ImageLabel", row)
-            avatar.Size = UDim2.fromOffset(22, 22)
+            avatar.Size = UDim2.fromOffset(25, 25)
             avatar.AnchorPoint = Vector2.new(0, 0.5)
             avatar.Position = UDim2.new(0, 6, 0.5, 0)
             avatar.BackgroundColor3 = Color3.fromRGB(10, 13, 20)
-            avatar.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", tonumber(uId) or 9685785248)
+            avatar.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", uidNum > 0 and uidNum or 9685785248)
+            avatar.ZIndex = 7
             Instance.new("UICorner", avatar).CornerRadius = UDim.new(1, 0)
 
-            local tagPrefix = isOwner and "👑 " or (isReportMode and "🛠️ " or "")
+            local headerPrefix = isOwner and "👑 @" or (isReportMode and "🛠️ @" or "@")
             local uLbl = Instance.new("TextLabel", row)
-            uLbl.Size = UDim2.new(0.72, 0, 0, 12)
-            uLbl.Position = UDim2.new(0, 33, 0, 3)
+            uLbl.Size = UDim2.new(0.36, 0, 0, 13)
+            uLbl.Position = UDim2.new(0, 36, 0, 3)
             uLbl.BackgroundTransparency = 1
-            uLbl.Text = tagPrefix .. "@" .. tostring(uName or "Player")
+            uLbl.Text = headerPrefix .. tostring(uName or "Player")
             uLbl.TextColor3 = accentCol
             uLbl.Font = Enum.Font.GothamBlack
-            uLbl.TextSize = 8.5
+            uLbl.TextSize = 8.3
             uLbl.TextXAlignment = Enum.TextXAlignment.Left
+            uLbl.TextTruncate = Enum.TextTruncate.AtEnd
+            uLbl.ZIndex = 7
+
+            -- Live Rank & Animated Tag Pill in Chat Bubble for Rank 1-100 & Developer!
+            if isOwner or hasRank then
+                local chatBadgePill = Instance.new("Frame", row)
+                chatBadgePill.Size = UDim2.fromOffset(108, 13)
+                chatBadgePill.Position = UDim2.new(0, 132, 0, 3)
+                chatBadgePill.BackgroundColor3 = badge and badge.theme.tagBg or Color3.fromRGB(32, 24, 8)
+                chatBadgePill.ZIndex = 7
+                Instance.new("UICorner", chatBadgePill).CornerRadius = UDim.new(1, 0)
+
+                local cbStroke = Instance.new("UIStroke", chatBadgePill)
+                cbStroke.Thickness = 0.85
+                cbStroke.Color = accentCol
+                cbStroke.Transparency = 0.25
+
+                local badgeLabelStr = isOwner
+                    and (hasRank and string.format("👑 DEV • #%d", badge.rankNum) or "👑 DEVELOPER")
+                    or string.format("%s • #%d", badge.title, badge.rankNum)
+
+                local cbCtrl = buildPremiumChromaTag(
+                    chatBadgePill,
+                    UDim2.fromScale(0.5, 0.5),
+                    Vector2.new(0.5, 0.5),
+                    6.4,
+                    badge and badge.theme or DEV_SPECIAL_THEME,
+                    badgeLabelStr
+                )
+                cbCtrl.setAlignment(Enum.TextXAlignment.Center)
+            end
 
             local tLbl = Instance.new("TextLabel", row)
-            tLbl.Size = UDim2.new(0.24, -6, 0, 12)
+            tLbl.Size = UDim2.new(0.18, -6, 0, 13)
             tLbl.AnchorPoint = Vector2.new(1, 0)
             tLbl.Position = UDim2.new(1, -6, 0, 3)
             tLbl.BackgroundTransparency = 1
             tLbl.Text = tostring(timeStr or os.date("%H:%M"))
-            tLbl.TextColor3 = Color3.fromRGB(120, 135, 160)
+            tLbl.TextColor3 = Color3.fromRGB(130, 145, 175)
             tLbl.Font = Enum.Font.Code
             tLbl.TextSize = 7.5
             tLbl.TextXAlignment = Enum.TextXAlignment.Right
+            tLbl.ZIndex = 7
 
             local mLbl = Instance.new("TextLabel", row)
-            mLbl.Size = UDim2.new(1, -38, 0, 15)
-            mLbl.Position = UDim2.new(0, 33, 0, 17)
+            mLbl.Size = UDim2.new(1, -42, 0, 18)
+            mLbl.Position = UDim2.new(0, 36, 0, 19)
             mLbl.BackgroundTransparency = 1
             mLbl.Text = tostring(msgStr or "")
             mLbl.TextColor3 = Color3.fromRGB(244, 248, 255)
             mLbl.Font = Enum.Font.GothamMedium
-            mLbl.TextSize = 9
+            mLbl.TextSize = 9.2
             mLbl.TextTruncate = Enum.TextTruncate.AtEnd
             mLbl.TextXAlignment = Enum.TextXAlignment.Left
+            mLbl.ZIndex = 7
 
             row.MouseButton1Click:Connect(function()
                 if uName and uName ~= "" then
@@ -3994,7 +4452,7 @@ task.spawn(function()
                 }):Play()
                 chatTabBtn.TextColor3 = Color3.new(1, 1, 1)
                 reportsTabBtn.TextColor3 = Color3.fromRGB(175, 195, 225)
-                modeBannerLbl.Text = "LIVE CHAT • TAP TO @MENTION"
+                modeBannerLbl.Text = "LIVE CHAT • RANKS 1-100 & TAGS ACTIVE"
                 inputBox.PlaceholderText = "Type message..."
                 sendBtn.Text = "SEND"
                 sendBtn.BackgroundColor3 = Color3.fromRGB(0, 215, 145)
