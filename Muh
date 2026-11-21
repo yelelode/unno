@@ -758,7 +758,7 @@ local function setLagFreeMode(enable)
 end
 
 -- ========================================================
--- PART 2: RAYFIELD GLASS + SETTINGS UI SCALE + TOPBAR TAG SELECTOR + BULLETPROOF REOPEN PILL
+-- PART 2: RAYFIELD GLASS + NATIVE REOPEN PRESERVED + TOPBAR TAG SELECTOR
 -- ========================================================
 local scalePresets = {1.00, 0.85, 0.75, 1.15}
 local scalePresetIdx = 1
@@ -784,7 +784,7 @@ end
 local function cleanOldUI(parent)
     if not parent then return end
     for _, child in ipairs(parent:GetChildren()) do
-        if child:IsA("ScreenGui") and (child.Name == "Rayfield" or child.Name == "TXR_UI" or child.Name == "TXR_FloatingReopenGui") then
+        if child:IsA("ScreenGui") and (child.Name == "Rayfield" or child.Name == "TXR_UI") then
             pcall(function() child:Destroy() end)
         end
     end
@@ -899,7 +899,6 @@ local function applyGlassyStyle(obj)
         if n == "Main" then
             obj.BackgroundColor3 = Color3.fromRGB(14, 16, 22)
             obj.BackgroundTransparency = 0.36
-            obj.ClipsDescendants = true
 
             local grad = obj:FindFirstChild("TXR_AcrylicMain") or Instance.new("UIGradient", obj)
             grad.Name = "TXR_AcrylicMain"
@@ -916,7 +915,6 @@ local function applyGlassyStyle(obj)
         elseif n == "Topbar" then
             obj.BackgroundColor3 = Color3.fromRGB(10, 12, 18)
             obj.BackgroundTransparency = 0.48
-            obj.ClipsDescendants = true
         elseif n == "Elements" or n == "TabBar" or n == "Placeholder" or n == "List" then
             obj.BackgroundTransparency = 1
         elseif obj.Parent and obj.Parent:IsA("ScrollingFrame") and obj.BackgroundTransparency < 0.85 then
@@ -945,23 +943,12 @@ local function applyGlassyStyle(obj)
 end
 
 -- ========================================================
--- TOPBAR TAG SELECTOR + SETTINGS UI SCALE + BULLETPROOF REOPEN CONTROLLER
+-- TOPBAR CUSTOM TAG SELECTOR + SETTINGS UI SCALE (100% NATIVE RAYFIELD CLOSE/REOPEN)
 -- ========================================================
 local function installTopbarAndSettingsControls(gui)
     task.spawn(function()
         local mainWin = gui:WaitForChild("Main", 5)
         if not mainWin or not mainWin:IsA("Frame") then return end
-        mainWin.ClipsDescendants = true
-
-        -- Capture default opened size & position so we can restore 100% cleanly on reopen!
-        task.wait(0.25)
-        local defaultMainSize = mainWin.Size
-        local defaultMainPos = mainWin.Position
-
-        local elementsFolder = mainWin:FindFirstChild("Elements")
-        if elementsFolder and elementsFolder:IsA("GuiObject") then
-            elementsFolder.ClipsDescendants = true
-        end
 
         local uiScale = mainWin:FindFirstChild("TXR_CustomScaler")
         if not uiScale then
@@ -973,7 +960,6 @@ local function installTopbarAndSettingsControls(gui)
 
         local topbar = mainWin:WaitForChild("Topbar", 5)
         if not topbar then return end
-        topbar.ClipsDescendants = true
 
         -- 1) TOPBAR CUSTOM TAG BUTTON (LEFT OF SEARCH ICON)
         local tagBtn, tagMenu
@@ -1168,121 +1154,17 @@ local function installTopbarAndSettingsControls(gui)
             updateAllTagPillDisplays()
         end
 
-        -- 2) DEDICATED FLOATING REOPEN PILL ("⚡ TXR HUB") THAT NEVER FAILS ON CLOSE!
-        local guiRoot = getSafeGuiRoot()
-        if guiRoot then
-            local oldReopen = guiRoot:FindFirstChild("TXR_FloatingReopenGui")
-            if oldReopen then oldReopen:Destroy() end
-
-            local reopenGui = Instance.new("ScreenGui")
-            reopenGui.Name = "TXR_FloatingReopenGui"
-            reopenGui.DisplayOrder = 999999
-            reopenGui.ResetOnSpawn = false
-            reopenGui.Parent = guiRoot
-
-            local reopenBtn = Instance.new("TextButton", reopenGui)
-            reopenBtn.Name = "ReopenHubPill"
-            reopenBtn.Size = UDim2.fromOffset(118, 30)
-            reopenBtn.AnchorPoint = Vector2.new(0.5, 0)
-            reopenBtn.Position = UDim2.new(0.5, 0, 0, 8)
-            reopenBtn.BackgroundColor3 = Color3.fromRGB(14, 18, 28)
-            reopenBtn.BackgroundTransparency = 0.08
-            reopenBtn.Text = "⚡ Show TXR"
-            reopenBtn.TextColor3 = Color3.fromRGB(240, 248, 255)
-            reopenBtn.Font = Enum.Font.GothamBlack
-            reopenBtn.TextSize = 11.5
-            reopenBtn.AutoButtonColor = false
-            reopenBtn.Visible = false
-            reopenBtn.ZIndex = 9999
-            Instance.new("UICorner", reopenBtn).CornerRadius = UDim.new(1, 0)
-
-            local rStroke = Instance.new("UIStroke", reopenBtn)
-            rStroke.Thickness = 1.25
-            rStroke.Color = Color3.fromRGB(0, 235, 255)
-            rStroke.Transparency = 0.25
-
-            local rScale = Instance.new("UIScale", reopenBtn)
-
-            local function forceRestoreMainWindow()
-                if tagMenu and tagMenu.Parent then
-                    tagMenu.Visible = false
-                end
-                reopenBtn.Visible = false
-
-                -- Hide Rayfield's broken default Show pill if present
-                for _, child in ipairs(gui:GetChildren()) do
-                    if child ~= mainWin and child:IsA("GuiObject") and child.Name ~= "Notifications" then
-                        child.Visible = false
-                    end
-                end
-
-                mainWin.Visible = true
-                mainWin.ClipsDescendants = true
-                mainWin.Size = defaultMainSize
-                mainWin.Position = defaultMainPos
-                mainWin.BackgroundTransparency = 0.36
-
-                for _, desc in ipairs(mainWin:GetDescendants()) do
-                    if desc:IsA("CanvasGroup") then
-                        desc.GroupTransparency = 0
-                    end
-                end
-
-                if elementsFolder then
-                    elementsFolder.Visible = true
-                    elementsFolder.ClipsDescendants = true
-                end
-                local tabBar = mainWin:FindFirstChild("TabBar")
-                if tabBar and tabBar:IsA("GuiObject") then
-                    tabBar.Visible = true
-                end
+        -- 2) SYNC ONLY TAG PILL & DROPDOWN WHEN RAYFIELD CLOSES/MINIMIZES (LEAVING RAYFIELD REOPEN 100% NATIVE)
+        RunService.Heartbeat:Connect(function()
+            if not mainWin or not mainWin.Parent then return end
+            local isOpen = mainWin.Visible and (mainWin.AbsoluteSize.Y > 85)
+            if tagBtn and tagBtn.Parent then
+                tagBtn.Visible = isOpen
             end
-
-            reopenBtn.MouseButton1Click:Connect(function()
-                rScale.Scale = 0.88
-                TweenService:Create(rScale, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
-                forceRestoreMainWindow()
-            end)
-
-            -- Watch Rayfield's close button & window collapsed state cleanly
-            local closeBtn = topbar:FindFirstChild("Hide") or topbar:FindFirstChild("Close")
-            if closeBtn and closeBtn:IsA("GuiButton") then
-                closeBtn.MouseButton1Click:Connect(function()
-                    if tagMenu and tagMenu.Parent then tagMenu.Visible = false end
-                    task.delay(0.15, function()
-                        if mainWin and mainWin.Parent then
-                            mainWin.Visible = false
-                            reopenBtn.Visible = true
-                        end
-                    end)
-                end)
+            if not isOpen and tagMenu and tagMenu.Parent then
+                tagMenu.Visible = false
             end
-
-            RunService.Heartbeat:Connect(function()
-                if not mainWin or not mainWin.Parent then
-                    if reopenGui and reopenGui.Parent then reopenGui:Destroy() end
-                    return
-                end
-
-                local isCollapsed = (not mainWin.Visible) or (mainWin.AbsoluteSize.Y < 80)
-                if isCollapsed then
-                    if tagMenu and tagMenu.Parent then tagMenu.Visible = false end
-                    if mainWin.Visible then
-                        mainWin.Visible = false
-                    end
-                    reopenBtn.Visible = true
-
-                    -- Hide Rayfield's duplicate Show button so only our working pill shows
-                    for _, child in ipairs(gui:GetChildren()) do
-                        if child ~= mainWin and child:IsA("GuiObject") and child.Name ~= "Notifications" then
-                            child.Visible = false
-                        end
-                    end
-                else
-                    reopenBtn.Visible = false
-                end
-            end)
-        end
+        end)
 
         -- 3) NATIVE-MATCHING "UI Size / Scale" BUTTON INSIDE RAYFIELD SETTINGS
         task.spawn(function()
