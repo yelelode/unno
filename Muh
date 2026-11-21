@@ -1,7 +1,8 @@
 -- ========================================================
--- PART 0: UNIVERSAL EXECUTOR SHIM & AUTO MAX-FPS ENGINE
--- (Works on iOS, Android, PC & All Executors / Low-End Devices)
+-- PART 0: UNIVERSAL EXECUTOR SHIM & CAMPAIGN CONFIG
+-- (Change UPDATE_CAMPAIGN_ID whenever you push a new update to reset votes!)
 -- ========================================================
+local UPDATE_CAMPAIGN_ID = "EMP_V206_R1"
 local GLOBAL_CHAT_SERVER = "https://my-roblox-private-chat.onrender.com"
 local DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1573276829048119307/tyJAzblu_3LU0vK-akPNwJaRTFM5aDORLYs9BxduE22fUT_LiLfli6ggqVljopH6cOsW"
 
@@ -60,7 +61,7 @@ local ChatService = game:GetService("Chat")
 local MODERATOR_USER_ID = 9685785248
 local playerName = lp and lp.Name or "UNKNOWN"
 
-local myRPName = (lp.UserId == MODERATOR_USER_ID) and "A  S  H  U" or "ᴇ ᴍ ᴩ  ꜱ ᴩ ᴀ ᴍ ᴍ ᴇ ʀ"
+local myRPName = (lp.UserId == MODERATOR_USER_ID) and "A  S  H  U" or "ᴇ ᴍ ᴩ  ꜱ ᴩ ᴀ ᴍ ᴍ ᴇʀ"
 local myRPBio = (lp.UserId == MODERATOR_USER_ID) and "" or ("Welcome " .. playerName .. " • ᴇ ᴍ ᴩ ᴏɴ ᴛᴏᴩ 🗿")
 local chatMsg = "----====<<// [!] \\>>====---- ᴇᴍᴩ ꜱᴩᴀᴍᴍᴇʀ ᴠ2.06 ʟᴏᴀᴅᴇᴅ ----====<<// [!] \\>>====----"
 
@@ -2058,11 +2059,12 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- TAB 5: ULTRA-SMOOTH TACTILE COMMUNITY & MILESTONE HUB
--- (1000 LIKES FOR NEXT UPDATE + CHAT || Report Bugs & Next Update Features)
+-- TAB 5: NEXT-GEN CYBER CREATOR MILESTONE & LIVE ARENA
+-- (Auto-Reset on UPDATE_CAMPAIGN_ID + 30-Particle Burst + Smooth Chat)
 -- ========================================================
 local LIKE_TARGET_GOAL = 1000
-local LOCAL_LOCK_FILE = "txr_emp_v206_like_" .. tostring(lp and lp.UserId or 0) .. ".txt"
+local LOCAL_LOCK_FILE = "txr_emp_vote_" .. UPDATE_CAMPAIGN_ID .. "_" .. tostring(lp and lp.UserId or 0) .. ".txt"
+local VOTE_TAG_PREFIX = "[EMP_LIKE_" .. UPDATE_CAMPAIGN_ID .. ":"
 local reqFn = (syn and syn.request) or (http and http.request) or http_request or request
 
 local function rawHttp(method, url, bodyStr)
@@ -2105,10 +2107,10 @@ local function isLocallyLiked()
     return liked
 end
 
-local function lockLikeLocally()
+local function setLocalLikeLock(state)
     pcall(function()
         if writefile then
-            writefile(LOCAL_LOCK_FILE, "LOCKED_LIKE_V206")
+            writefile(LOCAL_LOCK_FILE, state and "LOCKED" or "OPEN")
         end
     end)
 end
@@ -2116,7 +2118,7 @@ end
 local pollState = {
     totalLikes = 0,
     hasLiked = isLocallyLiked(),
-    activePanel = "CHAT", -- "CHAT" or "REPORTS"
+    activePanel = "CHAT",
     likersMap = {},
     renderedChatKeys = {},
     renderedReportKeys = {},
@@ -2150,9 +2152,9 @@ task.spawn(function()
             if hubLabel.Visible then hubLabel.Visible = false end
         end)
 
-        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 456)
-        card.BackgroundColor3 = Color3.fromRGB(7, 9, 14)
-        card.BackgroundTransparency = 0.04
+        card.Size = UDim2.new(card.Size.X.Scale, card.Size.X.Offset, 0, 466)
+        card.BackgroundColor3 = Color3.fromRGB(6, 8, 13)
+        card.BackgroundTransparency = 0.03
         card.ClipsDescendants = true
 
         for _, child in ipairs(card:GetChildren()) do
@@ -2161,86 +2163,121 @@ task.spawn(function()
             end
         end
 
-        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 14)
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 15)
 
         local masterStroke = Instance.new("UIStroke", card)
-        masterStroke.Thickness = 1.4
+        masterStroke.Thickness = 1.5
         masterStroke.Color = Color3.new(1, 1, 1)
-        masterStroke.Transparency = 0.30
+        masterStroke.Transparency = 0.25
 
         local masterStrokeGrad = Instance.new("UIGradient", masterStroke)
         masterStrokeGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 240, 255)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(175, 65, 255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 45, 115))
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 245, 255)),
+            ColorSequenceKeypoint.new(0.35, Color3.fromRGB(165, 65, 255)),
+            ColorSequenceKeypoint.new(0.7, Color3.fromRGB(255, 45, 115)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 245, 255))
         })
 
-        local function spawnJuiceParticles(parentObj, posUDim, count)
+        local function spawnJuiceExplosion(parentObj, posUDim, count)
             local palette = {
                 Color3.fromRGB(0, 245, 255),
                 Color3.fromRGB(255, 65, 145),
                 Color3.fromRGB(175, 85, 255),
-                Color3.fromRGB(75, 255, 165)
+                Color3.fromRGB(75, 255, 165),
+                Color3.fromRGB(255, 215, 65)
             }
-            for i = 1, (count or 18) do
+            for i = 1, (count or 28) do
                 local dot = Instance.new("Frame", parentObj)
-                local sz = math.random(4, 7)
+                local sz = math.random(4, 8)
                 dot.Size = UDim2.fromOffset(sz, sz)
                 dot.AnchorPoint = Vector2.new(0.5, 0.5)
                 dot.Position = posUDim
                 dot.BackgroundColor3 = palette[math.random(1, #palette)]
                 dot.BorderSizePixel = 0
-                dot.ZIndex = 50
+                dot.ZIndex = 60
                 Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
 
                 local angle = math.rad(math.random(0, 360))
-                local dist = math.random(35, 115)
+                local dist = math.random(40, 130)
                 local dx = math.cos(angle) * dist
                 local dy = math.sin(angle) * dist * 0.65
 
-                TweenService:Create(dot, TweenInfo.new(0.55 + math.random() * 0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                TweenService:Create(dot, TweenInfo.new(0.6 + math.random() * 0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                     Position = UDim2.new(posUDim.X.Scale, posUDim.X.Offset + dx, posUDim.Y.Scale, posUDim.Y.Offset + dy),
                     Size = UDim2.fromOffset(0, 0),
                     BackgroundTransparency = 1
                 }):Play()
 
-                task.delay(0.85, function()
+                task.delay(0.9, function()
                     if dot and dot.Parent then dot:Destroy() end
                 end)
             end
+
+            -- Floating +1 LIKE! Pop-up
+            local pop = Instance.new("TextLabel", parentObj)
+            pop.Size = UDim2.fromOffset(110, 24)
+            pop.AnchorPoint = Vector2.new(0.5, 0.5)
+            pop.Position = posUDim
+            pop.BackgroundTransparency = 1
+            pop.Text = "+1 LIKE! 🔥"
+            pop.TextColor3 = Color3.fromRGB(75, 255, 165)
+            pop.Font = Enum.Font.GothamBlack
+            pop.TextSize = 15
+            pop.ZIndex = 65
+
+            local pStroke = Instance.new("UIStroke", pop)
+            pStroke.Thickness = 1.5
+            pStroke.Color = Color3.new(0, 0, 0)
+
+            TweenService:Create(pop, TweenInfo.new(0.85, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                Position = UDim2.new(posUDim.X.Scale, posUDim.X.Offset, posUDim.Y.Scale, posUDim.Y.Offset - 45),
+                TextTransparency = 1
+            }):Play()
+            TweenService:Create(pStroke, TweenInfo.new(0.85), {Transparency = 1}):Play()
+            task.delay(0.9, function()
+                if pop and pop.Parent then pop:Destroy() end
+            end)
         end
 
         -- ====================================================
         -- 1. YOUTUBER STYLE MILESTONE: 1000 LIKES FOR NEXT UPDATE
         -- ====================================================
         local goalBox = Instance.new("Frame", card)
-        goalBox.Size = UDim2.new(1, -20, 0, 138)
+        goalBox.Size = UDim2.new(1, -20, 0, 142)
         goalBox.Position = UDim2.new(0, 10, 0, 10)
-        goalBox.BackgroundColor3 = Color3.fromRGB(13, 17, 27)
-        goalBox.BackgroundTransparency = 0.06
+        goalBox.BackgroundColor3 = Color3.fromRGB(13, 17, 28)
+        goalBox.BackgroundTransparency = 0.05
         goalBox.ClipsDescendants = true
         Instance.new("UICorner", goalBox).CornerRadius = UDim.new(0, 12)
 
+        local goalGradBg = Instance.new("UIGradient", goalBox)
+        goalGradBg.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(22, 28, 48)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(13, 17, 28)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(26, 16, 40))
+        })
+        goalGradBg.Rotation = 25
+
         local goalStroke = Instance.new("UIStroke", goalBox)
-        goalStroke.Thickness = 1.15
+        goalStroke.Thickness = 1.2
         goalStroke.Color = Color3.fromRGB(0, 235, 255)
-        goalStroke.Transparency = 0.45
+        goalStroke.Transparency = 0.42
 
         local goalTopBadge = Instance.new("TextLabel", goalBox)
         goalTopBadge.Size = UDim2.new(0.66, 0, 0, 15)
         goalTopBadge.Position = UDim2.new(0, 12, 0, 8)
         goalTopBadge.BackgroundTransparency = 1
-        goalTopBadge.Text = "🎬 NEXT UPDATE MILESTONE"
+        goalTopBadge.Text = "🎬 NEXT UPDATE MILESTONE  •  " .. UPDATE_CAMPAIGN_ID
         goalTopBadge.TextColor3 = Color3.fromRGB(255, 85, 135)
         goalTopBadge.Font = Enum.Font.GothamBlack
-        goalTopBadge.TextSize = 9.5
+        goalTopBadge.TextSize = 9
         goalTopBadge.TextXAlignment = Enum.TextXAlignment.Left
 
         local statusPill = Instance.new("Frame", goalBox)
-        statusPill.Size = UDim2.fromOffset(78, 18)
+        statusPill.Size = UDim2.fromOffset(80, 18)
         statusPill.AnchorPoint = Vector2.new(1, 0)
         statusPill.Position = UDim2.new(1, -10, 0, 8)
-        statusPill.BackgroundColor3 = Color3.fromRGB(24, 30, 44)
+        statusPill.BackgroundColor3 = Color3.fromRGB(22, 28, 42)
         Instance.new("UICorner", statusPill).CornerRadius = UDim.new(1, 0)
 
         local statusPillLbl = Instance.new("TextLabel", statusPill)
@@ -2258,34 +2295,34 @@ task.spawn(function()
         goalTitle.Text = "1000 LIKES FOR NEXT UPDATE"
         goalTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
         goalTitle.Font = Enum.Font.GothamBlack
-        goalTitle.TextSize = 14.5
+        goalTitle.TextSize = 15
         goalTitle.TextXAlignment = Enum.TextXAlignment.Left
 
         local counterRow = Instance.new("TextLabel", goalBox)
         counterRow.Size = UDim2.new(0.68, 0, 0, 16)
-        counterRow.Position = UDim2.new(0, 12, 0, 45)
+        counterRow.Position = UDim2.new(0, 12, 0, 46)
         counterRow.BackgroundTransparency = 1
         counterRow.Text = "0 / 1000 LIKES"
-        counterRow.TextColor3 = Color3.fromRGB(0, 240, 255)
-        counterRow.Font = Enum.Font.Code
+        counterRow.TextColor3 = Color3.fromRGB(0, 245, 255)
+        counterRow.Font = Enum.Font.GothamBlack
         counterRow.TextSize = 11.5
         counterRow.TextXAlignment = Enum.TextXAlignment.Left
 
         local pctText = Instance.new("TextLabel", goalBox)
         pctText.Size = UDim2.new(0.28, 0, 0, 16)
         pctText.AnchorPoint = Vector2.new(1, 0)
-        pctText.Position = UDim2.new(1, -12, 0, 45)
+        pctText.Position = UDim2.new(1, -12, 0, 46)
         pctText.BackgroundTransparency = 1
         pctText.Text = "0.0%"
         pctText.TextColor3 = Color3.fromRGB(175, 195, 225)
-        pctText.Font = Enum.Font.GothamBlack
-        pctText.TextSize = 10.5
+        pctText.Font = Enum.Font.Code
+        pctText.TextSize = 11
         pctText.TextXAlignment = Enum.TextXAlignment.Right
 
         local barTrack = Instance.new("Frame", goalBox)
-        barTrack.Size = UDim2.new(1, -24, 0, 11)
-        barTrack.Position = UDim2.new(0, 12, 0, 65)
-        barTrack.BackgroundColor3 = Color3.fromRGB(8, 11, 17)
+        barTrack.Size = UDim2.new(1, -24, 0, 12)
+        barTrack.Position = UDim2.new(0, 12, 0, 66)
+        barTrack.BackgroundColor3 = Color3.fromRGB(7, 10, 16)
         barTrack.ClipsDescendants = true
         Instance.new("UICorner", barTrack).CornerRadius = UDim.new(1, 0)
 
@@ -2297,14 +2334,14 @@ task.spawn(function()
 
         local fillGrad = Instance.new("UIGradient", likeBarFill)
         fillGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 230, 255)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(165, 65, 255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 245, 145))
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 235, 255)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(170, 65, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 250, 145))
         })
 
         local likeBtn = Instance.new("TextButton", goalBox)
-        likeBtn.Size = UDim2.new(1, -24, 0, 42)
-        likeBtn.Position = UDim2.new(0, 12, 0, 84)
+        likeBtn.Size = UDim2.new(1, -24, 0, 44)
+        likeBtn.Position = UDim2.new(0, 12, 0, 86)
         likeBtn.BackgroundColor3 = Color3.fromRGB(0, 145, 255)
         likeBtn.Text = ""
         likeBtn.AutoButtonColor = false
@@ -2314,24 +2351,24 @@ task.spawn(function()
         local likeBtnScale = Instance.new("UIScale", likeBtn)
 
         local btnStroke = Instance.new("UIStroke", likeBtn)
-        btnStroke.Thickness = 1.2
+        btnStroke.Thickness = 1.25
         btnStroke.Color = Color3.fromRGB(140, 235, 255)
-        btnStroke.Transparency = 0.35
+        btnStroke.Transparency = 0.30
 
         local btnGrad = Instance.new("UIGradient", likeBtn)
         btnGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 165, 255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(145, 55, 255))
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 175, 255)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(125, 65, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(235, 45, 135))
         })
 
-        -- Live Shimmer Sweep across Vote Button
         local shimmerBar = Instance.new("Frame", likeBtn)
-        shimmerBar.Size = UDim2.new(0.28, 0, 1.6, 0)
+        shimmerBar.Size = UDim2.new(0.28, 0, 1.7, 0)
         shimmerBar.AnchorPoint = Vector2.new(0.5, 0.5)
         shimmerBar.Position = UDim2.new(-0.3, 0, 0.5, 0)
         shimmerBar.Rotation = 18
         shimmerBar.BackgroundColor3 = Color3.new(1, 1, 1)
-        shimmerBar.BackgroundTransparency = 0.82
+        shimmerBar.BackgroundTransparency = 0.80
         shimmerBar.BorderSizePixel = 0
 
         local likeBtnText = Instance.new("TextLabel", likeBtn)
@@ -2340,50 +2377,49 @@ task.spawn(function()
         likeBtnText.Text = "👍  LIKE FOR NEXT UPDATE"
         likeBtnText.TextColor3 = Color3.new(1, 1, 1)
         likeBtnText.Font = Enum.Font.GothamBlack
-        likeBtnText.TextSize = 12
+        likeBtnText.TextSize = 12.5
         likeBtnText.ZIndex = 3
 
         -- ====================================================
         -- 2. SMOOTH CONSOLE: CHAT || Report Bugs & Next Update Features
         -- ====================================================
         local monitorBox = Instance.new("Frame", card)
-        monitorBox.Size = UDim2.new(1, -20, 0, 292)
-        monitorBox.Position = UDim2.new(0, 10, 0, 154)
+        monitorBox.Size = UDim2.new(1, -20, 0, 298)
+        monitorBox.Position = UDim2.new(0, 10, 0, 158)
         monitorBox.BackgroundColor3 = Color3.fromRGB(11, 14, 21)
-        monitorBox.BackgroundTransparency = 0.06
+        monitorBox.BackgroundTransparency = 0.05
         monitorBox.ClipsDescendants = true
         Instance.new("UICorner", monitorBox).CornerRadius = UDim.new(0, 12)
 
         local monStroke = Instance.new("UIStroke", monitorBox)
-        monStroke.Thickness = 1.15
-        monStroke.Color = Color3.fromRGB(38, 48, 72)
+        monStroke.Thickness = 1.2
+        monStroke.Color = Color3.fromRGB(38, 48, 74)
 
-        -- Sliding Pill Switcher
         local switchBar = Instance.new("Frame", monitorBox)
-        switchBar.Size = UDim2.new(1, -12, 0, 30)
+        switchBar.Size = UDim2.new(1, -12, 0, 32)
         switchBar.Position = UDim2.new(0, 6, 0, 6)
-        switchBar.BackgroundColor3 = Color3.fromRGB(16, 20, 31)
-        Instance.new("UICorner", switchBar).CornerRadius = UDim.new(0, 8)
+        switchBar.BackgroundColor3 = Color3.fromRGB(16, 20, 32)
+        Instance.new("UICorner", switchBar).CornerRadius = UDim.new(0, 9)
 
         local activePillSlider = Instance.new("Frame", switchBar)
-        activePillSlider.Size = UDim2.new(0.40, -4, 1, -4)
+        activePillSlider.Size = UDim2.new(0.38, -4, 1, -4)
         activePillSlider.Position = UDim2.new(0, 2, 0, 2)
-        activePillSlider.BackgroundColor3 = Color3.fromRGB(0, 155, 255)
-        Instance.new("UICorner", activePillSlider).CornerRadius = UDim.new(0, 6)
+        activePillSlider.BackgroundColor3 = Color3.fromRGB(0, 165, 255)
+        Instance.new("UICorner", activePillSlider).CornerRadius = UDim.new(0, 7)
 
         local chatTabBtn = Instance.new("TextButton", switchBar)
-        chatTabBtn.Size = UDim2.new(0.40, 0, 1, 0)
+        chatTabBtn.Size = UDim2.new(0.38, 0, 1, 0)
         chatTabBtn.Position = UDim2.new(0, 0, 0, 0)
         chatTabBtn.BackgroundTransparency = 1
         chatTabBtn.Text = "💬 CHAT"
         chatTabBtn.TextColor3 = Color3.new(1, 1, 1)
         chatTabBtn.Font = Enum.Font.GothamBlack
-        chatTabBtn.TextSize = 9.5
+        chatTabBtn.TextSize = 10
         chatTabBtn.ZIndex = 3
 
         local reportsTabBtn = Instance.new("TextButton", switchBar)
-        reportsTabBtn.Size = UDim2.new(0.60, 0, 1, 0)
-        reportsTabBtn.Position = UDim2.new(0.40, 0, 0, 0)
+        reportsTabBtn.Size = UDim2.new(0.62, 0, 1, 0)
+        reportsTabBtn.Position = UDim2.new(0.38, 0, 0, 0)
         reportsTabBtn.BackgroundTransparency = 1
         reportsTabBtn.Text = "🛠️ Report Bugs & Next Update Features"
         reportsTabBtn.TextColor3 = Color3.fromRGB(175, 195, 225)
@@ -2391,31 +2427,30 @@ task.spawn(function()
         reportsTabBtn.TextSize = 8.5
         reportsTabBtn.ZIndex = 3
 
-        -- Live Status Sub-Bar
         local liveStatusRow = Instance.new("Frame", monitorBox)
         liveStatusRow.Size = UDim2.new(1, -14, 0, 18)
-        liveStatusRow.Position = UDim2.new(0, 7, 0, 39)
+        liveStatusRow.Position = UDim2.new(0, 7, 0, 41)
         liveStatusRow.BackgroundTransparency = 1
 
         local radarDot = Instance.new("Frame", liveStatusRow)
         radarDot.Size = UDim2.fromOffset(6, 6)
         radarDot.AnchorPoint = Vector2.new(0, 0.5)
         radarDot.Position = UDim2.new(0, 4, 0.5, 0)
-        radarDot.BackgroundColor3 = Color3.fromRGB(0, 240, 145)
+        radarDot.BackgroundColor3 = Color3.fromRGB(0, 245, 145)
         Instance.new("UICorner", radarDot).CornerRadius = UDim.new(1, 0)
 
         local modeBannerLbl = Instance.new("TextLabel", liveStatusRow)
-        modeBannerLbl.Size = UDim2.new(0.72, 0, 1, 0)
+        modeBannerLbl.Size = UDim2.new(0.74, 0, 1, 0)
         modeBannerLbl.Position = UDim2.new(0, 15, 0, 0)
         modeBannerLbl.BackgroundTransparency = 1
-        modeBannerLbl.Text = "LIVE GLOBAL CHAT  •  TAP CARD TO @MENTION"
+        modeBannerLbl.Text = "GLOBAL CHAT  •  TAP ANY MESSAGE TO @MENTION"
         modeBannerLbl.TextColor3 = Color3.fromRGB(0, 235, 255)
         modeBannerLbl.Font = Enum.Font.GothamBlack
         modeBannerLbl.TextSize = 8
         modeBannerLbl.TextXAlignment = Enum.TextXAlignment.Left
 
         local logCounterLbl = Instance.new("TextLabel", liveStatusRow)
-        logCounterLbl.Size = UDim2.new(0.26, 0, 1, 0)
+        logCounterLbl.Size = UDim2.new(0.24, 0, 1, 0)
         logCounterLbl.AnchorPoint = Vector2.new(1, 0)
         logCounterLbl.Position = UDim2.new(1, -4, 0, 0)
         logCounterLbl.BackgroundTransparency = 1
@@ -2425,10 +2460,9 @@ task.spawn(function()
         logCounterLbl.TextSize = 8.5
         logCounterLbl.TextXAlignment = Enum.TextXAlignment.Right
 
-        -- Separate Persistent Scrolls for Smooth Zero-Flicker Switching
         local chatScroll = Instance.new("ScrollingFrame", monitorBox)
-        chatScroll.Size = UDim2.new(1, -14, 1, -102)
-        chatScroll.Position = UDim2.new(0, 7, 0, 60)
+        chatScroll.Size = UDim2.new(1, -14, 1, -104)
+        chatScroll.Position = UDim2.new(0, 7, 0, 62)
         chatScroll.BackgroundTransparency = 1
         chatScroll.ScrollBarThickness = 2
         chatScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 225, 255)
@@ -2437,12 +2471,12 @@ task.spawn(function()
         chatScroll.Visible = true
 
         local chatList = Instance.new("UIListLayout", chatScroll)
-        chatList.Padding = UDim.new(0, 5)
+        chatList.Padding = UDim.new(0, 6)
         chatList.SortOrder = Enum.SortOrder.LayoutOrder
 
         local reportScroll = Instance.new("ScrollingFrame", monitorBox)
-        reportScroll.Size = UDim2.new(1, -14, 1, -102)
-        reportScroll.Position = UDim2.new(0, 7, 0, 60)
+        reportScroll.Size = UDim2.new(1, -14, 1, -104)
+        reportScroll.Position = UDim2.new(0, 7, 0, 62)
         reportScroll.BackgroundTransparency = 1
         reportScroll.ScrollBarThickness = 2
         reportScroll.ScrollBarImageColor3 = Color3.fromRGB(185, 110, 255)
@@ -2451,7 +2485,7 @@ task.spawn(function()
         reportScroll.Visible = false
 
         local reportList = Instance.new("UIListLayout", reportScroll)
-        reportList.Padding = UDim.new(0, 5)
+        reportList.Padding = UDim.new(0, 6)
         reportList.SortOrder = Enum.SortOrder.LayoutOrder
 
         local inputDock = Instance.new("Frame", monitorBox)
@@ -2462,9 +2496,9 @@ task.spawn(function()
         Instance.new("UICorner", inputDock).CornerRadius = UDim.new(0, 9)
 
         local dockStroke = Instance.new("UIStroke", inputDock)
-        dockStroke.Thickness = 1
+        dockStroke.Thickness = 1.1
         dockStroke.Color = Color3.fromRGB(0, 210, 255)
-        dockStroke.Transparency = 0.50
+        dockStroke.Transparency = 0.45
 
         local inputBox = Instance.new("TextBox", inputDock)
         inputBox.Size = UDim2.new(1, -84, 1, -4)
@@ -2483,7 +2517,7 @@ task.spawn(function()
         sendBtn.Size = UDim2.fromOffset(66, 28)
         sendBtn.AnchorPoint = Vector2.new(1, 0.5)
         sendBtn.Position = UDim2.new(1, -4, 0.5, 0)
-        sendBtn.BackgroundColor3 = Color3.fromRGB(0, 210, 140)
+        sendBtn.BackgroundColor3 = Color3.fromRGB(0, 215, 145)
         sendBtn.Text = "SEND ➤"
         sendBtn.TextColor3 = Color3.fromRGB(10, 15, 20)
         sendBtn.Font = Enum.Font.GothamBlack
@@ -2509,31 +2543,38 @@ task.spawn(function()
             local isOwner = (tonumber(uId) == MODERATOR_USER_ID) or (uName == "TxR_AsHU")
             local isSelf = (lp and tostring(uId) == tostring(lp.UserId))
             local accentCol = isOwner and Color3.fromRGB(255, 205, 55)
-                or (isReportMode and Color3.fromRGB(185, 110, 255) or Color3.fromRGB(0, 230, 255))
+                or (isReportMode and Color3.fromRGB(185, 110, 255) or Color3.fromRGB(0, 235, 255))
 
             local row = Instance.new("TextButton", parentScroll)
-            row.Size = UDim2.new(1, -6, 0, 44)
-            row.BackgroundColor3 = isSelf and Color3.fromRGB(22, 30, 46) or Color3.fromRGB(17, 22, 33)
-            row.BackgroundTransparency = 0.14
+            row.Size = UDim2.new(1, -6, 0, 46)
+            row.BackgroundColor3 = isSelf and Color3.fromRGB(22, 31, 48) or Color3.fromRGB(16, 21, 32)
+            row.BackgroundTransparency = 0.10
             row.Text = ""
             row.AutoButtonColor = false
             row.LayoutOrder = orderNum
             row.ClipsDescendants = true
-            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 9)
 
             local rScale = Instance.new("UIScale", row)
-            rScale.Scale = 0.92
-            TweenService:Create(rScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+            rScale.Scale = 0.90
+            TweenService:Create(rScale, TweenInfo.new(0.26, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
             local rStroke = Instance.new("UIStroke", row)
-            rStroke.Thickness = isOwner and 1.2 or 0.9
+            rStroke.Thickness = isOwner and 1.25 or 0.95
             rStroke.Color = accentCol
-            rStroke.Transparency = isOwner and 0.30 or 0.62
+            rStroke.Transparency = isOwner and 0.25 or 0.58
+
+            local leftBar = Instance.new("Frame", row)
+            leftBar.Size = UDim2.new(0, 3, 1, -12)
+            leftBar.Position = UDim2.new(0, 4, 0, 6)
+            leftBar.BackgroundColor3 = accentCol
+            leftBar.BorderSizePixel = 0
+            Instance.new("UICorner", leftBar).CornerRadius = UDim.new(1, 0)
 
             local avatar = Instance.new("ImageLabel", row)
-            avatar.Size = UDim2.fromOffset(28, 28)
+            avatar.Size = UDim2.fromOffset(30, 30)
             avatar.AnchorPoint = Vector2.new(0, 0.5)
-            avatar.Position = UDim2.new(0, 7, 0.5, 0)
+            avatar.Position = UDim2.new(0, 12, 0.5, 0)
             avatar.BackgroundColor3 = Color3.fromRGB(10, 13, 20)
             avatar.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", tonumber(uId) or 9685785248)
             Instance.new("UICorner", avatar).CornerRadius = UDim.new(1, 0)
@@ -2541,7 +2582,7 @@ task.spawn(function()
             local tagPrefix = isOwner and "👑 OWNER • " or (isReportMode and "🛠️ IDEA • " or "")
             local uLbl = Instance.new("TextLabel", row)
             uLbl.Size = UDim2.new(0.72, 0, 0, 14)
-            uLbl.Position = UDim2.new(0, 42, 0, 5)
+            uLbl.Position = UDim2.new(0, 49, 0, 5)
             uLbl.BackgroundTransparency = 1
             uLbl.Text = tagPrefix .. "@" .. tostring(uName or "Player")
             uLbl.TextColor3 = accentCol
@@ -2561,18 +2602,19 @@ task.spawn(function()
             tLbl.TextXAlignment = Enum.TextXAlignment.Right
 
             local mLbl = Instance.new("TextLabel", row)
-            mLbl.Size = UDim2.new(1, -48, 0, 18)
-            mLbl.Position = UDim2.new(0, 42, 0, 20)
+            mLbl.Size = UDim2.new(1, -55, 0, 19)
+            mLbl.Position = UDim2.new(0, 49, 0, 21)
             mLbl.BackgroundTransparency = 1
             mLbl.Text = tostring(msgStr or "")
-            mLbl.TextColor3 = Color3.fromRGB(242, 246, 255)
+            mLbl.TextColor3 = Color3.fromRGB(244, 248, 255)
             mLbl.Font = Enum.Font.GothamMedium
             mLbl.TextSize = 10
             mLbl.TextTruncate = Enum.TextTruncate.AtEnd
             mLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-            -- Tap bubble to @mention user
             row.MouseButton1Click:Connect(function()
+                rScale.Scale = 0.96
+                TweenService:Create(rScale, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Scale = 1}):Play()
                 if uName and uName ~= "" then
                     inputBox.Text = "@" .. tostring(uName) .. " " .. inputBox.Text
                     inputBox:CaptureFocus()
@@ -2585,15 +2627,15 @@ task.spawn(function()
             if targetPanel == "CHAT" then
                 TweenService:Create(activePillSlider, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                     Position = UDim2.new(0, 2, 0, 2),
-                    Size = UDim2.new(0.40, -4, 1, -4),
-                    BackgroundColor3 = Color3.fromRGB(0, 155, 255)
+                    Size = UDim2.new(0.38, -4, 1, -4),
+                    BackgroundColor3 = Color3.fromRGB(0, 165, 255)
                 }):Play()
                 chatTabBtn.TextColor3 = Color3.new(1, 1, 1)
                 reportsTabBtn.TextColor3 = Color3.fromRGB(175, 195, 225)
-                modeBannerLbl.Text = "LIVE GLOBAL CHAT  •  TAP CARD TO @MENTION"
+                modeBannerLbl.Text = "GLOBAL CHAT  •  TAP ANY MESSAGE TO @MENTION"
                 inputBox.PlaceholderText = "Say something in global chat..."
                 sendBtn.Text = "SEND ➤"
-                sendBtn.BackgroundColor3 = Color3.fromRGB(0, 210, 140)
+                sendBtn.BackgroundColor3 = Color3.fromRGB(0, 215, 145)
                 dockStroke.Color = Color3.fromRGB(0, 210, 255)
                 chatScroll.Visible = true
                 reportScroll.Visible = false
@@ -2601,14 +2643,14 @@ task.spawn(function()
                 smoothScrollDown(chatScroll)
             else
                 TweenService:Create(activePillSlider, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                    Position = UDim2.new(0.40, 2, 0, 2),
-                    Size = UDim2.new(0.60, -4, 1, -4),
+                    Position = UDim2.new(0.38, 2, 0, 2),
+                    Size = UDim2.new(0.62, -4, 1, -4),
                     BackgroundColor3 = Color3.fromRGB(165, 65, 255)
                 }):Play()
                 reportsTabBtn.TextColor3 = Color3.new(1, 1, 1)
                 chatTabBtn.TextColor3 = Color3.fromRGB(175, 195, 225)
                 modeBannerLbl.Text = "REPORT BUGS & NEXT UPDATE FEATURES"
-                inputBox.PlaceholderText = "Report a bug or suggest next update feature..."
+                inputBox.PlaceholderText = "Report a bug or next update feature..."
                 sendBtn.Text = "POST ➤"
                 sendBtn.BackgroundColor3 = Color3.fromRGB(175, 85, 255)
                 dockStroke.Color = Color3.fromRGB(175, 85, 255)
@@ -2650,8 +2692,9 @@ task.spawn(function()
                 shimmerBar.Visible = false
             else
                 btnGrad.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 165, 255)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(145, 55, 255))
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 175, 255)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(125, 65, 255)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(235, 45, 135))
                 })
                 btnStroke.Color = Color3.fromRGB(140, 235, 255)
                 likeBtnText.Text = "👍  LIKE FOR NEXT UPDATE"
@@ -2693,6 +2736,7 @@ task.spawn(function()
             local freshLikers = {}
             local freshLikeCount = 0
             local myIdStr = tostring(lp and lp.UserId or 0)
+            local foundMyVoteOnServer = false
             local addedNewChat = false
             local addedNewReport = false
 
@@ -2707,22 +2751,24 @@ task.spawn(function()
                 uName = uName or rawU
                 local uId = tonumber(uIdStr) or 0
 
-                -- 1. Like votes: [EMP_LIKE_V206:UID:USERNAME]
-                local vUid, vUser = mText:match("^%[EMP_LIKE_V206:(.-):(.-)%]$")
-                if vUid and vUid ~= "" then
-                    local uidKey = tostring(vUid)
-                    if not freshLikers[uidKey] then
-                        freshLikers[uidKey] = (vUser ~= "" and vUser) or uName
-                        freshLikeCount += 1
-                    end
-                    if uidKey == myIdStr then
-                        pollState.hasLiked = true
-                        lockLikeLocally()
+                -- 1. Campaign-Scoped Like Votes: [EMP_LIKE_<CAMPAIGN_ID>:UID:USERNAME]
+                if mText:sub(1, #VOTE_TAG_PREFIX) == VOTE_TAG_PREFIX then
+                    local inner = mText:sub(#VOTE_TAG_PREFIX + 1, -2)
+                    local vUid, vUser = inner:match("^(.-):(.-)$")
+                    if vUid and vUid ~= "" then
+                        local uidKey = tostring(vUid)
+                        if not freshLikers[uidKey] then
+                            freshLikers[uidKey] = (vUser ~= "" and vUser) or uName
+                            freshLikeCount += 1
+                        end
+                        if uidKey == myIdStr then
+                            foundMyVoteOnServer = true
+                        end
                     end
                     continue
                 end
 
-                -- 2. Bug & Next Update Feature Reports: [EMP_REPORT_V206:UID:USER] MSG
+                -- 2. Bug & Next Update Feature Reports
                 local rUid, rUser, rMsg = mText:match("^%[EMP_REPORT_V206:(.-):(.-)%]%s*(.*)$")
                 if rUid and rMsg then
                     local rKey = tostring(item.id or (rUid .. "_" .. rMsg))
@@ -2736,7 +2782,7 @@ task.spawn(function()
                     continue
                 end
 
-                -- 3. Global Chat Messages: [EMP_HUBCHAT_V206:UID:USER] MSG
+                -- 3. Global Chat Messages
                 local cUid, cUser, cMsg = mText:match("^%[EMP_HUBCHAT_V206:(.-):(.-)%]%s*(.*)$")
                 if cUid and cMsg then
                     local cKey = tostring(item.id or (cUid .. "_" .. cMsg))
@@ -2748,6 +2794,15 @@ task.spawn(function()
                         createFeedBubble(chatScroll, pollState.chatOrderCounter, (cUser ~= "" and cUser) or uName, cUid, cMsg, tStr, false)
                     end
                 end
+            end
+
+            -- Auto-heal stale local lock if server has 0 likes for this campaign
+            if freshLikeCount == 0 and not foundMyVoteOnServer and pollState.totalLikes == 0 then
+                pollState.hasLiked = false
+                setLocalLikeLock(false)
+            elseif foundMyVoteOnServer then
+                pollState.hasLiked = true
+                setLocalLikeLock(true)
             end
 
             pollState.likersMap = freshLikers
@@ -2775,16 +2830,15 @@ task.spawn(function()
 
         local likeBusy = false
         likeBtn.MouseButton1Click:Connect(function()
-            -- Tactile spring bounce on click
-            likeBtnScale.Scale = 0.94
+            likeBtnScale.Scale = 0.93
             TweenService:Create(likeBtnScale, TweenInfo.new(0.35, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
-            if pollState.hasLiked or isLocallyLiked() or likeBusy then
+            if pollState.hasLiked or likeBusy then
                 pollState.hasLiked = true
                 updateLikeUI()
                 TXR_Lib:Notify({
                     Title = "🔒 LIKE LOCKED",
-                    Content = "Your like is already recorded!",
+                    Content = "Your like is already recorded for " .. UPDATE_CAMPAIGN_ID,
                     Duration = 2,
                     Image = 4483345998
                 })
@@ -2793,7 +2847,7 @@ task.spawn(function()
 
             likeBusy = true
             pollState.hasLiked = true
-            lockLikeLocally()
+            setLocalLikeLock(true)
 
             local uName = lp and lp.Name or "Player"
             local uId = tostring(lp and lp.UserId or 0)
@@ -2802,14 +2856,14 @@ task.spawn(function()
                 pollState.totalLikes += 1
             end
 
-            spawnJuiceParticles(goalBox, UDim2.new(0.5, 0, 0.75, 0), 24)
+            spawnJuiceExplosion(goalBox, UDim2.new(0.5, 0, 0.72, 0), 30)
             updateLikeUI()
 
             local currentCount = pollState.totalLikes
-            notifyWebhookAction(string.format("**@%s** (`%s`) ne **Like** kiya (**%d / %d**)", uName, uId, currentCount, LIKE_TARGET_GOAL))
+            notifyWebhookAction(string.format("**@%s** (`%s`) ne **Like** kiya (**%d / %d** • `%s`)", uName, uId, currentCount, LIKE_TARGET_GOAL, UPDATE_CAMPAIGN_ID))
 
             task.spawn(function()
-                postToGlobalServer(string.format("[EMP_LIKE_V206:%s:%s]", uId, uName))
+                postToGlobalServer(string.format("%s%s:%s]", VOTE_TAG_PREFIX, uId, uName))
                 task.wait(0.6)
                 syncFromGlobalServer()
                 likeBusy = false
@@ -2841,7 +2895,7 @@ task.spawn(function()
             end
 
             sendingItem = true
-            sendBtnScale.Scale = 0.90
+            sendBtnScale.Scale = 0.88
             TweenService:Create(sendBtnScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
             local uName = lp and lp.Name or "Player"
