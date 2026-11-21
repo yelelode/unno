@@ -758,7 +758,7 @@ local function setLagFreeMode(enable)
 end
 
 -- ========================================================
--- PART 2: RAYFIELD GLASS + NATIVE SETTINGS UI SCALE + TOPBAR TAG SELECTOR + REOPEN FIX
+-- PART 2: RAYFIELD GLASS + SETTINGS UI SCALE + TOPBAR TAG SELECTOR + BULLETPROOF REOPEN PILL
 -- ========================================================
 local scalePresets = {1.00, 0.85, 0.75, 1.15}
 local scalePresetIdx = 1
@@ -784,7 +784,7 @@ end
 local function cleanOldUI(parent)
     if not parent then return end
     for _, child in ipairs(parent:GetChildren()) do
-        if child:IsA("ScreenGui") and (child.Name == "Rayfield" or child.Name == "TXR_UI") then
+        if child:IsA("ScreenGui") and (child.Name == "Rayfield" or child.Name == "TXR_UI" or child.Name == "TXR_FloatingReopenGui") then
             pcall(function() child:Destroy() end)
         end
     end
@@ -945,13 +945,18 @@ local function applyGlassyStyle(obj)
 end
 
 -- ========================================================
--- TOPBAR CUSTOM TAG SELECTOR + MATCHING SETTINGS UI SCALE + ROCK-SOLID REOPEN GUARD
+-- TOPBAR TAG SELECTOR + SETTINGS UI SCALE + BULLETPROOF REOPEN CONTROLLER
 -- ========================================================
 local function installTopbarAndSettingsControls(gui)
     task.spawn(function()
         local mainWin = gui:WaitForChild("Main", 5)
         if not mainWin or not mainWin:IsA("Frame") then return end
         mainWin.ClipsDescendants = true
+
+        -- Capture default opened size & position so we can restore 100% cleanly on reopen!
+        task.wait(0.25)
+        local defaultMainSize = mainWin.Size
+        local defaultMainPos = mainWin.Position
 
         local elementsFolder = mainWin:FindFirstChild("Elements")
         if elementsFolder and elementsFolder:IsA("GuiObject") then
@@ -1163,52 +1168,123 @@ local function installTopbarAndSettingsControls(gui)
             updateAllTagPillDisplays()
         end
 
-        -- 2) GUARANTEE "Show TXR" REOPEN PILL IS ALWAYS CLICKABLE & NEVER BLOCKED
-        local function ensureReopenPillWorks(pillObj)
-            if not pillObj or pillObj:GetAttribute("TXR_ReopenHooked") then return end
-            pillObj:SetAttribute("TXR_ReopenHooked", true)
-            pillObj.ZIndex = 999
-            local btn = pillObj:IsA("GuiButton") and pillObj or pillObj:FindFirstChildWhichIsA("GuiButton", true)
-            if btn then
-                btn.ZIndex = 1000
-                btn.Active = true
-                btn.MouseButton1Click:Connect(function()
-                    if mainWin and mainWin.Parent then
-                        mainWin.Visible = true
-                        mainWin.ClipsDescendants = true
-                        if elementsFolder then
-                            elementsFolder.Visible = true
-                            elementsFolder.ClipsDescendants = true
-                        end
+        -- 2) DEDICATED FLOATING REOPEN PILL ("⚡ TXR HUB") THAT NEVER FAILS ON CLOSE!
+        local guiRoot = getSafeGuiRoot()
+        if guiRoot then
+            local oldReopen = guiRoot:FindFirstChild("TXR_FloatingReopenGui")
+            if oldReopen then oldReopen:Destroy() end
+
+            local reopenGui = Instance.new("ScreenGui")
+            reopenGui.Name = "TXR_FloatingReopenGui"
+            reopenGui.DisplayOrder = 999999
+            reopenGui.ResetOnSpawn = false
+            reopenGui.Parent = guiRoot
+
+            local reopenBtn = Instance.new("TextButton", reopenGui)
+            reopenBtn.Name = "ReopenHubPill"
+            reopenBtn.Size = UDim2.fromOffset(118, 30)
+            reopenBtn.AnchorPoint = Vector2.new(0.5, 0)
+            reopenBtn.Position = UDim2.new(0.5, 0, 0, 8)
+            reopenBtn.BackgroundColor3 = Color3.fromRGB(14, 18, 28)
+            reopenBtn.BackgroundTransparency = 0.08
+            reopenBtn.Text = "⚡ Show TXR"
+            reopenBtn.TextColor3 = Color3.fromRGB(240, 248, 255)
+            reopenBtn.Font = Enum.Font.GothamBlack
+            reopenBtn.TextSize = 11.5
+            reopenBtn.AutoButtonColor = false
+            reopenBtn.Visible = false
+            reopenBtn.ZIndex = 9999
+            Instance.new("UICorner", reopenBtn).CornerRadius = UDim.new(1, 0)
+
+            local rStroke = Instance.new("UIStroke", reopenBtn)
+            rStroke.Thickness = 1.25
+            rStroke.Color = Color3.fromRGB(0, 235, 255)
+            rStroke.Transparency = 0.25
+
+            local rScale = Instance.new("UIScale", reopenBtn)
+
+            local function forceRestoreMainWindow()
+                if tagMenu and tagMenu.Parent then
+                    tagMenu.Visible = false
+                end
+                reopenBtn.Visible = false
+
+                -- Hide Rayfield's broken default Show pill if present
+                for _, child in ipairs(gui:GetChildren()) do
+                    if child ~= mainWin and child:IsA("GuiObject") and child.Name ~= "Notifications" then
+                        child.Visible = false
                     end
+                end
+
+                mainWin.Visible = true
+                mainWin.ClipsDescendants = true
+                mainWin.Size = defaultMainSize
+                mainWin.Position = defaultMainPos
+                mainWin.BackgroundTransparency = 0.36
+
+                for _, desc in ipairs(mainWin:GetDescendants()) do
+                    if desc:IsA("CanvasGroup") then
+                        desc.GroupTransparency = 0
+                    end
+                end
+
+                if elementsFolder then
+                    elementsFolder.Visible = true
+                    elementsFolder.ClipsDescendants = true
+                end
+                local tabBar = mainWin:FindFirstChild("TabBar")
+                if tabBar and tabBar:IsA("GuiObject") then
+                    tabBar.Visible = true
+                end
+            end
+
+            reopenBtn.MouseButton1Click:Connect(function()
+                rScale.Scale = 0.88
+                TweenService:Create(rScale, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+                forceRestoreMainWindow()
+            end)
+
+            -- Watch Rayfield's close button & window collapsed state cleanly
+            local closeBtn = topbar:FindFirstChild("Hide") or topbar:FindFirstChild("Close")
+            if closeBtn and closeBtn:IsA("GuiButton") then
+                closeBtn.MouseButton1Click:Connect(function()
+                    if tagMenu and tagMenu.Parent then tagMenu.Visible = false end
+                    task.delay(0.15, function()
+                        if mainWin and mainWin.Parent then
+                            mainWin.Visible = false
+                            reopenBtn.Visible = true
+                        end
+                    end)
                 end)
             end
+
+            RunService.Heartbeat:Connect(function()
+                if not mainWin or not mainWin.Parent then
+                    if reopenGui and reopenGui.Parent then reopenGui:Destroy() end
+                    return
+                end
+
+                local isCollapsed = (not mainWin.Visible) or (mainWin.AbsoluteSize.Y < 80)
+                if isCollapsed then
+                    if tagMenu and tagMenu.Parent then tagMenu.Visible = false end
+                    if mainWin.Visible then
+                        mainWin.Visible = false
+                    end
+                    reopenBtn.Visible = true
+
+                    -- Hide Rayfield's duplicate Show button so only our working pill shows
+                    for _, child in ipairs(gui:GetChildren()) do
+                        if child ~= mainWin and child:IsA("GuiObject") and child.Name ~= "Notifications" then
+                            child.Visible = false
+                        end
+                    end
+                else
+                    reopenBtn.Visible = false
+                end
+            end)
         end
 
-        for _, child in ipairs(gui:GetDescendants()) do
-            if child:IsA("TextLabel") and child.Text and child.Text:find("Show", 1, true) then
-                ensureReopenPillWorks(child.Parent)
-            end
-        end
-        gui.DescendantAdded:Connect(function(desc)
-            if desc:IsA("TextLabel") and desc.Text and desc.Text:find("Show", 1, true) then
-                ensureReopenPillWorks(desc.Parent)
-            end
-        end)
-
-        -- 3) CLEAN DROPDOWN AUTO-HIDE WHEN WINDOW COLLAPSES (WITHOUT BREAKING REOPEN!)
-        mainWin:GetPropertyChangedSignal("Visible"):Connect(function()
-            if not mainWin.Visible and tagMenu and tagMenu.Parent then
-                tagMenu.Visible = false
-            end
-        end)
-        mainWin:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-            if mainWin.AbsoluteSize.Y < 90 and tagMenu and tagMenu.Parent then
-                tagMenu.Visible = false
-            end
-        end)
-
-        -- 4) NATIVE-MATCHING "UI Size / Scale" BUTTON INSIDE RAYFIELD SETTINGS
+        -- 3) NATIVE-MATCHING "UI Size / Scale" BUTTON INSIDE RAYFIELD SETTINGS
         task.spawn(function()
             while mainWin and mainWin.Parent do
                 for _, desc in ipairs(mainWin:GetDescendants()) do
