@@ -418,10 +418,11 @@ local function setLagFreeMode(enable)
 end
 
 -- ========================================================
--- PART 2: PURE RAYFIELD NATIVE SMOOTHNESS + LIGHTWEIGHT GLASS + UI SCALER
+-- PART 2: PURE RAYFIELD NATIVE SMOOTHNESS + TOPBAR UI SCALER
 -- ========================================================
-local currentUiScaleValue = 1.0
-local applyGlobalUiScale = nil
+local scalePresets = {1.00, 0.85, 0.75, 1.15}
+local scalePresetIdx = 1
+local currentUiScaleValue = 1.00
 
 local function getSafeGuiRoot()
     local root
@@ -598,26 +599,64 @@ local function applyGlassyStyle(obj)
     end
 end
 
-local function attachWindowScaler(gui)
-    local mainWin = gui:FindFirstChild("Main")
-    if not mainWin or not mainWin:IsA("Frame") then return end
+-- Attach sleek UI Size Pill right beside the Search icon in Topbar
+local function installTopbarSizeButton(gui)
+    task.spawn(function()
+        local mainWin = gui:WaitForChild("Main", 5)
+        if not mainWin or not mainWin:IsA("Frame") then return end
 
-    local uiScale = mainWin:FindFirstChild("TXR_CustomScaler")
-    if not uiScale then
-        uiScale = Instance.new("UIScale")
-        uiScale.Name = "TXR_CustomScaler"
-        uiScale.Scale = currentUiScaleValue
-        uiScale.Parent = mainWin
-    end
-
-    applyGlobalUiScale = function(newScale)
-        currentUiScaleValue = math.clamp(newScale, 0.70, 1.25)
-        if uiScale and uiScale.Parent then
-            TweenService:Create(uiScale, TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                Scale = currentUiScaleValue
-            }):Play()
+        local uiScale = mainWin:FindFirstChild("TXR_CustomScaler")
+        if not uiScale then
+            uiScale = Instance.new("UIScale")
+            uiScale.Name = "TXR_CustomScaler"
+            uiScale.Scale = currentUiScaleValue
+            uiScale.Parent = mainWin
         end
-    end
+
+        local topbar = mainWin:WaitForChild("Topbar", 5)
+        if not topbar or topbar:FindFirstChild("TXR_TopbarSizePill") then return end
+
+        local sizePill = Instance.new("TextButton")
+        sizePill.Name = "TXR_TopbarSizePill"
+        sizePill.Size = UDim2.fromOffset(58, 22)
+        sizePill.AnchorPoint = Vector2.new(1, 0.5)
+        -- Positioned cleanly just to the left of the Search icon in Topbar
+        sizePill.Position = UDim2.new(1, -138, 0.5, 0)
+        sizePill.BackgroundColor3 = Color3.fromRGB(18, 24, 38)
+        sizePill.BackgroundTransparency = 0.15
+        sizePill.Text = "📐 100%"
+        sizePill.TextColor3 = Color3.fromRGB(0, 240, 255)
+        sizePill.Font = Enum.Font.GothamBlack
+        sizePill.TextSize = 9.5
+        sizePill.AutoButtonColor = false
+        sizePill.ZIndex = 15
+        sizePill:SetAttribute("TXR_CustomCard", true)
+        sizePill.Parent = topbar
+
+        Instance.new("UICorner", sizePill).CornerRadius = UDim.new(1, 0)
+
+        local pillStroke = Instance.new("UIStroke", sizePill)
+        pillStroke.Thickness = 1
+        pillStroke.Color = Color3.fromRGB(0, 225, 255)
+        pillStroke.Transparency = 0.40
+
+        local pillScale = Instance.new("UIScale", sizePill)
+
+        sizePill.MouseButton1Click:Connect(function()
+            pillScale.Scale = 0.88
+            TweenService:Create(pillScale, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+
+            scalePresetIdx = (scalePresetIdx % #scalePresets) + 1
+            currentUiScaleValue = scalePresets[scalePresetIdx]
+            sizePill.Text = string.format("📐 %d%%", math.floor(currentUiScaleValue * 100 + 0.5))
+
+            if uiScale and uiScale.Parent then
+                TweenService:Create(uiScale, TweenInfo.new(0.26, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                    Scale = currentUiScaleValue
+                }):Play()
+            end
+        end)
+    end)
 end
 
 local function applyTXRBranding(parent)
@@ -625,7 +664,7 @@ local function applyTXRBranding(parent)
 
     for _, existing in ipairs(parent:GetChildren()) do
         if existing:IsA("ScreenGui") and existing.Name == "TXR_UI" then
-            attachWindowScaler(existing)
+            installTopbarSizeButton(existing)
         end
     end
 
@@ -637,7 +676,7 @@ local function applyTXRBranding(parent)
                 applyGlassyStyle(desc)
             end
             gui.DescendantAdded:Connect(applyGlassyStyle)
-            task.defer(function() attachWindowScaler(gui) end)
+            installTopbarSizeButton(gui)
         end
     end)
 end
@@ -2135,7 +2174,7 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- TAB 4.5: COMPACT NEXT-GEN GLOBAL RANKINGS ARENA
+-- TAB 4.5: REDESIGNED CYBER-CHAMPION RANKINGS ARENA
 -- Mode 1: TOP SPAMMERS (COM GOD -> SPAM GOD -> FLOOD KING -> MESSAGE BEAST -> CHAT MACHINE)
 -- Mode 2: TOP GRINDERS (NO-LIFE GOD -> AFK KING -> SERVER GHOST -> GRIND DEMON -> NIGHT OWL)
 -- ========================================================
@@ -2202,7 +2241,7 @@ task.spawn(function()
         local rkStroke = Instance.new("UIStroke", card)
         rkStroke.Thickness = 1.35
         rkStroke.Color = Color3.new(1, 1, 1)
-        rkStroke.Transparency = 0.28
+        rkStroke.Transparency = 0.25
 
         local rkStrokeGrad = Instance.new("UIGradient", rkStroke)
         rkStrokeGrad.Color = ColorSequence.new({
@@ -2211,41 +2250,12 @@ task.spawn(function()
             ColorSequenceKeypoint.new(1, Color3.fromRGB(185, 65, 255))
         })
 
-        -- Compact Header + Switcher Row
-        local topBar = Instance.new("Frame", card)
-        topBar.Size = UDim2.new(1, -16, 0, 24)
-        topBar.Position = UDim2.new(0, 8, 0, 6)
-        topBar.BackgroundTransparency = 1
-
-        local titleLbl = Instance.new("TextLabel", topBar)
-        titleLbl.Size = UDim2.new(0.62, 0, 1, 0)
-        titleLbl.BackgroundTransparency = 1
-        titleLbl.Text = "🏆 EMP RANKINGS"
-        titleLbl.TextColor3 = Color3.new(1, 1, 1)
-        titleLbl.Font = Enum.Font.GothamBlack
-        titleLbl.TextSize = 11.5
-        titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-
-        local seasonPill = Instance.new("Frame", topBar)
-        seasonPill.Size = UDim2.fromOffset(82, 16)
-        seasonPill.AnchorPoint = Vector2.new(1, 0.5)
-        seasonPill.Position = UDim2.new(1, 0, 0.5, 0)
-        seasonPill.BackgroundColor3 = Color3.fromRGB(20, 26, 42)
-        Instance.new("UICorner", seasonPill).CornerRadius = UDim.new(1, 0)
-
-        local seasonTxt = Instance.new("TextLabel", seasonPill)
-        seasonTxt.Size = UDim2.fromScale(1, 1)
-        seasonTxt.BackgroundTransparency = 1
-        seasonTxt.Text = RANKING_SEASON_ID
-        seasonTxt.TextColor3 = Color3.fromRGB(255, 210, 65)
-        seasonTxt.Font = Enum.Font.GothamBlack
-        seasonTxt.TextSize = 7.5
-
+        -- Mode Switcher Header (TOP SPAMMERS || TOP GRINDERS)
         local switchBar = Instance.new("Frame", card)
-        switchBar.Size = UDim2.new(1, -16, 0, 24)
-        switchBar.Position = UDim2.new(0, 8, 0, 32)
+        switchBar.Size = UDim2.new(1, -16, 0, 28)
+        switchBar.Position = UDim2.new(0, 8, 0, 8)
         switchBar.BackgroundColor3 = Color3.fromRGB(15, 20, 32)
-        Instance.new("UICorner", switchBar).CornerRadius = UDim.new(0, 7)
+        Instance.new("UICorner", switchBar).CornerRadius = UDim.new(0, 8)
 
         local modeSlider = Instance.new("Frame", switchBar)
         modeSlider.Size = UDim2.new(0.5, -3, 1, -4)
@@ -2259,7 +2269,7 @@ task.spawn(function()
         spamModeBtn.Text = "⚡ TOP SPAMMERS"
         spamModeBtn.TextColor3 = Color3.new(1, 1, 1)
         spamModeBtn.Font = Enum.Font.GothamBlack
-        spamModeBtn.TextSize = 8.5
+        spamModeBtn.TextSize = 9
         spamModeBtn.ZIndex = 3
 
         local grindModeBtn = Instance.new("TextButton", switchBar)
@@ -2269,112 +2279,107 @@ task.spawn(function()
         grindModeBtn.Text = "⏱️ TOP GRINDERS"
         grindModeBtn.TextColor3 = Color3.fromRGB(175, 195, 225)
         grindModeBtn.Font = Enum.Font.GothamBlack
-        grindModeBtn.TextSize = 8.5
+        grindModeBtn.TextSize = 9
         grindModeBtn.ZIndex = 3
 
-        -- Compact Top-3 Podium Stage (Fits cleanly without clipping)
-        local podiumStage = Instance.new("Frame", card)
-        podiumStage.Size = UDim2.new(1, -16, 0, 102)
-        podiumStage.Position = UDim2.new(0, 8, 0, 60)
-        podiumStage.BackgroundColor3 = Color3.fromRGB(12, 16, 27)
-        podiumStage.BackgroundTransparency = 0.08
-        Instance.new("UICorner", podiumStage).CornerRadius = UDim.new(0, 9)
+        -- Full-Width #1 Champion Spotlight Hero Banner
+        local champHero = Instance.new("Frame", card)
+        champHero.Size = UDim2.new(1, -16, 0, 64)
+        champHero.Position = UDim2.new(0, 8, 0, 42)
+        champHero.BackgroundColor3 = Color3.new(1, 1, 1)
+        champHero.ClipsDescendants = true
+        Instance.new("UICorner", champHero).CornerRadius = UDim.new(0, 10)
 
-        local podStroke = Instance.new("UIStroke", podiumStage)
-        podStroke.Thickness = 1
-        podStroke.Color = Color3.fromRGB(38, 50, 76)
+        local champGrad = Instance.new("UIGradient", champHero)
+        champGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(48, 34, 14)),
+            ColorSequenceKeypoint.new(0.55, Color3.fromRGB(22, 24, 40)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(36, 18, 42))
+        })
+        champGrad.Rotation = 12
 
-        local function createCompactPodium(placeNum, xScale, widthScale, heightPx, accentColor, rankTag)
-            local box = Instance.new("Frame", podiumStage)
-            box.Size = UDim2.new(widthScale, -4, 0, heightPx)
-            box.AnchorPoint = Vector2.new(0.5, 1)
-            box.Position = UDim2.new(xScale, 0, 1, -4)
-            box.BackgroundColor3 = (placeNum == 1) and Color3.fromRGB(22, 27, 44) or Color3.fromRGB(16, 21, 34)
-            Instance.new("UICorner", box).CornerRadius = UDim.new(0, 8)
+        local champStroke = Instance.new("UIStroke", champHero)
+        champStroke.Thickness = 1.4
+        champStroke.Color = Color3.fromRGB(255, 208, 55)
+        champStroke.Transparency = 0.15
 
-            local bs = Instance.new("UIStroke", box)
-            bs.Thickness = (placeNum == 1) and 1.35 or 0.95
-            bs.Color = accentColor
-            bs.Transparency = (placeNum == 1) and 0.20 or 0.45
+        local champAvatarRing = Instance.new("Frame", champHero)
+        champAvatarRing.Size = UDim2.fromOffset(48, 48)
+        champAvatarRing.AnchorPoint = Vector2.new(0, 0.5)
+        champAvatarRing.Position = UDim2.new(0, 8, 0.5, 0)
+        champAvatarRing.BackgroundColor3 = Color3.fromRGB(255, 208, 55)
+        Instance.new("UICorner", champAvatarRing).CornerRadius = UDim.new(1, 0)
 
-            local avSize = (placeNum == 1) and 28 or 24
-            local av = Instance.new("ImageLabel", box)
-            av.Size = UDim2.fromOffset(avSize, avSize)
-            av.AnchorPoint = Vector2.new(0.5, 0)
-            av.Position = UDim2.new(0.5, 0, 0, 4)
-            av.BackgroundColor3 = Color3.fromRGB(10, 13, 20)
-            av.Image = "rbxthumb://type=AvatarHeadShot&id=9685785248&w=100&h=100"
-            Instance.new("UICorner", av).CornerRadius = UDim.new(1, 0)
+        local champAvatar = Instance.new("ImageLabel", champAvatarRing)
+        champAvatar.Size = UDim2.fromOffset(44, 44)
+        champAvatar.AnchorPoint = Vector2.new(0.5, 0.5)
+        champAvatar.Position = UDim2.fromScale(0.5, 0.5)
+        champAvatar.BackgroundColor3 = Color3.fromRGB(10, 13, 20)
+        champAvatar.Image = "rbxthumb://type=AvatarHeadShot&id=9685785248&w=100&h=100"
+        Instance.new("UICorner", champAvatar).CornerRadius = UDim.new(1, 0)
 
-            local avStroke = Instance.new("UIStroke", av)
-            avStroke.Thickness = 1.4
-            avStroke.Color = accentColor
+        local champBadge = Instance.new("TextLabel", champHero)
+        champBadge.Size = UDim2.new(0.56, 0, 0, 14)
+        champBadge.Position = UDim2.new(0, 64, 0, 7)
+        champBadge.BackgroundTransparency = 1
+        champBadge.Text = "#1  •  👑 COM GOD"
+        champBadge.TextColor3 = Color3.fromRGB(255, 215, 65)
+        champBadge.Font = Enum.Font.GothamBlack
+        champBadge.TextSize = 9.5
+        champBadge.TextXAlignment = Enum.TextXAlignment.Left
 
-            local tierLbl = Instance.new("TextLabel", box)
-            tierLbl.Size = UDim2.new(1, -4, 0, 12)
-            tierLbl.Position = UDim2.new(0, 2, 0, 5 + avSize)
-            tierLbl.BackgroundTransparency = 1
-            tierLbl.Text = rankTag
-            tierLbl.TextColor3 = accentColor
-            tierLbl.Font = Enum.Font.GothamBlack
-            tierLbl.TextSize = 7.5
-            tierLbl.TextTruncate = Enum.TextTruncate.AtEnd
+        local champName = Instance.new("TextLabel", champHero)
+        champName.Size = UDim2.new(0.56, 0, 0, 18)
+        champName.Position = UDim2.new(0, 64, 0, 22)
+        champName.BackgroundTransparency = 1
+        champName.Text = "@Player"
+        champName.TextColor3 = Color3.new(1, 1, 1)
+        champName.Font = Enum.Font.GothamBlack
+        champName.TextSize = 13
+        champName.TextXAlignment = Enum.TextXAlignment.Left
+        champName.TextTruncate = Enum.TextTruncate.AtEnd
 
-            local nameLbl = Instance.new("TextLabel", box)
-            nameLbl.Size = UDim2.new(1, -6, 0, 12)
-            nameLbl.Position = UDim2.new(0, 3, 0, 17 + avSize)
-            nameLbl.BackgroundTransparency = 1
-            nameLbl.Text = "---"
-            nameLbl.TextColor3 = Color3.new(1, 1, 1)
-            nameLbl.Font = Enum.Font.GothamBold
-            nameLbl.TextSize = 8
-            nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
+        local champSub = Instance.new("TextLabel", champHero)
+        champSub.Size = UDim2.new(0.56, 0, 0, 13)
+        champSub.Position = UDim2.new(0, 64, 0, 42)
+        champSub.BackgroundTransparency = 1
+        champSub.Text = "SUPREME CHAT DOMINATOR"
+        champSub.TextColor3 = Color3.fromRGB(190, 205, 230)
+        champSub.Font = Enum.Font.GothamBold
+        champSub.TextSize = 7.5
+        champSub.TextXAlignment = Enum.TextXAlignment.Left
 
-            local scoreLbl = Instance.new("TextLabel", box)
-            scoreLbl.Size = UDim2.new(1, -6, 0, 12)
-            scoreLbl.Position = UDim2.new(0, 3, 0, 29 + avSize)
-            scoreLbl.BackgroundTransparency = 1
-            scoreLbl.Text = "0 PKT"
-            scoreLbl.TextColor3 = Color3.fromRGB(175, 200, 235)
-            scoreLbl.Font = Enum.Font.Code
-            scoreLbl.TextSize = 8
+        local champScore = Instance.new("TextLabel", champHero)
+        champScore.Size = UDim2.new(0.32, -10, 0, 26)
+        champScore.AnchorPoint = Vector2.new(1, 0.5)
+        champScore.Position = UDim2.new(1, -10, 0.5, 0)
+        champScore.BackgroundTransparency = 1
+        champScore.Text = "0 PKT"
+        champScore.TextColor3 = Color3.fromRGB(255, 225, 95)
+        champScore.Font = Enum.Font.GothamBlack
+        champScore.TextSize = 14
+        champScore.TextXAlignment = Enum.TextXAlignment.Right
 
-            return {avatar = av, tier = tierLbl, name = nameLbl, score = scoreLbl}
-        end
-
-        local pod2 = createCompactPodium(2, 0.175, 0.32, 84, Color3.fromRGB(0, 235, 255), "⚡ SPAM GOD")
-        local pod1 = createCompactPodium(1, 0.500, 0.34, 94, Color3.fromRGB(255, 208, 48), "👑 COM GOD")
-        local pod3 = createCompactPodium(3, 0.825, 0.32, 80, Color3.fromRGB(190, 95, 255), "🔥 FLOOD KING")
-        local podiumSlots = {pod1, pod2, pod3}
-
-        -- Ranked List (#4 to #25)
+        -- Ranked Cards Scroll (#2 to #25 with Neon Power Bars)
         local rankScroll = Instance.new("ScrollingFrame", card)
-        rankScroll.Size = UDim2.new(1, -16, 0, 130)
-        rankScroll.Position = UDim2.new(0, 8, 0, 166)
-        rankScroll.BackgroundColor3 = Color3.fromRGB(11, 14, 21)
-        rankScroll.BackgroundTransparency = 0.12
+        rankScroll.Size = UDim2.new(1, -16, 0, 184)
+        rankScroll.Position = UDim2.new(0, 8, 0, 112)
+        rankScroll.BackgroundTransparency = 1
         rankScroll.ScrollBarThickness = 2
         rankScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 225, 255)
         rankScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
         rankScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        Instance.new("UICorner", rankScroll).CornerRadius = UDim.new(0, 8)
 
         local rankListLayout = Instance.new("UIListLayout", rankScroll)
-        rankListLayout.Padding = UDim.new(0, 4)
+        rankListLayout.Padding = UDim.new(0, 5)
         rankListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-        local rankPad = Instance.new("UIPadding", rankScroll)
-        rankPad.PaddingTop = UDim.new(0, 4)
-        rankPad.PaddingBottom = UDim.new(0, 4)
-        rankPad.PaddingLeft = UDim.new(0, 5)
-        rankPad.PaddingRight = UDim.new(0, 5)
-
-        -- Sticky Footer: YOUR LIVE RANK
+        -- Sticky Footer: YOUR LIVE RANK + NEXT RANK GAP
         local myRankBar = Instance.new("Frame", card)
         myRankBar.Size = UDim2.new(1, -16, 0, 28)
         myRankBar.AnchorPoint = Vector2.new(0.5, 1)
         myRankBar.Position = UDim2.new(0.5, 0, 1, -6)
-        myRankBar.BackgroundColor3 = Color3.fromRGB(18, 26, 44)
+        myRankBar.BackgroundColor3 = Color3.fromRGB(16, 24, 40)
         Instance.new("UICorner", myRankBar).CornerRadius = UDim.new(0, 8)
 
         local myRankStroke = Instance.new("UIStroke", myRankBar)
@@ -2384,23 +2389,23 @@ task.spawn(function()
 
         local myRankLeft = Instance.new("TextLabel", myRankBar)
         myRankLeft.Size = UDim2.new(0.68, 0, 1, 0)
-        myRankLeft.Position = UDim2.new(0, 8, 0, 0)
+        myRankLeft.Position = UDim2.new(0, 10, 0, 0)
         myRankLeft.BackgroundTransparency = 1
-        myRankLeft.Text = "RANK #1 • 👑 COM GOD"
+        myRankLeft.Text = "YOUR RANK: #1 • 👑 COM GOD"
         myRankLeft.TextColor3 = Color3.new(1, 1, 1)
         myRankLeft.Font = Enum.Font.GothamBlack
         myRankLeft.TextSize = 8.5
         myRankLeft.TextXAlignment = Enum.TextXAlignment.Left
 
         local myRankRight = Instance.new("TextLabel", myRankBar)
-        myRankRight.Size = UDim2.new(0.30, -8, 1, 0)
+        myRankRight.Size = UDim2.new(0.30, -10, 1, 0)
         myRankRight.AnchorPoint = Vector2.new(1, 0)
-        myRankRight.Position = UDim2.new(1, -8, 0, 0)
+        myRankRight.Position = UDim2.new(1, -10, 0, 0)
         myRankRight.BackgroundTransparency = 1
         myRankRight.Text = "0 PKT"
         myRankRight.TextColor3 = Color3.fromRGB(75, 245, 175)
         myRankRight.Font = Enum.Font.Code
-        myRankRight.TextSize = 9
+        myRankRight.TextSize = 9.5
         myRankRight.TextXAlignment = Enum.TextXAlignment.Right
 
         local function getTierForRank(rankNum, mode)
@@ -2409,6 +2414,14 @@ task.spawn(function()
             else
                 return GRIND_TIER_TITLES[rankNum] or "⚔️ ACTIVE USER"
             end
+        end
+
+        local function getRankAccent(rankNum)
+            if rankNum == 2 then return Color3.fromRGB(0, 235, 255) end
+            if rankNum == 3 then return Color3.fromRGB(255, 115, 45) end
+            if rankNum == 4 then return Color3.fromRGB(255, 55, 115) end
+            if rankNum == 5 then return Color3.fromRGB(55, 245, 165) end
+            return Color3.fromRGB(125, 155, 210)
         end
 
         local function renderLeaderboard()
@@ -2443,20 +2456,16 @@ task.spawn(function()
                 return valA > valB
             end)
 
-            for place = 1, 3 do
-                local slot = podiumSlots[place]
-                local pData = sorted[place]
-                slot.tier.Text = getTierForRank(place, rankState.activeMode)
-                if pData then
-                    local scoreVal = isSpam and (pData.spam or 0) or (pData.grind or 0)
-                    slot.avatar.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", tonumber(pData.uid) or 9685785248)
-                    slot.name.Text = "@" .. tostring(pData.name or "Player")
-                    slot.score.Text = string.format("%d %s", scoreVal, unitSuffix)
-                else
-                    slot.avatar.Image = "rbxthumb://type=AvatarHeadShot&id=9685785248&w=100&h=100"
-                    slot.name.Text = "---"
-                    slot.score.Text = "0 " .. unitSuffix
-                end
+            local topScore = 1
+            if sorted[1] then
+                topScore = math.max(1, isSpam and (sorted[1].spam or 1) or (sorted[1].grind or 1))
+                local cData = sorted[1]
+                local cVal = isSpam and (cData.spam or 0) or (cData.grind or 0)
+                champAvatar.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", tonumber(cData.uid) or 9685785248)
+                champBadge.Text = "#1  •  " .. getTierForRank(1, rankState.activeMode)
+                champName.Text = "@" .. tostring(cData.name or "Player")
+                champSub.Text = isSpam and "SUPREME CHAT DOMINATOR" or "SUPREME 24/7 ACTIVE LEGEND"
+                champScore.Text = string.format("%d %s", cVal, unitSuffix)
             end
 
             for _, child in ipairs(rankScroll:GetChildren()) do
@@ -2472,74 +2481,98 @@ task.spawn(function()
                     myScoreVal = isSpam and (entry.spam or 0) or (entry.grind or 0)
                 end
 
-                if idx >= 4 and idx <= 25 then
+                if idx >= 2 and idx <= 25 then
                     local isTop5 = (idx <= 5)
                     local isMe = (tostring(entry.uid) == myIdStr)
-                    local accentCol = (idx == 4) and Color3.fromRGB(255, 75, 115)
-                        or ((idx == 5) and Color3.fromRGB(0, 235, 165) or Color3.fromRGB(135, 165, 225))
+                    local accentCol = getRankAccent(idx)
+                    local eScore = isSpam and (entry.spam or 0) or (entry.grind or 0)
+                    local fillRatio = math.clamp(eScore / topScore, 0.06, 1)
 
                     local row = Instance.new("Frame", rankScroll)
-                    row.Size = UDim2.new(1, 0, 0, 32)
-                    row.BackgroundColor3 = isMe and Color3.fromRGB(24, 35, 56) or Color3.fromRGB(16, 21, 33)
+                    row.Size = UDim2.new(1, -4, 0, 38)
+                    row.BackgroundColor3 = isMe and Color3.fromRGB(22, 32, 52) or Color3.fromRGB(14, 19, 30)
                     row.LayoutOrder = idx
-                    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
+                    row.ClipsDescendants = true
+                    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
 
                     local rStroke = Instance.new("UIStroke", row)
-                    rStroke.Thickness = (isTop5 or isMe) and 1.0 or 0.75
+                    rStroke.Thickness = (isTop5 or isMe) and 1.1 or 0.8
                     rStroke.Color = accentCol
-                    rStroke.Transparency = (isTop5 or isMe) and 0.30 or 0.72
+                    rStroke.Transparency = (isTop5 or isMe) and 0.28 or 0.72
 
-                    local rankNumLbl = Instance.new("TextLabel", row)
-                    rankNumLbl.Size = UDim2.fromOffset(26, 32)
-                    rankNumLbl.BackgroundTransparency = 1
-                    rankNumLbl.Text = string.format("#%02d", idx)
-                    rankNumLbl.TextColor3 = accentCol
-                    rankNumLbl.Font = Enum.Font.GothamBlack
-                    rankNumLbl.TextSize = 8.5
+                    local leftStrip = Instance.new("Frame", row)
+                    leftStrip.Size = UDim2.new(0, 3, 1, -10)
+                    leftStrip.Position = UDim2.new(0, 3, 0, 5)
+                    leftStrip.BackgroundColor3 = accentCol
+                    leftStrip.BorderSizePixel = 0
+                    Instance.new("UICorner", leftStrip).CornerRadius = UDim.new(1, 0)
+
+                    local rankPill = Instance.new("TextLabel", row)
+                    rankPill.Size = UDim2.fromOffset(26, 38)
+                    rankPill.Position = UDim2.fromOffset(6, 0)
+                    rankPill.BackgroundTransparency = 1
+                    rankPill.Text = string.format("#%d", idx)
+                    rankPill.TextColor3 = accentCol
+                    rankPill.Font = Enum.Font.GothamBlack
+                    rankPill.TextSize = 10
 
                     local av = Instance.new("ImageLabel", row)
-                    av.Size = UDim2.fromOffset(22, 22)
+                    av.Size = UDim2.fromOffset(26, 26)
                     av.AnchorPoint = Vector2.new(0, 0.5)
-                    av.Position = UDim2.new(0, 28, 0.5, 0)
+                    av.Position = UDim2.new(0, 33, 0.5, 0)
                     av.BackgroundColor3 = Color3.fromRGB(10, 13, 20)
                     av.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", tonumber(entry.uid) or 9685785248)
                     Instance.new("UICorner", av).CornerRadius = UDim.new(1, 0)
 
                     local uNameLbl = Instance.new("TextLabel", row)
-                    uNameLbl.Size = UDim2.new(0.46, 0, 0, 13)
-                    uNameLbl.Position = UDim2.new(0, 54, 0, 3)
+                    uNameLbl.Size = UDim2.new(0.52, 0, 0, 14)
+                    uNameLbl.Position = UDim2.new(0, 65, 0, 4)
                     uNameLbl.BackgroundTransparency = 1
-                    uNameLbl.Text = "@" .. tostring(entry.name or "Player")
+                    uNameLbl.Text = "@" .. tostring(entry.name or "Player") .. (isMe and " • YOU" or "")
                     uNameLbl.TextColor3 = Color3.new(1, 1, 1)
-                    uNameLbl.Font = Enum.Font.GothamBold
-                    uNameLbl.TextSize = 8.5
+                    uNameLbl.Font = Enum.Font.GothamBlack
+                    uNameLbl.TextSize = 9
                     uNameLbl.TextXAlignment = Enum.TextXAlignment.Left
                     uNameLbl.TextTruncate = Enum.TextTruncate.AtEnd
 
                     local tierSubLbl = Instance.new("TextLabel", row)
-                    tierSubLbl.Size = UDim2.new(0.46, 0, 0, 12)
-                    tierSubLbl.Position = UDim2.new(0, 54, 0, 17)
+                    tierSubLbl.Size = UDim2.new(0.52, 0, 0, 12)
+                    tierSubLbl.Position = UDim2.new(0, 65, 0, 18)
                     tierSubLbl.BackgroundTransparency = 1
                     tierSubLbl.Text = getTierForRank(idx, rankState.activeMode)
                     tierSubLbl.TextColor3 = accentCol
-                    tierSubLbl.Font = Enum.Font.GothamBlack
+                    tierSubLbl.Font = Enum.Font.GothamBold
                     tierSubLbl.TextSize = 7.5
                     tierSubLbl.TextXAlignment = Enum.TextXAlignment.Left
 
+                    -- Relative Neon Power Bar at bottom of card
+                    local pTrack = Instance.new("Frame", row)
+                    pTrack.Size = UDim2.new(1, -74, 0, 3)
+                    pTrack.Position = UDim2.new(0, 65, 1, -5)
+                    pTrack.BackgroundColor3 = Color3.fromRGB(8, 11, 18)
+                    pTrack.BorderSizePixel = 0
+                    Instance.new("UICorner", pTrack).CornerRadius = UDim.new(1, 0)
+
+                    local pFill = Instance.new("Frame", pTrack)
+                    pFill.Size = UDim2.new(fillRatio, 0, 1, 0)
+                    pFill.BackgroundColor3 = accentCol
+                    pFill.BorderSizePixel = 0
+                    Instance.new("UICorner", pFill).CornerRadius = UDim.new(1, 0)
+
                     local valLbl = Instance.new("TextLabel", row)
-                    valLbl.Size = UDim2.new(0.28, -8, 1, 0)
+                    valLbl.Size = UDim2.new(0.26, -8, 0, 26)
                     valLbl.AnchorPoint = Vector2.new(1, 0)
-                    valLbl.Position = UDim2.new(1, -8, 0, 0)
+                    valLbl.Position = UDim2.new(1, -8, 0, 4)
                     valLbl.BackgroundTransparency = 1
-                    valLbl.Text = string.format("%d %s", isSpam and (entry.spam or 0) or (entry.grind or 0), unitSuffix)
-                    valLbl.TextColor3 = Color3.fromRGB(220, 235, 255)
-                    valLbl.Font = Enum.Font.Code
-                    valLbl.TextSize = 8.5
+                    valLbl.Text = string.format("%d %s", eScore, unitSuffix)
+                    valLbl.TextColor3 = Color3.fromRGB(235, 242, 255)
+                    valLbl.Font = Enum.Font.GothamBlack
+                    valLbl.TextSize = 9.5
                     valLbl.TextXAlignment = Enum.TextXAlignment.Right
                 end
             end
 
-            myRankLeft.Text = string.format("RANK #%d • %s", myRankNum, getTierForRank(myRankNum, rankState.activeMode))
+            myRankLeft.Text = string.format("YOUR RANK: #%d  •  %s", myRankNum, getTierForRank(myRankNum, rankState.activeMode))
             myRankRight.Text = string.format("%d %s", myScoreVal, unitSuffix)
         end
 
@@ -2757,7 +2790,6 @@ task.spawn(function()
             end
         end
 
-        -- 1. Compact Milestone Card (1000 Likes For Next Update)
         local goalBox = Instance.new("Frame", card)
         goalBox.Size = UDim2.new(1, -16, 0, 96)
         goalBox.Position = UDim2.new(0, 8, 0, 6)
@@ -2884,7 +2916,6 @@ task.spawn(function()
         likeBtnText.TextSize = 10.5
         likeBtnText.ZIndex = 3
 
-        -- 2. Compact Console: CHAT || Report Bugs & Next Update Features
         local monitorBox = Instance.new("Frame", card)
         monitorBox.Size = UDim2.new(1, -16, 0, 224)
         monitorBox.Position = UDim2.new(0, 8, 0, 106)
@@ -3504,14 +3535,13 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- TAB 6: CUSTOM UI SIZE SCALER + DEV & EMP CLAN CARDS
+-- TAB 6: CUSTOM PORTRAIT DEVELOPER & EMP CLAN CARDS
 -- ========================================================
 local DEV_USER_ID = 9685785248
 local DEV_CUSTOM_IMAGE = "rbxassetid://79059905046105"
 local DISCORD_LINK = "https://discord.gg/8aE54JJ8Rp"
 local copyClip = setclipboard or toclipboard or (syn and syn.write_clipboard) or function() end
 
-local uiScalerPlaceholder = DevTab:CreateLabel("TXR_UI_SIZE_SCALER_CARD")
 local devCardPlaceholder = DevTab:CreateLabel("TXR_DEV_PROFILE_CARD")
 local discordCardPlaceholder = DevTab:CreateLabel("TXR_DISCORD_INVITE_CARD")
 
@@ -3519,13 +3549,11 @@ task.spawn(function()
     task.wait(0.35)
     local guiRoot = getSafeGuiRoot()
     if not guiRoot then return end
-    local scalerLabel, profileLabel, discordLabel
+    local profileLabel, discordLabel
 
     for _, obj in ipairs(guiRoot:GetDescendants()) do
         if obj:IsA("TextLabel") then
-            if obj.Text == "TXR_UI_SIZE_SCALER_CARD" then
-                scalerLabel = obj
-            elseif obj.Text == "TXR_DEV_PROFILE_CARD" then
+            if obj.Text == "TXR_DEV_PROFILE_CARD" then
                 profileLabel = obj
             elseif obj.Text == "TXR_DISCORD_INVITE_CARD" then
                 discordLabel = obj
@@ -3547,113 +3575,6 @@ task.spawn(function()
     end
 
     local cardStrokeGrad, portraitRingGrad, verifiedRingGrad, dStrokeGrad, srvIconGrad
-
-    -- Interactive Custom UI Size Bar (75% / 85% / 100% / 115% + - / +)
-    if scalerLabel and scalerLabel.Parent and scalerLabel.Parent:IsA("Frame") then
-        local sCard = scalerLabel.Parent
-        sCard:SetAttribute("TXR_CustomCard", true)
-        lockHideLabel(scalerLabel, uiScalerPlaceholder)
-
-        sCard.Size = UDim2.new(sCard.Size.X.Scale, sCard.Size.X.Offset, 0, 74)
-        sCard.BackgroundColor3 = Color3.fromRGB(13, 17, 27)
-        sCard.BackgroundTransparency = 0.08
-        sCard.ClipsDescendants = true
-
-        for _, child in ipairs(sCard:GetChildren()) do
-            if child:IsA("UIStroke") or child:IsA("UIGradient") then
-                child:Destroy()
-            end
-        end
-
-        Instance.new("UICorner", sCard).CornerRadius = UDim.new(0, 11)
-        local scStroke = Instance.new("UIStroke", sCard)
-        scStroke.Thickness = 1.15
-        scStroke.Color = Color3.fromRGB(0, 235, 255)
-        scStroke.Transparency = 0.45
-
-        local scTitle = Instance.new("TextLabel", sCard)
-        scTitle.Size = UDim2.new(0.65, 0, 0, 18)
-        scTitle.Position = UDim2.new(0, 10, 0, 6)
-        scTitle.BackgroundTransparency = 1
-        scTitle.Text = "📐 CUSTOM UI SIZE"
-        scTitle.TextColor3 = Color3.new(1, 1, 1)
-        scTitle.Font = Enum.Font.GothamBlack
-        scTitle.TextSize = 10.5
-        scTitle.TextXAlignment = Enum.TextXAlignment.Left
-
-        local sizeValueLbl = Instance.new("TextLabel", sCard)
-        sizeValueLbl.Size = UDim2.new(0.30, -10, 0, 18)
-        sizeValueLbl.AnchorPoint = Vector2.new(1, 0)
-        sizeValueLbl.Position = UDim2.new(1, -10, 0, 6)
-        sizeValueLbl.BackgroundTransparency = 1
-        sizeValueLbl.Text = string.format("%d%%", math.floor(currentUiScaleValue * 100 + 0.5))
-        sizeValueLbl.TextColor3 = Color3.fromRGB(0, 245, 255)
-        sizeValueLbl.Font = Enum.Font.Code
-        sizeValueLbl.TextSize = 10.5
-        sizeValueLbl.TextXAlignment = Enum.TextXAlignment.Right
-
-        local function syncSizeLabel()
-            sizeValueLbl.Text = string.format("%d%%", math.floor(currentUiScaleValue * 100 + 0.5))
-        end
-
-        local btnRow = Instance.new("Frame", sCard)
-        btnRow.Size = UDim2.new(1, -20, 0, 32)
-        btnRow.Position = UDim2.new(0, 10, 0, 30)
-        btnRow.BackgroundTransparency = 1
-
-        local minusBtn = Instance.new("TextButton", btnRow)
-        minusBtn.Size = UDim2.new(0.14, 0, 1, 0)
-        minusBtn.BackgroundColor3 = Color3.fromRGB(28, 34, 52)
-        minusBtn.Text = "-"
-        minusBtn.TextColor3 = Color3.new(1, 1, 1)
-        minusBtn.Font = Enum.Font.GothamBlack
-        minusBtn.TextSize = 14
-        Instance.new("UICorner", minusBtn).CornerRadius = UDim.new(0, 7)
-
-        local presets = {0.75, 0.85, 1.00, 1.15}
-        for idx, pVal in ipairs(presets) do
-            local pBtn = Instance.new("TextButton", btnRow)
-            pBtn.Size = UDim2.new(0.17, -3, 1, 0)
-            pBtn.Position = UDim2.new(0.15 + ((idx - 1) * 0.17), 2, 0, 0)
-            pBtn.BackgroundColor3 = (idx == 3) and Color3.fromRGB(0, 155, 255) or Color3.fromRGB(20, 26, 40)
-            pBtn.Text = string.format("%d%%", math.floor(pVal * 100))
-            pBtn.TextColor3 = Color3.new(1, 1, 1)
-            pBtn.Font = Enum.Font.GothamBold
-            pBtn.TextSize = 8.5
-            Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 7)
-
-            pBtn.MouseButton1Click:Connect(function()
-                if applyGlobalUiScale then
-                    applyGlobalUiScale(pVal)
-                    syncSizeLabel()
-                end
-            end)
-        end
-
-        local plusBtn = Instance.new("TextButton", btnRow)
-        plusBtn.Size = UDim2.new(0.14, 0, 1, 0)
-        plusBtn.Position = UDim2.new(0.86, 2, 0, 0)
-        plusBtn.BackgroundColor3 = Color3.fromRGB(28, 34, 52)
-        plusBtn.Text = "+"
-        plusBtn.TextColor3 = Color3.new(1, 1, 1)
-        plusBtn.Font = Enum.Font.GothamBlack
-        plusBtn.TextSize = 14
-        Instance.new("UICorner", plusBtn).CornerRadius = UDim.new(0, 7)
-
-        minusBtn.MouseButton1Click:Connect(function()
-            if applyGlobalUiScale then
-                applyGlobalUiScale(currentUiScaleValue - 0.05)
-                syncSizeLabel()
-            end
-        end)
-
-        plusBtn.MouseButton1Click:Connect(function()
-            if applyGlobalUiScale then
-                applyGlobalUiScale(currentUiScaleValue + 0.05)
-                syncSizeLabel()
-            end
-        end)
-    end
 
     if profileLabel and profileLabel.Parent and profileLabel.Parent:IsA("Frame") then
         local card = profileLabel.Parent
