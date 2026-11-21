@@ -2172,8 +2172,8 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- TAB 4.5: QUANTUM CYBER-THRONE RANKINGS ARENA (ULTRA POLISHED)
--- (Levitating #1 Crown + 3-Layer Chroma Tags + 🎯 ME Quick-Jump + Rank-Up Burst)
+-- TAB 4.5: HOLOGRAPHIC PRESTIGE ESPORTS RANKINGS ARENA
+-- (Ambient Aura + Corner Brackets + 3-Layer Chroma Tags + Glass Inspector)
 -- ========================================================
 local RANK_TAG_PREFIX = "[EMP_RANK_" .. RANKING_SEASON_ID .. ":"
 
@@ -2183,7 +2183,7 @@ local TOP5_PREMIUM_THEMES = {
         grindTitle = "👑 NO-LIFE GOD",
         speed      = 1.28,
         border     = Color3.fromRGB(255, 215, 55),
-        cardTintA  = Color3.fromRGB(48, 32, 10),
+        cardTintA  = Color3.fromRGB(52, 34, 10),
         cardTintB  = Color3.fromRGB(7, 9, 15),
         tagBg      = Color3.fromRGB(32, 20, 6),
         colors     = {
@@ -2199,7 +2199,7 @@ local TOP5_PREMIUM_THEMES = {
         grindTitle = "⚡ AFK KING",
         speed      = 1.22,
         border     = Color3.fromRGB(0, 245, 255),
-        cardTintA  = Color3.fromRGB(8, 36, 52),
+        cardTintA  = Color3.fromRGB(8, 38, 56),
         cardTintB  = Color3.fromRGB(7, 9, 15),
         tagBg      = Color3.fromRGB(6, 22, 34),
         colors     = {
@@ -2214,7 +2214,7 @@ local TOP5_PREMIUM_THEMES = {
         grindTitle = "👻 SERVER GHOST",
         speed      = 1.18,
         border     = Color3.fromRGB(200, 75, 255),
-        cardTintA  = Color3.fromRGB(38, 12, 56),
+        cardTintA  = Color3.fromRGB(40, 12, 60),
         cardTintB  = Color3.fromRGB(7, 9, 15),
         tagBg      = Color3.fromRGB(22, 8, 36),
         colors     = {
@@ -2229,7 +2229,7 @@ local TOP5_PREMIUM_THEMES = {
         grindTitle = "💀 GRIND DEMON",
         speed      = 1.24,
         border     = Color3.fromRGB(255, 45, 95),
-        cardTintA  = Color3.fromRGB(44, 10, 26),
+        cardTintA  = Color3.fromRGB(46, 10, 26),
         cardTintB  = Color3.fromRGB(7, 9, 15),
         tagBg      = Color3.fromRGB(30, 6, 16),
         colors     = {
@@ -2243,7 +2243,7 @@ local TOP5_PREMIUM_THEMES = {
         grindTitle = "🦉 NIGHT OWL",
         speed      = 1.20,
         border     = Color3.fromRGB(15, 255, 175),
-        cardTintA  = Color3.fromRGB(8, 38, 30),
+        cardTintA  = Color3.fromRGB(8, 40, 30),
         cardTintB  = Color3.fromRGB(7, 9, 15),
         tagBg      = Color3.fromRGB(6, 24, 18),
         colors     = {
@@ -2256,6 +2256,8 @@ local TOP5_PREMIUM_THEMES = {
 
 local UNRANKED_CHROMA_CFG = {
     speed = 1.05,
+    border = Color3.fromRGB(95, 175, 255),
+    tagBg = Color3.fromRGB(16, 24, 38),
     colors = {
         ColorSequenceKeypoint.new(0.00, Color3.fromRGB(95, 175, 255)),
         ColorSequenceKeypoint.new(0.50, Color3.fromRGB(185, 225, 255)),
@@ -2272,7 +2274,7 @@ local function buildPremiumChromaTag(parentObj, posUDim, anchorVec, textSize, th
     host.Position = posUDim
     host.BackgroundTransparency = 1
     host.BorderSizePixel = 0
-    host.ZIndex = 12
+    host.ZIndex = parentObj.ZIndex + 1
 
     local badgeGlow = Instance.new("TextLabel", host)
     badgeGlow.Size = UDim2.fromScale(1, 1)
@@ -2283,7 +2285,7 @@ local function buildPremiumChromaTag(parentObj, posUDim, anchorVec, textSize, th
     badgeGlow.Font = Enum.Font.GothamBlack
     badgeGlow.TextSize = textSize
     badgeGlow.TextTruncate = Enum.TextTruncate.AtEnd
-    badgeGlow.ZIndex = 12
+    badgeGlow.ZIndex = host.ZIndex
 
     local glowStroke = Instance.new("UIStroke", badgeGlow)
     glowStroke.Thickness = 1.2
@@ -2298,7 +2300,7 @@ local function buildPremiumChromaTag(parentObj, posUDim, anchorVec, textSize, th
     badgeLabel.Font = Enum.Font.GothamBlack
     badgeLabel.TextSize = textSize
     badgeLabel.TextTruncate = Enum.TextTruncate.AtEnd
-    badgeLabel.ZIndex = 13
+    badgeLabel.ZIndex = host.ZIndex + 1
 
     local bStroke = Instance.new("UIStroke", badgeLabel)
     bStroke.Thickness = 0.9
@@ -2313,7 +2315,7 @@ local function buildPremiumChromaTag(parentObj, posUDim, anchorVec, textSize, th
     badgeShine.Font = Enum.Font.GothamBlack
     badgeShine.TextSize = textSize
     badgeShine.TextTruncate = Enum.TextTruncate.AtEnd
-    badgeShine.ZIndex = 14
+    badgeShine.ZIndex = host.ZIndex + 2
 
     local shineGrad = Instance.new("UIGradient", badgeShine)
     shineGrad.Color = ColorSequence.new(Color3.new(1, 1, 1))
@@ -2417,9 +2419,9 @@ task.spawn(function()
         Instance.new("UICorner", card).CornerRadius = UDim.new(0, 14)
 
         local rkStroke = Instance.new("UIStroke", card)
-        rkStroke.Thickness = 1.4
+        rkStroke.Thickness = 1.45
         rkStroke.Color = Color3.new(1, 1, 1)
-        rkStroke.Transparency = 0.18
+        rkStroke.Transparency = 0.16
 
         local rkStrokeGrad = Instance.new("UIGradient", rkStroke)
         rkStrokeGrad.Color = ColorSequence.new({
@@ -2427,6 +2429,40 @@ task.spawn(function()
             ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 245, 255)),
             ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 75, 255))
         })
+
+        -- Ambient Holographic Radial Energy Aura behind Champion Stage
+        local holoAura = Instance.new("ImageLabel", card)
+        holoAura.Size = UDim2.fromOffset(220, 150)
+        holoAura.AnchorPoint = Vector2.new(0.5, 0)
+        holoAura.Position = UDim2.new(0.5, 0, 0, 24)
+        holoAura.BackgroundTransparency = 1
+        holoAura.Image = "rbxassetid://1316045217"
+        holoAura.ImageColor3 = Color3.fromRGB(255, 195, 55)
+        holoAura.ImageTransparency = 0.84
+        holoAura.ZIndex = 1
+
+        -- Razor-Sharp Cyberpunk Corner Brackets
+        local function addCyberBracket(xScale, yScale, xOff, yOff, col)
+            local hBar = Instance.new("Frame", card)
+            hBar.Size = UDim2.fromOffset(14, 1.5)
+            hBar.AnchorPoint = Vector2.new(xScale, yScale)
+            hBar.Position = UDim2.new(xScale, xOff, yScale, yOff)
+            hBar.BackgroundColor3 = col
+            hBar.BorderSizePixel = 0
+            hBar.ZIndex = 8
+
+            local vBar = Instance.new("Frame", card)
+            vBar.Size = UDim2.fromOffset(1.5, 14)
+            vBar.AnchorPoint = Vector2.new(xScale, yScale)
+            vBar.Position = UDim2.new(xScale, xOff, yScale, yOff)
+            vBar.BackgroundColor3 = col
+            vBar.BorderSizePixel = 0
+            vBar.ZIndex = 8
+        end
+        addCyberBracket(0, 0, 4, 4, Color3.fromRGB(0, 245, 255))
+        addCyberBracket(1, 0, -4, 4, Color3.fromRGB(255, 215, 55))
+        addCyberBracket(0, 1, 4, -4, Color3.fromRGB(200, 75, 255))
+        addCyberBracket(1, 1, -4, -4, Color3.fromRGB(0, 245, 255))
 
         -- Top Specular Glass Reflection Sheen
         local oledSheen = Instance.new("Frame", card)
@@ -2472,14 +2508,15 @@ task.spawn(function()
             end
         end
 
-        -- Segmented Header: Live Season Pill + Dual Mode Switcher + 🎯 ME Quick-Jump
+        -- Segmented Header: Live Season Pill + Dual Mode Switcher + 🎯 ME + ↻ Sync
         local topBar = Instance.new("Frame", card)
         topBar.Size = UDim2.new(1, -16, 0, 28)
         topBar.Position = UDim2.new(0, 8, 0, 7)
         topBar.BackgroundTransparency = 1
+        topBar.ZIndex = 5
 
         local liveStatusPill = Instance.new("Frame", topBar)
-        liveStatusPill.Size = UDim2.fromOffset(78, 24)
+        liveStatusPill.Size = UDim2.fromOffset(74, 24)
         liveStatusPill.AnchorPoint = Vector2.new(0, 0.5)
         liveStatusPill.Position = UDim2.new(0, 0, 0.5, 0)
         liveStatusPill.BackgroundColor3 = Color3.fromRGB(11, 15, 24)
@@ -2492,24 +2529,24 @@ task.spawn(function()
         local liveDot = Instance.new("Frame", liveStatusPill)
         liveDot.Size = UDim2.fromOffset(6, 6)
         liveDot.AnchorPoint = Vector2.new(0, 0.5)
-        liveDot.Position = UDim2.new(0, 7, 0.5, 0)
+        liveDot.Position = UDim2.new(0, 6, 0.5, 0)
         liveDot.BackgroundColor3 = Color3.fromRGB(45, 255, 155)
         Instance.new("UICorner", liveDot).CornerRadius = UDim.new(1, 0)
 
         local seasonLabel = Instance.new("TextLabel", liveStatusPill)
-        seasonLabel.Size = UDim2.new(1, -18, 1, 0)
-        seasonLabel.Position = UDim2.fromOffset(17, 0)
+        seasonLabel.Size = UDim2.new(1, -16, 1, 0)
+        seasonLabel.Position = UDim2.fromOffset(15, 0)
         seasonLabel.BackgroundTransparency = 1
         seasonLabel.Text = RANKING_SEASON_ID
         seasonLabel.TextColor3 = Color3.fromRGB(225, 240, 255)
         seasonLabel.Font = Enum.Font.GothamBlack
-        seasonLabel.TextSize = 7.2
+        seasonLabel.TextSize = 7
         seasonLabel.TextXAlignment = Enum.TextXAlignment.Left
 
         local switchBar = Instance.new("Frame", topBar)
-        switchBar.Size = UDim2.new(1, -118, 0, 24)
+        switchBar.Size = UDim2.new(1, -142, 0, 24)
         switchBar.AnchorPoint = Vector2.new(0.5, 0.5)
-        switchBar.Position = UDim2.new(0.5, 22, 0.5, 0)
+        switchBar.Position = UDim2.new(0.5, 9, 0.5, 0)
         switchBar.BackgroundColor3 = Color3.fromRGB(11, 15, 24)
         Instance.new("UICorner", switchBar).CornerRadius = UDim.new(0, 7)
 
@@ -2529,7 +2566,7 @@ task.spawn(function()
         spamModeBtn.Text = "⚡ SPAMMERS"
         spamModeBtn.TextColor3 = Color3.new(1, 1, 1)
         spamModeBtn.Font = Enum.Font.GothamBlack
-        spamModeBtn.TextSize = 7.8
+        spamModeBtn.TextSize = 7.5
         spamModeBtn.ZIndex = 3
 
         local grindModeBtn = Instance.new("TextButton", switchBar)
@@ -2539,16 +2576,16 @@ task.spawn(function()
         grindModeBtn.Text = "⏱️ GRINDERS"
         grindModeBtn.TextColor3 = Color3.fromRGB(160, 180, 210)
         grindModeBtn.Font = Enum.Font.GothamBlack
-        grindModeBtn.TextSize = 7.8
+        grindModeBtn.TextSize = 7.5
         grindModeBtn.ZIndex = 3
 
         local locateMeBtn = Instance.new("TextButton", topBar)
-        locateMeBtn.Size = UDim2.fromOffset(30, 24)
+        locateMeBtn.Size = UDim2.fromOffset(26, 24)
         locateMeBtn.AnchorPoint = Vector2.new(1, 0.5)
-        locateMeBtn.Position = UDim2.new(1, 0, 0.5, 0)
+        locateMeBtn.Position = UDim2.new(1, -30, 0.5, 0)
         locateMeBtn.BackgroundColor3 = Color3.fromRGB(14, 22, 36)
         locateMeBtn.Text = "🎯"
-        locateMeBtn.TextSize = 11
+        locateMeBtn.TextSize = 10.5
         locateMeBtn.AutoButtonColor = false
         Instance.new("UICorner", locateMeBtn).CornerRadius = UDim.new(0, 7)
 
@@ -2558,6 +2595,174 @@ task.spawn(function()
         locStroke.Transparency = 0.35
 
         local locScale = Instance.new("UIScale", locateMeBtn)
+
+        local refreshRankBtn = Instance.new("TextButton", topBar)
+        refreshRankBtn.Size = UDim2.fromOffset(26, 24)
+        refreshRankBtn.AnchorPoint = Vector2.new(1, 0.5)
+        refreshRankBtn.Position = UDim2.new(1, 0, 0.5, 0)
+        refreshRankBtn.BackgroundColor3 = Color3.fromRGB(14, 22, 36)
+        refreshRankBtn.Text = "↻"
+        refreshRankBtn.TextColor3 = Color3.fromRGB(75, 245, 175)
+        refreshRankBtn.Font = Enum.Font.GothamBlack
+        refreshRankBtn.TextSize = 13
+        refreshRankBtn.AutoButtonColor = false
+        Instance.new("UICorner", refreshRankBtn).CornerRadius = UDim.new(0, 7)
+
+        local refStroke = Instance.new("UIStroke", refreshRankBtn)
+        refStroke.Thickness = 0.95
+        refStroke.Color = Color3.fromRGB(75, 245, 175)
+        refStroke.Transparency = 0.35
+
+        local refScale = Instance.new("UIScale", refreshRankBtn)
+
+        -- ====================================================
+        -- IN-CARD GLASSY PLAYER INSPECTOR OVERLAY
+        -- ====================================================
+        local inspectorOverlay = Instance.new("Frame", card)
+        inspectorOverlay.Size = UDim2.fromScale(1, 1)
+        inspectorOverlay.BackgroundColor3 = Color3.fromRGB(2, 4, 8)
+        inspectorOverlay.BackgroundTransparency = 0.32
+        inspectorOverlay.Visible = false
+        inspectorOverlay.ZIndex = 40
+
+        local inspModal = Instance.new("Frame", inspectorOverlay)
+        inspModal.Size = UDim2.fromOffset(248, 152)
+        inspModal.AnchorPoint = Vector2.new(0.5, 0.5)
+        inspModal.Position = UDim2.fromScale(0.5, 0.5)
+        inspModal.BackgroundColor3 = Color3.fromRGB(10, 14, 24)
+        inspModal.BackgroundTransparency = 0.04
+        inspModal.ZIndex = 41
+        Instance.new("UICorner", inspModal).CornerRadius = UDim.new(0, 13)
+
+        local inspStroke = Instance.new("UIStroke", inspModal)
+        inspStroke.Thickness = 1.35
+        inspStroke.Color = Color3.fromRGB(0, 240, 255)
+        inspStroke.Transparency = 0.20
+
+        local inspScale = Instance.new("UIScale", inspModal)
+        inspScale.Scale = 0.85
+
+        local inspCloseBtn = Instance.new("TextButton", inspModal)
+        inspCloseBtn.Size = UDim2.fromOffset(22, 22)
+        inspCloseBtn.AnchorPoint = Vector2.new(1, 0)
+        inspCloseBtn.Position = UDim2.new(1, -8, 0, 8)
+        inspCloseBtn.BackgroundColor3 = Color3.fromRGB(24, 30, 46)
+        inspCloseBtn.Text = "✕"
+        inspCloseBtn.TextColor3 = Color3.fromRGB(255, 85, 115)
+        inspCloseBtn.Font = Enum.Font.GothamBlack
+        inspCloseBtn.TextSize = 10
+        inspCloseBtn.ZIndex = 45
+        Instance.new("UICorner", inspCloseBtn).CornerRadius = UDim.new(1, 0)
+
+        local inspAvRing = Instance.new("Frame", inspModal)
+        inspAvRing.Size = UDim2.fromOffset(48, 48)
+        inspAvRing.Position = UDim2.fromOffset(12, 12)
+        inspAvRing.BackgroundColor3 = Color3.fromRGB(0, 240, 255)
+        inspAvRing.ZIndex = 42
+        Instance.new("UICorner", inspAvRing).CornerRadius = UDim.new(1, 0)
+
+        local inspAv = Instance.new("ImageLabel", inspAvRing)
+        inspAv.Size = UDim2.fromOffset(44, 44)
+        inspAv.AnchorPoint = Vector2.new(0.5, 0.5)
+        inspAv.Position = UDim2.fromScale(0.5, 0.5)
+        inspAv.BackgroundColor3 = Color3.fromRGB(6, 8, 14)
+        inspAv.Image = "rbxthumb://type=AvatarHeadShot&id=9685785248&w=100&h=100"
+        inspAv.ZIndex = 43
+        Instance.new("UICorner", inspAv).CornerRadius = UDim.new(1, 0)
+
+        local inspNameLbl = Instance.new("TextLabel", inspModal)
+        inspNameLbl.Size = UDim2.new(1, -98, 0, 18)
+        inspNameLbl.Position = UDim2.fromOffset(68, 12)
+        inspNameLbl.BackgroundTransparency = 1
+        inspNameLbl.Text = "@Player"
+        inspNameLbl.TextColor3 = Color3.new(1, 1, 1)
+        inspNameLbl.Font = Enum.Font.GothamBlack
+        inspNameLbl.TextSize = 12
+        inspNameLbl.TextXAlignment = Enum.TextXAlignment.Left
+        inspNameLbl.TextTruncate = Enum.TextTruncate.AtEnd
+        inspNameLbl.ZIndex = 43
+
+        local inspRankBadgeLbl = Instance.new("TextLabel", inspModal)
+        inspRankBadgeLbl.Size = UDim2.new(1, -98, 0, 14)
+        inspRankBadgeLbl.Position = UDim2.fromOffset(68, 30)
+        inspRankBadgeLbl.BackgroundTransparency = 1
+        inspRankBadgeLbl.Text = "GLOBAL RANK #1"
+        inspRankBadgeLbl.TextColor3 = Color3.fromRGB(255, 215, 55)
+        inspRankBadgeLbl.Font = Enum.Font.GothamBold
+        inspRankBadgeLbl.TextSize = 8.5
+        inspRankBadgeLbl.TextXAlignment = Enum.TextXAlignment.Left
+        inspRankBadgeLbl.ZIndex = 43
+
+        local inspTagPill = Instance.new("Frame", inspModal)
+        inspTagPill.Size = UDim2.fromOffset(124, 16)
+        inspTagPill.Position = UDim2.fromOffset(68, 46)
+        inspTagPill.BackgroundColor3 = Color3.fromRGB(32, 20, 6)
+        inspTagPill.ZIndex = 43
+        Instance.new("UICorner", inspTagPill).CornerRadius = UDim.new(1, 0)
+
+        local inspTagCtrl = buildPremiumChromaTag(
+            inspTagPill,
+            UDim2.fromScale(0.5, 0.5),
+            Vector2.new(0.5, 0.5),
+            7.5,
+            TOP5_PREMIUM_THEMES[1],
+            "👑 COM GOD"
+        )
+
+        -- 2-Column Live Stats Box inside Inspector
+        local inspStatsGrid = Instance.new("Frame", inspModal)
+        inspStatsGrid.Size = UDim2.new(1, -24, 0, 68)
+        inspStatsGrid.Position = UDim2.fromOffset(12, 72)
+        inspStatsGrid.BackgroundColor3 = Color3.fromRGB(16, 22, 36)
+        inspStatsGrid.ZIndex = 42
+        Instance.new("UICorner", inspStatsGrid).CornerRadius = UDim.new(0, 9)
+
+        local inspSpamVal = Instance.new("TextLabel", inspStatsGrid)
+        inspSpamVal.Size = UDim2.new(0.5, 0, 0, 24)
+        inspSpamVal.Position = UDim2.fromOffset(0, 10)
+        inspSpamVal.BackgroundTransparency = 1
+        inspSpamVal.Text = "0"
+        inspSpamVal.TextColor3 = Color3.fromRGB(0, 245, 255)
+        inspSpamVal.Font = Enum.Font.GothamBlack
+        inspSpamVal.TextSize = 15
+        inspSpamVal.ZIndex = 43
+
+        local inspSpamSub = Instance.new("TextLabel", inspStatsGrid)
+        inspSpamSub.Size = UDim2.new(0.5, 0, 0, 14)
+        inspSpamSub.Position = UDim2.fromOffset(0, 36)
+        inspSpamSub.BackgroundTransparency = 1
+        inspSpamSub.Text = "⚡ PACKETS SENT"
+        inspSpamSub.TextColor3 = Color3.fromRGB(160, 180, 210)
+        inspSpamSub.Font = Enum.Font.GothamBold
+        inspSpamSub.TextSize = 7.5
+        inspSpamSub.ZIndex = 43
+
+        local inspGrindVal = Instance.new("TextLabel", inspStatsGrid)
+        inspGrindVal.Size = UDim2.new(0.5, 0, 0, 24)
+        inspGrindVal.Position = UDim2.new(0.5, 0, 0, 10)
+        inspGrindVal.BackgroundTransparency = 1
+        inspGrindVal.Text = "0m"
+        inspGrindVal.TextColor3 = Color3.fromRGB(200, 95, 255)
+        inspGrindVal.Font = Enum.Font.GothamBlack
+        inspGrindVal.TextSize = 15
+        inspGrindVal.ZIndex = 43
+
+        local inspGrindSub = Instance.new("TextLabel", inspStatsGrid)
+        inspGrindSub.Size = UDim2.new(0.5, 0, 0, 14)
+        inspGrindSub.Position = UDim2.new(0.5, 0, 0, 36)
+        inspGrindSub.BackgroundTransparency = 1
+        inspGrindSub.Text = "⏱️ ACTIVE GRIND"
+        inspGrindSub.TextColor3 = Color3.fromRGB(160, 180, 210)
+        inspGrindSub.Font = Enum.Font.GothamBold
+        inspGrindSub.TextSize = 7.5
+        inspGrindSub.ZIndex = 43
+
+        inspCloseBtn.MouseButton1Click:Connect(function()
+            TweenService:Create(inspScale, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Scale = 0.85}):Play()
+            task.delay(0.16, function()
+                inspectorOverlay.Visible = false
+            end)
+        end)
 
         local function inspectPlayerEntry(pData, placeNum)
             if not pData then
@@ -2569,15 +2774,27 @@ task.spawn(function()
                 })
                 return
             end
+
+            local cfg = TOP5_PREMIUM_THEMES[placeNum] or UNRANKED_CHROMA_CFG
             local titleStr = (rankState.activeMode == "SPAM")
                 and (TOP5_PREMIUM_THEMES[placeNum] and TOP5_PREMIUM_THEMES[placeNum].spamTitle or "⚔️ SPAMMER")
                 or (TOP5_PREMIUM_THEMES[placeNum] and TOP5_PREMIUM_THEMES[placeNum].grindTitle or "⚔️ ACTIVE USER")
-            TXR_Lib:Notify({
-                Title = string.format("#%d • @%s (%s)", placeNum, tostring(pData.name), titleStr),
-                Content = string.format("⚡ %d Packets Sent  |  ⏱️ %d Mins Grind", tonumber(pData.spam) or 0, tonumber(pData.grind) or 0),
-                Duration = 2.6,
-                Image = 4483345998
-            })
+
+            inspAv.Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", tonumber(pData.uid) or 9685785248)
+            inspAvRing.BackgroundColor3 = cfg.border
+            inspStroke.Color = cfg.border
+            inspNameLbl.Text = "@" .. tostring(pData.name or "Player")
+            inspRankBadgeLbl.Text = string.format("GLOBAL RANK #%d", placeNum)
+            inspRankBadgeLbl.TextColor3 = cfg.border
+            inspTagPill.BackgroundColor3 = cfg.tagBg
+            inspTagCtrl.setText(titleStr)
+            inspTagCtrl.setTheme(cfg)
+            inspSpamVal.Text = tostring(tonumber(pData.spam) or 0)
+            inspGrindVal.Text = tostring(tonumber(pData.grind) or 0) .. "m"
+
+            inspectorOverlay.Visible = true
+            inspScale.Scale = 0.85
+            TweenService:Create(inspScale, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
         end
 
         -- 3D-Pedestal Champions Stage
@@ -2585,9 +2802,10 @@ task.spawn(function()
         podiumStage.Size = UDim2.new(1, -16, 0, 130)
         podiumStage.Position = UDim2.new(0, 8, 0, 40)
         podiumStage.BackgroundTransparency = 1
+        podiumStage.ZIndex = 4
 
         local podiumRingGrads = {}
-        local champSweepGrad = nil
+        local podiumSweepGrads = {}
         local champCrownLbl = nil
 
         local function createPedestalSlot(placeNum, xScale, widthScale, heightPx)
@@ -2597,7 +2815,7 @@ task.spawn(function()
             box.AnchorPoint = Vector2.new(0.5, 1)
             box.Position = UDim2.new(xScale, 0, 1, 0)
             box.BackgroundColor3 = Color3.new(1, 1, 1)
-            box.BackgroundTransparency = 0.06
+            box.BackgroundTransparency = 0.05
             box.Text = ""
             box.AutoButtonColor = false
             box.ClipsDescendants = true
@@ -2613,49 +2831,37 @@ task.spawn(function()
             })
 
             local bs = Instance.new("UIStroke", box)
-            bs.Thickness = (placeNum == 1) and 1.5 or 1.05
+            bs.Thickness = (placeNum == 1) and 1.55 or 1.05
             bs.Color = cfg.border
             bs.Transparency = (placeNum == 1) and 0.10 or 0.30
 
-            if placeNum == 1 then
-                local sweepOverlay = Instance.new("Frame", box)
-                sweepOverlay.Size = UDim2.fromScale(1, 1)
-                sweepOverlay.BackgroundColor3 = Color3.fromRGB(255, 240, 180)
-                sweepOverlay.BackgroundTransparency = 0
-                sweepOverlay.BorderSizePixel = 0
-                sweepOverlay.ZIndex = 2
-                Instance.new("UICorner", sweepOverlay).CornerRadius = UDim.new(0, 11)
+            -- Diagonal Glass Sweep Overlay on all Top-3 Pedestals
+            local sweepOverlay = Instance.new("Frame", box)
+            sweepOverlay.Size = UDim2.fromScale(1, 1)
+            sweepOverlay.BackgroundColor3 = cfg.border
+            sweepOverlay.BackgroundTransparency = 0
+            sweepOverlay.BorderSizePixel = 0
+            sweepOverlay.ZIndex = 2
+            Instance.new("UICorner", sweepOverlay).CornerRadius = UDim.new(0, 11)
 
-                champSweepGrad = Instance.new("UIGradient", sweepOverlay)
-                champSweepGrad.Rotation = 25
-                champSweepGrad.Transparency = NumberSequence.new({
-                    NumberSequenceKeypoint.new(0.00, 1.00),
-                    NumberSequenceKeypoint.new(0.42, 1.00),
-                    NumberSequenceKeypoint.new(0.50, 0.86),
-                    NumberSequenceKeypoint.new(0.58, 1.00),
-                    NumberSequenceKeypoint.new(1.00, 1.00)
-                })
-            end
+            local swGrad = Instance.new("UIGradient", sweepOverlay)
+            swGrad.Rotation = 25
+            swGrad.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0.00, 1.00),
+                NumberSequenceKeypoint.new(0.42, 1.00),
+                NumberSequenceKeypoint.new(0.50, (placeNum == 1) and 0.85 or 0.90),
+                NumberSequenceKeypoint.new(0.58, 1.00),
+                NumberSequenceKeypoint.new(1.00, 1.00)
+            })
+            table.insert(podiumSweepGrads, {grad = swGrad, phase = placeNum * 0.7})
 
             local bottomPedestalBar = Instance.new("Frame", box)
-            bottomPedestalBar.Size = UDim2.new(0.75, 0, 0, 2.5)
+            bottomPedestalBar.Size = UDim2.new(0.76, 0, 0, 2.5)
             bottomPedestalBar.AnchorPoint = Vector2.new(0.5, 1)
             bottomPedestalBar.Position = UDim2.new(0.5, 0, 1, -1)
             bottomPedestalBar.BackgroundColor3 = cfg.border
             bottomPedestalBar.BorderSizePixel = 0
             Instance.new("UICorner", bottomPedestalBar).CornerRadius = UDim.new(1, 0)
-
-            local numBadge = Instance.new("TextLabel", box)
-            numBadge.Size = UDim2.fromOffset(24, 14)
-            numBadge.Position = UDim2.fromOffset(5, 5)
-            numBadge.BackgroundColor3 = cfg.tagBg
-            numBadge.BackgroundTransparency = 0.08
-            numBadge.Text = (placeNum == 1) and "1ST" or ((placeNum == 2) and "2ND" or "3RD")
-            numBadge.TextColor3 = cfg.border
-            numBadge.Font = Enum.Font.GothamBlack
-            numBadge.TextSize = 7
-            numBadge.ZIndex = 4
-            Instance.new("UICorner", numBadge).CornerRadius = UDim.new(0, 4)
 
             if placeNum == 1 then
                 champCrownLbl = Instance.new("TextLabel", box)
@@ -2665,14 +2871,14 @@ task.spawn(function()
                 champCrownLbl.BackgroundTransparency = 1
                 champCrownLbl.Text = "👑"
                 champCrownLbl.TextSize = 11
-                champCrownLbl.ZIndex = 4
+                champCrownLbl.ZIndex = 5
             end
 
             local avSize = (placeNum == 1) and 36 or 30
             local avRing = Instance.new("Frame", box)
             avRing.Size = UDim2.fromOffset(avSize + 4, avSize + 4)
             avRing.AnchorPoint = Vector2.new(0.5, 0)
-            avRing.Position = UDim2.new(0.5, 0, 0, 7)
+            avRing.Position = UDim2.new(0.5, 0, 0, 6)
             avRing.BackgroundColor3 = Color3.new(1, 1, 1)
             avRing.ZIndex = 4
             Instance.new("UICorner", avRing).CornerRadius = UDim.new(1, 0)
@@ -2690,10 +2896,26 @@ task.spawn(function()
             av.ZIndex = 5
             Instance.new("UICorner", av).CornerRadius = UDim.new(1, 0)
 
+            -- Avatar-Anchored Rank Medallion Pill (#1 / #2 / #3)
+            local medalBadge = Instance.new("TextLabel", box)
+            medalBadge.Size = UDim2.fromOffset(24, 12)
+            medalBadge.AnchorPoint = Vector2.new(0.5, 0.5)
+            medalBadge.Position = UDim2.new(0.5, 0, 0, 9 + avSize)
+            medalBadge.BackgroundColor3 = cfg.tagBg
+            medalBadge.Text = "#" .. tostring(placeNum)
+            medalBadge.TextColor3 = cfg.border
+            medalBadge.Font = Enum.Font.GothamBlack
+            medalBadge.TextSize = 7
+            medalBadge.ZIndex = 7
+            Instance.new("UICorner", medalBadge).CornerRadius = UDim.new(1, 0)
+            local mbStroke = Instance.new("UIStroke", medalBadge)
+            mbStroke.Thickness = 0.85
+            mbStroke.Color = cfg.border
+
             local tagPill = Instance.new("Frame", box)
             tagPill.Size = UDim2.new(1, -10, 0, 17)
             tagPill.AnchorPoint = Vector2.new(0.5, 0)
-            tagPill.Position = UDim2.new(0.5, 0, 0, 13 + avSize)
+            tagPill.Position = UDim2.new(0.5, 0, 0, 17 + avSize)
             tagPill.BackgroundColor3 = cfg.tagBg
             tagPill.BackgroundTransparency = 0.08
             tagPill.ZIndex = 4
@@ -2715,7 +2937,7 @@ task.spawn(function()
 
             local nameLbl = Instance.new("TextLabel", box)
             nameLbl.Size = UDim2.new(1, -8, 0, 13)
-            nameLbl.Position = UDim2.new(0, 4, 0, 32 + avSize)
+            nameLbl.Position = UDim2.new(0, 4, 0, 35 + avSize)
             nameLbl.BackgroundTransparency = 1
             nameLbl.Text = "OPEN SLOT"
             nameLbl.TextColor3 = Color3.new(1, 1, 1)
@@ -2727,7 +2949,7 @@ task.spawn(function()
             local scorePill = Instance.new("Frame", box)
             scorePill.Size = UDim2.new(0.82, 0, 0, 14)
             scorePill.AnchorPoint = Vector2.new(0.5, 1)
-            scorePill.Position = UDim2.new(0.5, 0, 1, -6)
+            scorePill.Position = UDim2.new(0.5, 0, 1, -5)
             scorePill.BackgroundColor3 = Color3.fromRGB(6, 8, 14)
             scorePill.BackgroundTransparency = 0.20
             scorePill.ZIndex = 4
@@ -2752,9 +2974,9 @@ task.spawn(function()
             return slotRef
         end
 
-        local pod2 = createPedestalSlot(2, 0.172, 0.33, 112)
-        local pod1 = createPedestalSlot(1, 0.500, 0.34, 126)
-        local pod3 = createPedestalSlot(3, 0.828, 0.33, 108)
+        local pod2 = createPedestalSlot(2, 0.172, 0.33, 114)
+        local pod1 = createPedestalSlot(1, 0.500, 0.34, 128)
+        local pod3 = createPedestalSlot(3, 0.828, 0.33, 110)
         local podiumSlots = {pod1, pod2, pod3}
 
         -- Ranked Glass Cards Scroll (#4, #5 Multi-Layer Chroma + #6 to #25)
@@ -2766,6 +2988,7 @@ task.spawn(function()
         rankScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 225, 255)
         rankScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
         rankScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        rankScroll.ZIndex = 4
 
         local rankListLayout = Instance.new("UIListLayout", rankScroll)
         rankListLayout.Padding = UDim.new(0, 5)
@@ -2778,6 +3001,7 @@ task.spawn(function()
         myRankBar.Position = UDim2.new(0.5, 0, 1, -6)
         myRankBar.BackgroundColor3 = Color3.fromRGB(12, 17, 28)
         myRankBar.BackgroundTransparency = 0.05
+        myRankBar.ZIndex = 5
         Instance.new("UICorner", myRankBar).CornerRadius = UDim.new(0, 8)
 
         local myRankStroke = Instance.new("UIStroke", myRankBar)
@@ -2794,6 +3018,7 @@ task.spawn(function()
         myRankNumLbl.Font = Enum.Font.GothamBlack
         myRankNumLbl.TextSize = 8.5
         myRankNumLbl.TextXAlignment = Enum.TextXAlignment.Left
+        myRankNumLbl.ZIndex = 6
 
         local myFooterTagPill = Instance.new("Frame", myRankBar)
         myFooterTagPill.Size = UDim2.fromOffset(102, 17)
@@ -2801,6 +3026,7 @@ task.spawn(function()
         myFooterTagPill.Position = UDim2.new(0, 52, 0.5, 0)
         myFooterTagPill.BackgroundColor3 = Color3.fromRGB(22, 28, 44)
         myFooterTagPill.BackgroundTransparency = 0.10
+        myFooterTagPill.ZIndex = 6
         Instance.new("UICorner", myFooterTagPill).CornerRadius = UDim.new(1, 0)
 
         local myFooterPillStroke = Instance.new("UIStroke", myFooterTagPill)
@@ -2827,6 +3053,7 @@ task.spawn(function()
         myRankRight.Font = Enum.Font.Code
         myRankRight.TextSize = 8.5
         myRankRight.TextXAlignment = Enum.TextXAlignment.Right
+        myRankRight.ZIndex = 6
 
         locateMeBtn.MouseButton1Click:Connect(function()
             locScale.Scale = 0.85
@@ -2956,6 +3183,7 @@ task.spawn(function()
                 row.AutoButtonColor = false
                 row.LayoutOrder = idx
                 row.ClipsDescendants = true
+                row.ZIndex = 5
                 Instance.new("UICorner", row).CornerRadius = UDim.new(0, 9)
 
                 if isMe then
@@ -3016,6 +3244,7 @@ task.spawn(function()
                 tagPill.Position = UDim2.new(0, 61, 0, 19)
                 tagPill.BackgroundColor3 = tagBgCol
                 tagPill.BackgroundTransparency = 0.08
+                tagPill.ZIndex = 6
                 Instance.new("UICorner", tagPill).CornerRadius = UDim.new(1, 0)
 
                 local tPillStroke = Instance.new("UIStroke", tagPill)
@@ -3074,19 +3303,12 @@ task.spawn(function()
                 end)
             end
 
-            -- Update Sticky Footer with Live Chroma Badge + Next Rank Gap
-            local myCfg = TOP5_PREMIUM_THEMES[myRankNum]
+            local myCfg = TOP5_PREMIUM_THEMES[myRankNum] or UNRANKED_CHROMA_CFG
             myRankNumLbl.Text = string.format("YOU #%d", myRankNum)
             myFooterChromaCtrl.setText(getTierForRank(myRankNum, rankState.activeMode))
-            if myCfg then
-                myFooterChromaCtrl.setTheme(myCfg)
-                myFooterTagPill.BackgroundColor3 = myCfg.tagBg
-                myFooterPillStroke.Color = myCfg.border
-            else
-                myFooterChromaCtrl.setTheme(UNRANKED_CHROMA_CFG)
-                myFooterTagPill.BackgroundColor3 = Color3.fromRGB(16, 24, 38)
-                myFooterPillStroke.Color = Color3.fromRGB(95, 175, 255)
-            end
+            myFooterChromaCtrl.setTheme(myCfg)
+            myFooterTagPill.BackgroundColor3 = myCfg.tagBg
+            myFooterPillStroke.Color = myCfg.border
 
             if myRankNum > 1 and sorted[myRankNum - 1] then
                 local above = sorted[myRankNum - 1]
@@ -3167,6 +3389,16 @@ task.spawn(function()
             renderLeaderboard()
         end
 
+        refreshRankBtn.MouseButton1Click:Connect(function()
+            refScale.Scale = 0.82
+            TweenService:Create(refScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+            refreshRankBtn.Rotation = 0
+            TweenService:Create(refreshRankBtn, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Rotation = 360}):Play()
+            task.spawn(function()
+                syncRankingsWithServer(true)
+            end)
+        end)
+
         local rkClock = 0
         local sparkTimer = 0
         RunService.Heartbeat:Connect(function(dt)
@@ -3181,9 +3413,14 @@ task.spawn(function()
                     rItem.grad.Rotation = (rkClock * 95 * rItem.dir) % 360
                 end
             end
-            if champSweepGrad and champSweepGrad.Parent then
-                local sw = ((rkClock * 0.45) % 2.6) - 1.3
-                champSweepGrad.Offset = Vector2.new(sw, 0)
+            for _, sItem in ipairs(podiumSweepGrads) do
+                if sItem.grad and sItem.grad.Parent then
+                    local sw = (((rkClock * 0.42) + sItem.phase) % 2.8) - 1.4
+                    sItem.grad.Offset = Vector2.new(sw, 0)
+                end
+            end
+            if holoAura and holoAura.Parent then
+                holoAura.ImageTransparency = 0.80 + ((math.sin(rkClock * 2.5) + 1) / 2) * 0.10
             end
             if champCrownLbl and champCrownLbl.Parent then
                 champCrownLbl.Position = UDim2.new(1, -5, 0, 4 + math.sin(rkClock * 3.5) * 1.5)
